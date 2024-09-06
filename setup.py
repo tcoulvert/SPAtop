@@ -4,9 +4,9 @@ setup(
     name="src",
     packages=find_packages(),
     version="0.1.0",
-    description="hhh",
-    author="Javier Duarte",
-    url="https://github.com/ucsd-hep-ex/hhh",
+    description="SPAtop",
+    author="Javier Duarte, Billy Li, Melissa Quinnan, Thomas Sievert",
+    url="https://github.com/tcoulvert/SPAtop",
     license="MIT",
     install_requires=[
         "coffea",

@@ -16,7 +16,7 @@ from src.data.delphes.matching import (
 
 vector.register_awkward()
 vector.register_numba()
-ak.numba.register()
+ak.numba.register_and_check()
 
 logging.basicConfig(level=logging.INFO)
 
@@ -30,51 +30,56 @@ def to_np_array(ak_array, max_n=10, pad=0):
     return ak.fill_none(ak.pad_none(ak_array, max_n, clip=True, axis=-1), pad).to_numpy()
 
 
-def get_datasets(arrays, n_higgs):  # noqa: C901
+def get_datasets(arrays, n_tops):  # noqa: C901
     part_pid = arrays["Particle/Particle.PID"]  # PDG ID
     part_m1 = arrays["Particle/Particle.M1"]
-    # note: see some +/-15 PDG ID particles (taus) so h->tautau is turned on
-    # explicitly mask these events out, just keeping hbb events
-    condition_hbb = np.logical_and(np.abs(part_pid) == 5, part_pid[part_m1] == 25)
-    mask_hbb = ak.count(part_pid[condition_hbb], axis=-1) == 2 * n_higgs
-    part_pid = part_pid[mask_hbb]
-    part_pt = arrays["Particle/Particle.PT"][mask_hbb]
-    part_eta = arrays["Particle/Particle.Eta"][mask_hbb]
-    part_phi = arrays["Particle/Particle.Phi"][mask_hbb]
-    part_mass = arrays["Particle/Particle.Mass"][mask_hbb]
-    part_m1 = arrays["Particle/Particle.M1"][mask_hbb]
-    part_d1 = arrays["Particle/Particle.D1"][mask_hbb]
+    # condition_hbb = np.logical_and(np.abs(part_pid) == 5, part_pid[part_m1] == 25)
+    # mask_hbb = ak.count(part_pid[condition_hbb], axis=-1) == 2 * n_tops
+    # part_pid = part_pid
+    part_pt = arrays["Particle/Particle.PT"]
+    part_eta = arrays["Particle/Particle.Eta"]
+    part_phi = arrays["Particle/Particle.Phi"]
+    part_mass = arrays["Particle/Particle.Mass"]
+    part_m1 = arrays["Particle/Particle.M1"]
+    part_d1 = arrays["Particle/Particle.D1"]
+    part_d2 = arrays["Particle/Particle.D2"]
+    print(f"top d1 = \n{part_pid[part_d1[part_pid == 6]][:, -1]}\n{'='*60}")
+    print(f"all top d1 are bjets? = {ak.all(part_pid[part_d1[part_pid == 6]][:, -1] == 5)}\n{'='*60}")
+    print(f"top d2 = \n{part_pid[part_d2[part_pid == 6]][:, -1]}\n{'='*60}")
+    print(f"all top d2 are Ws? = {ak.all((part_pid[part_d1[part_pid == 6]][:, -1] == 24) | (part_pid[part_d1[part_pid == 6]][:, -1] == -24))}\n{'='*60}")
+    print(f"non Ws top d2 = \n{part_pid[part_d1[part_pid == 6]][:, -1][(part_pid[part_d1[part_pid == 6]][:, -1] != 24) & (part_pid[part_d1[part_pid == 6]][:, -1] != -24)]}\n{'='*60}")
+    print(f"all non Ws top d2 are bjets? = {ak.all(part_pid[part_d1[part_pid == 6]][:, -1][(part_pid[part_d1[part_pid == 6]][:, -1] != 24) & (part_pid[part_d1[part_pid == 6]][:, -1] != -24)] == 5)}\n{'='*60}")
 
     # small-radius jet info
-    pt = arrays["Jet/Jet.PT"][mask_hbb]
-    eta = arrays["Jet/Jet.Eta"][mask_hbb]
-    phi = arrays["Jet/Jet.Phi"][mask_hbb]
-    mass = arrays["Jet/Jet.Mass"][mask_hbb]
-    btag = arrays["Jet/Jet.BTag"][mask_hbb]
-    flavor = arrays["Jet/Jet.Flavor"][mask_hbb]
+    pt = arrays["Jet/Jet.PT"]
+    eta = arrays["Jet/Jet.Eta"]
+    phi = arrays["Jet/Jet.Phi"]
+    mass = arrays["Jet/Jet.Mass"]
+    btag = arrays["Jet/Jet.BTag"]
+    flavor = arrays["Jet/Jet.Flavor"]
 
     # large-radius jet info
-    fj_pt = arrays["FatJet/FatJet.PT"][mask_hbb]
-    fj_eta = arrays["FatJet/FatJet.Eta"][mask_hbb]
-    fj_phi = arrays["FatJet/FatJet.Phi"][mask_hbb]
-    fj_mass = arrays["FatJet/FatJet.Mass"][mask_hbb]
-    fj_sdp4 = arrays["FatJet/FatJet.SoftDroppedP4[5]"][mask_hbb]
+    fj_pt = arrays["FatJet/FatJet.PT"]
+    fj_eta = arrays["FatJet/FatJet.Eta"]
+    fj_phi = arrays["FatJet/FatJet.Phi"]
+    fj_mass = arrays["FatJet/FatJet.Mass"]
+    fj_sdp4 = arrays["FatJet/FatJet.SoftDroppedP4[5]"]
     # first entry (i = 0) is the total SoftDropped Jet 4-momenta
     # from i = 1 to 4 are the pruned subjets 4-momenta
     fj_sdmass2 = (
         fj_sdp4.fE[..., 0] ** 2 - fj_sdp4.fP.fX[..., 0] ** 2 - fj_sdp4.fP.fY[..., 0] ** 2 - fj_sdp4.fP.fZ[..., 0] ** 2
     )
     fj_sdmass = np.sqrt(np.maximum(fj_sdmass2, 0))
-    fj_taus = arrays["FatJet/FatJet.Tau[5]"][mask_hbb]
+    fj_taus = arrays["FatJet/FatJet.Tau[5]"]
     # just saving just tau21 and tau32, can save others if useful
     fj_tau21 = np.nan_to_num(fj_taus[..., 1] / fj_taus[..., 0], nan=-1)
     fj_tau32 = np.nan_to_num(fj_taus[..., 2] / fj_taus[..., 1], nan=-1)
-    fj_charge = arrays["FatJet/FatJet.Charge"][mask_hbb]
-    fj_ehadovereem = arrays["FatJet/FatJet.EhadOverEem"][mask_hbb]
-    fj_neutralenergyfrac = arrays["FatJet/FatJet.NeutralEnergyFraction"][mask_hbb]
-    fj_chargedenergyfrac = arrays["FatJet/FatJet.ChargedEnergyFraction"][mask_hbb]
-    fj_nneutral = arrays["FatJet/FatJet.NNeutrals"][mask_hbb]
-    fj_ncharged = arrays["FatJet/FatJet.NCharged"][mask_hbb]
+    fj_charge = arrays["FatJet/FatJet.Charge"]
+    fj_ehadovereem = arrays["FatJet/FatJet.EhadOverEem"]
+    fj_neutralenergyfrac = arrays["FatJet/FatJet.NeutralEnergyFraction"]
+    fj_chargedenergyfrac = arrays["FatJet/FatJet.ChargedEnergyFraction"]
+    fj_nneutral = arrays["FatJet/FatJet.NNeutrals"]
+    fj_ncharged = arrays["FatJet/FatJet.NCharged"]
 
     particles = ak.zip(
         {
@@ -90,9 +95,9 @@ def get_datasets(arrays, n_higgs):  # noqa: C901
         with_name="Momentum4D",
     )
 
-    higgs_condition = np.logical_and(particles.pid == 25, np.abs(particles.pid[particles.d1]) == 5)
-    higgses = ak.to_regular(particles[higgs_condition], axis=1)
-    bquark_condition = np.logical_and(np.abs(particles.pid) == 5, particles.pid[particles.m1] == 25)
+    tops_condition = np.logical_and(particles.pid == 6, np.abs(particles.pid[particles.d1]) == 5)  # do we know the bquarks are going to be daughter 1?
+    topquarks = ak.to_regular(particles[tops_condition], axis=1)
+    bquark_condition = np.logical_and(np.abs(particles.pid) == 5, particles.pid[particles.m1] == 6)
     bquarks = ak.to_regular(particles[bquark_condition], axis=1)
 
     jets = ak.zip(
@@ -118,12 +123,12 @@ def get_datasets(arrays, n_higgs):  # noqa: C901
         with_name="Momentum4D",
     )
 
-    higgs_idx = match_higgs_to_jet(higgses, bquarks, jets, ak.ArrayBuilder()).snapshot()
+    higgs_idx = match_higgs_to_jet(topquarks, bquarks, jets, ak.ArrayBuilder()).snapshot()
     matched_fj_idx = match_fjet_to_jet(fjets, jets, ak.ArrayBuilder()).snapshot()
-    fj_higgs_idx = match_higgs_to_fjet(higgses, bquarks, fjets, ak.ArrayBuilder()).snapshot()
+    fj_higgs_idx = match_higgs_to_fjet(topquarks, bquarks, fjets, ak.ArrayBuilder()).snapshot()
 
     # keep events with >= min_jets small-radius jets
-    min_jets = 2 * n_higgs
+    min_jets = 2 * n_tops
     mask_minjets = ak.num(pt[pt > MIN_JET_PT]) >= min_jets
     # sort by btag first, then pt
     sorted_by_pt = ak.argsort(pt, ascending=False, axis=-1)
@@ -165,7 +170,7 @@ def get_datasets(arrays, n_higgs):  # noqa: C901
     fj_higgs_idx = fj_higgs_idx[sorted_by_fj_pt][mask_minjets]
 
     # keep only top n_fjets
-    n_fjets = n_higgs
+    n_fjets = n_tops
     fj_pt = fj_pt[:, :n_fjets]
     fj_eta = fj_eta[:, :n_fjets]
     fj_phi = fj_phi[:, :n_fjets]
@@ -182,7 +187,7 @@ def get_datasets(arrays, n_higgs):  # noqa: C901
     fj_higgs_idx = fj_higgs_idx[:, :n_fjets]
 
     # add H pT info
-    H_pt = higgses[mask_minjets].pt
+    H_pt = topquarks[mask_minjets].pt
     H_pt = ak.fill_none(ak.pad_none(H_pt, target=3, axis=1, clip=True), -1)
 
     h1_pt, bh1_pt = H_pt[:, 0], H_pt[:, 0]
@@ -198,18 +203,18 @@ def get_datasets(arrays, n_higgs):  # noqa: C901
     # index of small-radius jet if Higgs is reconstructed
     h1_bs = ak.local_index(higgs_idx)[higgs_idx == 1]
     h2_bs = ak.local_index(higgs_idx)[higgs_idx == 2]
-    if n_higgs == 3:
+    if n_tops == 3:
         h3_bs = ak.local_index(higgs_idx)[higgs_idx == 3]
 
     # index of large-radius jet if Higgs is reconstructed
     h1_bb = ak.local_index(fj_higgs_idx)[fj_higgs_idx == 1]
     h2_bb = ak.local_index(fj_higgs_idx)[fj_higgs_idx == 2]
-    if n_higgs == 3:
+    if n_tops == 3:
         h3_bb = ak.local_index(fj_higgs_idx)[fj_higgs_idx == 3]
 
     # check/fix small-radius jet truth (ensure max 2 small-radius jets per higgs)
     check = np.unique(ak.count(h1_bs, axis=-1)).to_list() + np.unique(ak.count(h2_bs, axis=-1)).to_list()
-    if n_higgs == 3:
+    if n_tops == 3:
         check += np.unique(ak.count(h3_bs, axis=-1)).to_list()
 
     if 3 in check:
@@ -217,7 +222,7 @@ def get_datasets(arrays, n_higgs):  # noqa: C901
 
     # check/fix large-radius jet truth (ensure max 1 large-radius jet per higgs)
     fj_check = np.unique(ak.count(h1_bb, axis=-1)).to_list() + np.unique(ak.count(h2_bb, axis=-1)).to_list()
-    if n_higgs == 3:
+    if n_tops == 3:
         fj_check += np.unique(ak.count(h3_bb, axis=-1)).to_list()
 
     if 2 in fj_check:
@@ -225,29 +230,29 @@ def get_datasets(arrays, n_higgs):  # noqa: C901
 
     h1_bs = ak.fill_none(ak.pad_none(h1_bs, 2, clip=True), -1)
     h2_bs = ak.fill_none(ak.pad_none(h2_bs, 2, clip=True), -1)
-    if n_higgs == 3:
+    if n_tops == 3:
         h3_bs = ak.fill_none(ak.pad_none(h3_bs, 2, clip=True), -1)
 
     h1_bb = ak.fill_none(ak.pad_none(h1_bb, 1, clip=True), -1)
     h2_bb = ak.fill_none(ak.pad_none(h2_bb, 1, clip=True), -1)
-    if n_higgs == 3:
+    if n_tops == 3:
         h3_bb = ak.fill_none(ak.pad_none(h3_bb, 1, clip=True), -1)
 
     h1_b1, h1_b2 = h1_bs[:, 0], h1_bs[:, 1]
     h2_b1, h2_b2 = h2_bs[:, 0], h2_bs[:, 1]
-    if n_higgs == 3:
+    if n_tops == 3:
         h3_b1, h3_b2 = h3_bs[:, 0], h3_bs[:, 1]
 
     # mask whether Higgs can be reconstructed as 2 small-radius jet
     h1_mask = ak.all(h1_bs != -1, axis=-1)
     h2_mask = ak.all(h2_bs != -1, axis=-1)
-    if n_higgs == 3:
+    if n_tops == 3:
         h3_mask = ak.all(h3_bs != -1, axis=-1)
 
     # mask whether Higgs can be reconstructed as 1 large-radius jet
     h1_fj_mask = ak.all(h1_bb != -1, axis=-1)
     h2_fj_mask = ak.all(h2_bb != -1, axis=-1)
-    if n_higgs == 3:
+    if n_tops == 3:
         h3_fj_mask = ak.all(h3_bb != -1, axis=-1)
 
     datasets = {}
@@ -289,7 +294,7 @@ def get_datasets(arrays, n_higgs):  # noqa: C901
     datasets["TARGETS/h2/b2"] = h2_b2.to_numpy()
     datasets["TARGETS/h2/pt"] = h2_pt.to_numpy()
 
-    if n_higgs == 3:
+    if n_tops == 3:
         datasets["TARGETS/h3/mask"] = h3_mask.to_numpy()
         datasets["TARGETS/h3/b1"] = h3_b1.to_numpy()
         datasets["TARGETS/h3/b2"] = h3_b2.to_numpy()
@@ -303,7 +308,7 @@ def get_datasets(arrays, n_higgs):  # noqa: C901
     datasets["TARGETS/bh2/bb"] = h2_bb.to_numpy().reshape(h2_fj_mask.to_numpy().shape)
     datasets["TARGETS/bh2/pt"] = bh2_pt.to_numpy()
 
-    if n_higgs == 3:
+    if n_tops == 3:
         datasets["TARGETS/bh3/mask"] = h3_fj_mask.to_numpy()
         datasets["TARGETS/bh3/bb"] = h3_bb.to_numpy().reshape(h3_fj_mask.to_numpy().shape)
         datasets["TARGETS/bh3/pt"] = bh3_pt.to_numpy()
@@ -315,18 +320,18 @@ def get_datasets(arrays, n_higgs):  # noqa: C901
 @click.argument("in-files", nargs=-1)
 @click.option(
     "--out-file",
-    default=f"{PROJECT_DIR}/data/delphes/hhh_training.h5",
+    default=f"{PROJECT_DIR}/data/delphes/tt_training.h5",
     help="Output file.",
 )
-@click.option("--train-frac", default=0.95, help="Fraction for training.")
+@click.option("--train-frac", default=0.50, help="Fraction for training.")
 @click.option(
-    "--n-higgs",
-    "n_higgs",
-    default=3,
-    type=click.IntRange(2, 3),
-    help="Number of Higgs bosons per event",
+    "--n-tops",
+    "n_tops",
+    default=2,
+    type=click.IntRange(2, 4),
+    help="Number of top quarks per event",
 )
-def main(in_files, out_file, train_frac, n_higgs):
+def main(in_files, out_file, train_frac, n_tops):
     all_datasets = {}
     for file_name in in_files:
         with uproot.open(file_name) as in_file:
@@ -344,8 +349,10 @@ def main(in_files, out_file, train_frac, n_higgs):
                 + [key for key in events.keys() if "Jet/Jet." in key]
                 + [key for key in events.keys() if "FatJet/FatJet." in key and "fBits" not in key]
             )
+            for key in keys:
+                print(f"{key}\n{'-'*60}")
             arrays = events.arrays(keys, entry_start=entry_start, entry_stop=entry_stop)
-            datasets = get_datasets(arrays, n_higgs)
+            datasets = get_datasets(arrays, n_tops)
             for dataset_name, data in datasets.items():
                 if dataset_name not in all_datasets:
                     all_datasets[dataset_name] = []
