@@ -47,6 +47,10 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     # print(f"all top d1 are bjets? = {ak.all(part_pid[part_d1[part_pid == 6]][:, -1] == 5)}\n{'='*60}")
     # print(f"top d2 = \n{part_pid[part_d2[part_pid == 6]][:, -1]}\n{'='*60}")
     # print(f"all top d2 are Ws? = {ak.all((part_pid[part_d2[part_pid == 6]][:, -1] == 24) | (part_pid[part_d2[part_pid == 6]][:, -1] == -24))}\n{'='*60}")
+    print(f"d1 of W-: \n{part_pid[part_d1[part_pid == -24]][:, -1]}\n{'='*60}")
+    print(f"d1 of W+: \n{part_pid[part_d1[part_pid == 24]][:, -1]}\n{'='*60}")
+    print(f"d2 of W-: \n{part_pid[part_d2[part_pid == -24]][:, -1]}\n{'='*60}")
+    print(f"d2 of W+: \n{part_pid[part_d2[part_pid == 24]][:, -1]}\n{'='*60}")
 
     # small-radius jet info
     pt = arrays["Jet/Jet.PT"]
@@ -123,7 +127,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         },
         with_name="Momentum4D",
     )
-    ## PICK UP FROM HERE ##
+    ## PICK UP FROM HERE ## -> working on changing the amtching to include Ws for the tops
     higgs_idx = match_higgs_to_jet(topquarks, bquarks, jets, ak.ArrayBuilder()).snapshot()
     matched_fj_idx = match_fjet_to_jet(fjets, jets, ak.ArrayBuilder()).snapshot()
     fj_higgs_idx = match_higgs_to_fjet(topquarks, bquarks, fjets, ak.ArrayBuilder()).snapshot()

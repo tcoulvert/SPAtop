@@ -12,14 +12,14 @@ FJET_DR = 0.8  # https://github.com/delphes/delphes/blob/master/cards/delphes_ca
 
 
 @nb.njit
-def match_fjet_to_higgs(higgses, bquarks, fjets, builder):
-    for higgses_event, bquarks_event, fjets_event in zip(higgses, bquarks, fjets):
+def match_fjet_to_higgs(tops, bquarks, fjets, builder):
+    for tops_event, bquarks_event, fjets_event in zip(tops, bquarks, fjets):
         builder.begin_list()
-        for higgs, higgs_idx in zip(higgses_event, higgses_event.idx):
+        for higgs, top_idx in zip(tops_event, tops_event.idx):
             match_idx = -1
             bdaughters = []
             for bquark, bquark_m1 in zip(bquarks_event, bquarks_event.m1):
-                if bquark_m1 == higgs_idx:
+                if bquark_m1 == top_idx:
                     bdaughters.append(bquark)
             for i, fjet in enumerate(fjets_event):
                 dr_h = fjet.deltaR(higgs)
@@ -33,15 +33,15 @@ def match_fjet_to_higgs(higgses, bquarks, fjets, builder):
 
 
 @nb.njit
-def match_jets_to_higgs(higgses, bquarks, jets, builder):
-    for higgses_event, bquarks_event, jets_event in zip(higgses, bquarks, jets):
+def match_jets_to_higgs(tops, bquarks, jets, builder):
+    for tops_event, bquarks_event, jets_event in zip(tops, bquarks, jets):
         builder.begin_list()
-        for _, higgs_idx in zip(higgses_event, higgses_event.idx):
+        for _, top_idx in zip(tops_event, tops_event.idx):
             match_idx_b0 = -1
             match_idx_b1 = -1
             bdaughters = []
             for bquark, bquark_m1 in zip(bquarks_event, bquarks_event.m1):
-                if bquark_m1 == higgs_idx:
+                if bquark_m1 == top_idx:
                     bdaughters.append(bquark)
             for i, jet in enumerate(jets_event):
                 dr_b0 = jet.deltaR(bdaughters[0])
@@ -60,15 +60,15 @@ def match_jets_to_higgs(higgses, bquarks, jets, builder):
 
 
 @nb.njit
-def match_higgs_to_fjet(higgses, bquarks, fjets, builder):
-    for higgses_event, bquarks_event, fjets_event in zip(higgses, bquarks, fjets):
+def match_higgs_to_fjet(tops, bquarks, fjets, builder):
+    for tops_event, bquarks_event, fjets_event in zip(tops, bquarks, fjets):
         builder.begin_list()
         for i, fjet in enumerate(fjets_event):
             match_idx = -1
-            for j, (higgs, higgs_idx) in enumerate(zip(higgses_event, higgses_event.idx)):
+            for j, (higgs, top_idx) in enumerate(zip(tops_event, tops_event.idx)):
                 bdaughters = []
                 for bquark, bquark_m1 in zip(bquarks_event, bquarks_event.m1):
-                    if bquark_m1 == higgs_idx:
+                    if bquark_m1 == top_idx:
                         bdaughters.append(bquark)
                 dr_h = fjet.deltaR(higgs)
                 dr_b0 = fjet.deltaR(bdaughters[0])
@@ -81,19 +81,37 @@ def match_higgs_to_fjet(higgses, bquarks, fjets, builder):
 
 
 @nb.njit
-def match_higgs_to_jet(higgses, bquarks, jets, builder):
-    for higgses_event, bquarks_event, jets_event in zip(higgses, bquarks, jets):
+def match_higgs_to_jet(tops, bquarks, jets, builder):
+    for tops_event, bquarks_event, jets_event in zip(tops, bquarks, jets):
         builder.begin_list()
         for i, (jet, jet_flv) in enumerate(zip(jets_event, jets_event.flavor)):
             match_idx = -1
-            for j, (_, higgs_idx) in enumerate(zip(higgses_event, higgses_event.idx)):
+            for j, (_, top_idx) in enumerate(zip(tops_event, tops_event.idx)):
                 for bquark, bquark_m1 in zip(bquarks_event, bquarks_event.m1):
-                    if bquark_m1 == higgs_idx and jet.deltaR(bquark) < JET_DR and np.abs(jet_flv) == 5:
+                    if bquark_m1 == top_idx and jet.deltaR(bquark) < JET_DR and np.abs(jet_flv) == 5:
                         match_idx = j + 1  # index higgs as 1, 2, 3
             builder.append(match_idx)
         builder.end_list()
 
-    return builder
+#     return builder
+# @nb.njit
+# def match_top_to_jet(tops, bquarks, wbosons, jets, builder):
+#     for tops_event, bquarks_event, wbosons_event, jets_event in zip(tops, bquarks, wbosons, jets):
+#         builder.begin_list()
+#         for i, (jet, jet_flv) in enumerate(zip(jets_event, jets_event.flavor)):
+#             match_idx = -1
+#             for j, (_, top_idx) in enumerate(zip(tops_event, tops_event.idx)):
+#                 for bquark, bquark_m1, wboson, wboson_m1 in zip(bquarks_event, bquarks_event.m1, wbosons_event, wbosons_event.m1):
+#                     if (
+#                         bquark_m1 == top_idx and wboson_m1 == top_idx
+#                      ) and (
+#                         jet.deltaR(bquark) < JET_DR or jet.deltaR(wboson) < JET_DR
+#                      ) and np.abs(jet_flv) == 5:
+#                         match_idx = j + 1  # index higgs as 1, 2, 3
+#             builder.append(match_idx)
+#         builder.end_list()
+
+#     return builder
 
 
 @nb.njit
