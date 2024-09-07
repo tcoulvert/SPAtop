@@ -43,12 +43,10 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     part_m1 = arrays["Particle/Particle.M1"]
     part_d1 = arrays["Particle/Particle.D1"]
     part_d2 = arrays["Particle/Particle.D2"]
-    print(f"top d1 = \n{part_pid[part_d1[part_pid == 6]][:, -1]}\n{'='*60}")
-    print(f"all top d1 are bjets? = {ak.all(part_pid[part_d1[part_pid == 6]][:, -1] == 5)}\n{'='*60}")
-    print(f"top d2 = \n{part_pid[part_d2[part_pid == 6]][:, -1]}\n{'='*60}")
-    print(f"all top d2 are Ws? = {ak.all((part_pid[part_d1[part_pid == 6]][:, -1] == 24) | (part_pid[part_d1[part_pid == 6]][:, -1] == -24))}\n{'='*60}")
-    print(f"non Ws top d2 = \n{part_pid[part_d1[part_pid == 6]][:, -1][(part_pid[part_d1[part_pid == 6]][:, -1] != 24) & (part_pid[part_d1[part_pid == 6]][:, -1] != -24)]}\n{'='*60}")
-    print(f"all non Ws top d2 are bjets? = {ak.all(part_pid[part_d1[part_pid == 6]][:, -1][(part_pid[part_d1[part_pid == 6]][:, -1] != 24) & (part_pid[part_d1[part_pid == 6]][:, -1] != -24)] == 5)}\n{'='*60}")
+    # print(f"top d1 = \n{part_pid[part_d1[part_pid == 6]][:, -1]}\n{'='*60}")
+    # print(f"all top d1 are bjets? = {ak.all(part_pid[part_d1[part_pid == 6]][:, -1] == 5)}\n{'='*60}")
+    # print(f"top d2 = \n{part_pid[part_d2[part_pid == 6]][:, -1]}\n{'='*60}")
+    # print(f"all top d2 are Ws? = {ak.all((part_pid[part_d2[part_pid == 6]][:, -1] == 24) | (part_pid[part_d2[part_pid == 6]][:, -1] == -24))}\n{'='*60}")
 
     # small-radius jet info
     pt = arrays["Jet/Jet.PT"]
@@ -90,15 +88,18 @@ def get_datasets(arrays, n_tops):  # noqa: C901
             "pid": part_pid,
             "m1": part_m1,
             "d1": part_d1,
+            "d2": part_d2,
             "idx": ak.local_index(part_pid),
         },
         with_name="Momentum4D",
     )
 
-    tops_condition = np.logical_and(particles.pid == 6, np.abs(particles.pid[particles.d1]) == 5)  # do we know the bquarks are going to be daughter 1?
+    tops_condition = np.logical_and(particles.pid == 6, np.abs(particles.pid[particles.d1]) == 5)  # do we know the bquarks are going to be daughter 1? yes, confirmed.
     topquarks = ak.to_regular(particles[tops_condition], axis=1)
     bquark_condition = np.logical_and(np.abs(particles.pid) == 5, particles.pid[particles.m1] == 6)
     bquarks = ak.to_regular(particles[bquark_condition], axis=1)
+    wbosons_condition = np.logical_and(np.abs(particles.pid) == 24, particles.pid[particles.m1] == 6)
+    wbosons = ak.to_regular(particles[wbosons_condition], axis=1)
 
     jets = ak.zip(
         {
@@ -122,7 +123,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         },
         with_name="Momentum4D",
     )
-
+    ## PICK UP FROM HERE ##
     higgs_idx = match_higgs_to_jet(topquarks, bquarks, jets, ak.ArrayBuilder()).snapshot()
     matched_fj_idx = match_fjet_to_jet(fjets, jets, ak.ArrayBuilder()).snapshot()
     fj_higgs_idx = match_higgs_to_fjet(topquarks, bquarks, fjets, ak.ArrayBuilder()).snapshot()
@@ -349,8 +350,8 @@ def main(in_files, out_file, train_frac, n_tops):
                 + [key for key in events.keys() if "Jet/Jet." in key]
                 + [key for key in events.keys() if "FatJet/FatJet." in key and "fBits" not in key]
             )
-            for key in keys:
-                print(f"{key}\n{'-'*60}")
+            # for key in keys:
+            #     print(f"{key}\n{'-'*60}")
             arrays = events.arrays(keys, entry_start=entry_start, entry_stop=entry_stop)
             datasets = get_datasets(arrays, n_tops)
             for dataset_name, data in datasets.items():
