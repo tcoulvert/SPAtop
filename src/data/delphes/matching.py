@@ -93,7 +93,26 @@ def match_higgs_to_jet(tops, bquarks, jets, builder):
             builder.append(match_idx)
         builder.end_list()
 
-#     return builder
+    return builder
+
+# Need to fix this #
+@nb.njit
+def match_wboson_to_jet(wbosons, jets, builder):
+    for wbosons_event, jets_event in zip(wbosons, jets):
+        builder.begin_list()
+        for i, jet in enumerate(jets_event):
+            match_idx = -1
+            for j, _ in enumerate(wbosons_event):
+                n_matched_quarks = 0
+                for wquark1, wquark2 in zip(wbosons_event.d1, wbosons_event.d2):
+                    if jet.deltaR(wquark1) or jet.deltaR(wquark2):
+                        n_matched_quarks += 1
+                        if n_matched_quarks == 2:
+                            match_idx = j + 1  # index higgs as 1, 2, 3
+            builder.append(match_idx)
+        builder.end_list()
+
+    return builder
 # @nb.njit
 # def match_top_to_jet(tops, bquarks, wbosons, jets, builder):
 #     for tops_event, bquarks_event, wbosons_event, jets_event in zip(tops, bquarks, wbosons, jets):
