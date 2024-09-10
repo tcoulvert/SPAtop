@@ -49,10 +49,10 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     # print(f"all top d1 are bjets? = {ak.all(part_pid[part_d1[part_pid == 6]][:, -1] == 5)}\n{'='*60}")
     # print(f"top d2 = \n{part_pid[part_d2[part_pid == 6]][:, -1]}\n{'='*60}")
     # print(f"all top d2 are Ws? = {ak.all((part_pid[part_d2[part_pid == 6]][:, -1] == 24) | (part_pid[part_d2[part_pid == 6]][:, -1] == -24))}\n{'='*60}")
-    # print(f"d1 of W-: \n{part_pid[part_d1[part_pid == -24]][:, -1]}\n{'='*60}")
-    # print(f"d1 of W+: \n{part_pid[part_d1[part_pid == 24]][:, -1]}\n{'='*60}")
-    # print(f"d2 of W-: \n{part_pid[part_d2[part_pid == -24]][:, -1]}\n{'='*60}")
-    # print(f"d2 of W+: \n{part_pid[part_d2[part_pid == 24]][:, -1]}\n{'='*60}")
+    print(f"d1 of W-: \n{part_pid[part_d1[part_pid == -24]][:, -1]}\n{'='*60}")
+    print(f"d1 of W+: \n{part_pid[part_d1[part_pid == 24]][:, -1]}\n{'='*60}")
+    print(f"d2 of W-: \n{part_pid[part_d2[part_pid == -24]][:, -1]}\n{'='*60}")
+    print(f"d2 of W+: \n{part_pid[part_d2[part_pid == 24]][:, -1]}\n{'='*60}")
     # print(f"how many None d1 of W-: \n{ak.sum(ak.is_none(part_pid[part_d1[part_pid == -24]][:, -1]))}\n{'='*60}")
     # print(f"how many None d1 of W+: \n{ak.sum(ak.is_none(part_pid[part_d1[part_pid == 24]][:, -1]))}\n{'='*60}")
     # print(f"how many None d2 of W-: \n{ak.sum(ak.is_none(part_pid[part_d2[part_pid == -24]][:, -1]))}\n{'='*60}")
@@ -107,22 +107,49 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         },
         with_name="Momentum4D",
     )
+    print(f"particles d1: \n{particles.d1}")
 
     tops_condition = np.logical_and(
-        particles.pid == 6, np.logical_and(
+        np.abs(particles.pid) == 6, np.logical_and(
             np.abs(particles.pid[particles.d1]) == 5, np.abs(particles.pid[particles.d2]) == 24
         )   # do we know the bquarks are going to be daughter 1? yes, confirmed.
     )
     topquarks = ak.to_regular(particles[tops_condition], axis=1)
-    bquark_condition = np.logical_and(np.abs(particles.pid) == 5, particles.pid[particles.m1] == 6)
+    bquark_condition = np.logical_and(np.abs(particles.pid) == 5, np.abs(particles.pid[particles.m1]) == 6)
     bquarks = ak.to_regular(particles[bquark_condition], axis=1)
-    wbosons_condition = np.logical_and(np.abs(particles.pid) == 24, particles.pid[particles.m1] == 6)
+    wbosons_condition = np.logical_and(np.abs(particles.pid) == 24, np.abs(particles.pid[particles.m1]) == 6)
     wbosons = ak.to_regular(particles[wbosons_condition], axis=1)
-    wquarks = ak.to_regular(
-        ak.zip(
-            {'d1': particles[wbosons.d1], 'd2': particles[wbosons.d2]}
+    wquarks_condition = np.logical_and(
+        np.abs(particles.pid[particles.m1]) == 24, np.logical_and(
+            particles.pid >= -6, particles.pid <= 6
         )
     )
+    wquarks = ak.to_regular(particles[wquarks_condition], axis=1)
+    # print(f"wquarks_condition: \n{wquarks_condition}")
+    print(f"wquarks: \n{particles[wquarks_condition]}")
+    print(f"wquarks nums: \n{np.unique(ak.num(particles[wquarks_condition]))}")
+    print(f"wquarks.m1: \n{wquarks.m1}")
+    print(f"wbosons.idx: \n{wbosons.idx}\n -> wbosons.idx[:,0]: {wbosons.idx[:, 0]}")
+    print(ak.zip([wbosons.idx[:, 0] for _ in range(len(wquarks.m1[0]))]))
+    print(f"wquarks from w1: \n{wquarks[wquarks.m1 > ak.zip([ak.singletons(wbosons.idx[:, 0]) for _ in range(len(wquarks.m1[0]))])]}")
+    print(f"wquarks from w2: \n{wquarks[wquarks.m1 > ak.singletons(wbosons.idx[:, 1])]}")
+    wquarks = ak.to_regular(
+        ak.zip(
+            {'d1': wquarks[wquarks.m1 == wbosons.idx[:, 0]], 'd2': wquarks[wquarks.m1 == wbosons.idx[:, 1]]}
+        )
+    )
+    # print(f"topquarks: \n{topquarks}\n{'-'*60}")
+    # print(f"num topquarks: \n{ak.num(topquarks)}\n{'-'*60}")
+    # print(f"num topquarks = n_tops?: \n{ak.all(ak.num(topquarks) == n_tops)}\n{'-'*60 + '-'*60}")
+    # print(f"bquarks: \n{bquarks}\n{'-'*60}")
+    # print(f"num bquarks: \n{ak.num(bquarks)}\n{'-'*60}")
+    # print(f"num bquarks = n_tops?: \n{ak.all(ak.num(bquarks) == n_tops)}\n{'-'*60 + '-'*60}")
+    # print(f"wbosons: \n{wbosons}\n{'-'*60}")
+    # print(f"num wbosons: \n{ak.num(wbosons)}\n{'-'*60}")
+    # print(f"num wbosons = n_tops?: \n{ak.all(ak.num(wbosons) == n_tops)}\n{'-'*60 + '-'*60}")
+    # print(f"wquarks: \n{wquarks}\n{'-'*60}")
+    # print(f"num wquarks: \n{ak.num(wquarks)}\n{'-'*60}")
+    # print(f"num wquarks = 2 * n_tops?: \n{ak.all(ak.num(wquarks.d1) == n_tops) & ak.all(ak.num(wquarks.d2) == n_tops)}\n{'-'*60}")
 
     jets = ak.zip(
         {
@@ -146,10 +173,62 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         },
         with_name="Momentum4D",
     )
-    ## PICK UP FROM HERE ## -> working on changing the amtching to include Ws for the tops
+    for tops_event, bquarks_event, wbosons_event, wquarks1_event, wquarks2_event, jets_event in zip(
+        topquarks, bquarks, wbosons, wquarks.d1, wquarks.d2, jets
+    ):
+        print(f"tops_event: \n{tops_event}\n{'-'*60}")
+        print(f"tops_event shape = {np.shape(tops_event)}\n{'-'*60}")
+        print(f"bquarks_event: \n{bquarks_event}\n{'-'*60}")
+        print(f"bquarks_event shape = {np.shape(bquarks_event)}\n{'-'*60}")
+        print(f"wbosons_event: \n{wbosons_event}\n{'-'*60}")
+        print(f"wbosons_event shape = {np.shape(wbosons_event)}\n{'-'*60}")
+        print(f"wquarks1_event: \n{wquarks1_event}\n{'-'*60}")
+        print(f"wquarks1_event shape = {np.shape(wquarks1_event)}\n{'-'*60}")
+        print(f"wquarks2_event: \n{wquarks2_event}\n{'-'*60}")
+        print(f"wquarks2_event shape = {np.shape(wquarks2_event)}\n{'-'*60}")
+        print(f"jets_event: \n{jets_event}\n{'-'*60}")
+        print(f"jets_event shape = {np.shape(jets_event)}\n{'-'*60}")
+        break
+    
+    top_idx = match_top_to_jet(topquarks, bquarks, wbosons, wquarks, jets, ak.ArrayBuilder()).snapshot()
+    top_b_idx = match_top_to_jet(topquarks, bquarks, wbosons, wquarks, jets, ak.ArrayBuilder(), match_type='b').snapshot()
+    top_q_idx = match_top_to_jet(topquarks, bquarks, wbosons, wquarks, jets, ak.ArrayBuilder(), match_type='q').snapshot()
     top_idx = match_top_to_jet(topquarks, bquarks, wbosons, wquarks, jets, ak.ArrayBuilder()).snapshot()
     matched_fj_idx = match_fjet_to_jet(fjets, jets, ak.ArrayBuilder()).snapshot()
     fj_top_idx = match_top_to_fjet(topquarks, bquarks, wbosons, wquarks, fjets, ak.ArrayBuilder()).snapshot()
+    fj_top_bqq_idx = match_top_to_fjet(topquarks, bquarks, wbosons, wquarks, fjets, ak.ArrayBuilder(), match_type='bqq').snapshot()
+    fj_top_bq_idx = match_top_to_fjet(topquarks, bquarks, wbosons, wquarks, fjets, ak.ArrayBuilder(), match_type='bq').snapshot()
+    fj_top_qq_idx = match_top_to_fjet(topquarks, bquarks, wbosons, wquarks, fjets, ak.ArrayBuilder(), match_type='qq').snapshot()
+    # print(f"fjets: \n{fjets}\n{'='*60}")
+    # print(f"empty at same places fjets-any: \n{ak.all(ak.num(fjets) == ak.num(fj_top_idx))}\n{'='*60}")
+    # print(f"empty at same places fjets-bqq: \n{ak.all(ak.num(fjets) == ak.num(fj_top_bqq_idx))}\n{'='*60}")
+    # print(f"empty at same places fjets-bq: \n{ak.all(ak.num(fjets) == ak.num(fj_top_bq_idx))}\n{'='*60}")
+    # print(f"empty at same places fjets-qq: \n{ak.all(ak.num(fjets) == ak.num(fj_top_qq_idx))}\n{'='*60}")
+    # print(f"fjet any boosted: \n{fj_top_idx}\n{'='*60}")
+    # print(f"fjet all boosted: \n{fj_top_bqq_idx}\n{'='*60}")
+    # print(f"fjet bq boosted: \n{fj_top_bq_idx}\n{'='*60}")
+    # print(f"fjet qq boosted: \n{fj_top_qq_idx}\n{'='*60}")
+    # total_arr = np.where(fj_top_idx > 0, 1, -1) + np.where(fj_top_bqq_idx > 0, 1, -1) + np.where(fj_top_bq_idx > 0, 1, -1) + np.where(fj_top_qq_idx > 0, 1, -1)
+    # print(f"only 2 arrays have fatjets: \n{ak.all((total_arr == 0) | (total_arr == -4))}\n{'='*60}")
+    # less_total_arr = np.where(fj_top_bqq_idx > 0, 1, -1) + np.where(fj_top_bq_idx > 0, 1, -1) + np.where(fj_top_qq_idx > 0, 1, -1)
+    # print(f"only 1 array has fatjets: \n{ak.all((less_total_arr == -1) | (less_total_arr == -3))}\n{'='*60}")
+    print(f"jet any: \n{top_idx}\n{'='*60}")
+    print(f"jet t->b: \n{top_b_idx}\n{'='*60}")
+    print(f"jet w->q: \n{top_q_idx}\n{'='*60}")
+    total_arr = np.where(top_idx > 0, 1, -1) + np.where(top_b_idx > 0, 1, -1) + np.where(top_q_idx > 0, 1, -1)
+    print(f"only 2 arrays have jets: \n{ak.all((total_arr == 1) | (total_arr == -3))}\n{'='*60}")
+    less_total_arr = np.where(top_b_idx > 0, 1, -1) + np.where(top_q_idx > 0, 1, -1)
+    print(f"only 1 array has jets: \n{ak.all((less_total_arr == 0) | (less_total_arr == -2))}\n{'='*60}")
+    print(f"total arr where problems: \n{ak.drop_none(ak.firsts(total_arr[(total_arr != 1) & (total_arr != -3)]))}")
+    print(f"less total arr where problems: \n{ak.drop_none(ak.firsts(less_total_arr[(less_total_arr != 0) & (less_total_arr != -2)]))}")
+    problem_indices = ak.where(
+        ak.is_none(ak.firsts(total_arr[(total_arr != 1) & (total_arr != -3)])), -1, range(len(ak.firsts(total_arr[(total_arr != 1) & (total_arr != -3)])))
+    )
+    print(f"top_idx where problems: \n{top_idx[problem_indices != -1]}")
+    print(f"top_b_idx where problems: \n{top_b_idx[problem_indices != -1]}")
+    print(f"top_q_idx where problems: \n{top_q_idx[problem_indices != -1]}")
+    print(f"fatjets where problems: \n{fj_top_idx[problem_indices != -1]}")
+
 
     # keep events with >= min_jets small-radius jets
     min_jets = 3 * n_tops
@@ -192,6 +271,9 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     fj_nneutral = fj_nneutral[sorted_by_fj_pt][mask_minjets]
     fj_ncharged = fj_ncharged[sorted_by_fj_pt][mask_minjets]
     fj_top_idx = fj_top_idx[sorted_by_fj_pt][mask_minjets]
+    fj_top_bqq_idx = fj_top_bqq_idx[sorted_by_fj_pt][mask_minjets]
+    fj_top_bq_idx = fj_top_bq_idx[sorted_by_fj_pt][mask_minjets]
+    fj_top_qq_idx = fj_top_qq_idx[sorted_by_fj_pt][mask_minjets]
 
     # keep only top n_fjets
     n_fjets = n_tops
@@ -209,6 +291,9 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     fj_nneutral = fj_nneutral[:, :n_fjets]
     fj_ncharged = fj_ncharged[:, :n_fjets]
     fj_top_idx = fj_top_idx[:, :n_fjets]
+    fj_top_bqq_idx = fj_top_bqq_idx[:, :n_fjets]
+    fj_top_bq_idx = fj_top_bq_idx[:, :n_fjets]
+    fj_top_qq_idx = fj_top_qq_idx[:, :n_fjets]
 
     # add H pT info
     top_pt = topquarks[mask_minjets].pt
@@ -217,10 +302,9 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     top_pt_dict = {}
     for i in range(n_tops):
         top_pt_dict[f"top{i+1}_pt"] = top_pt[:, i]
-        top_pt_dict[f"bqq_top{i+1}_pt"] = top_pt[:, i]
-        top_pt_dict[f"bq_top{i+1}_pt"] = top_pt[:, i]
-        top_pt_dict[f"qq_top{i+1}_pt"] = top_pt[:, i]
-    
+        top_pt_dict[f"top{i+1}_bqq_pt"] = top_pt[:, i]
+        top_pt_dict[f"top{i+1}_bq_pt"] = top_pt[:, i]
+        top_pt_dict[f"top{i+1}_qq_pt"] = top_pt[:, i]
     # h1_pt, bh1_pt = top_pt[:, 0], top_pt[:, 0]
     # h2_pt, bh2_pt = top_pt[:, 1], top_pt[:, 1]
     # if n_tops == 3:
@@ -232,33 +316,82 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     # mask to define zero-padded large-radius jets
     fj_mask = fj_pt > MIN_FJET_PT
 
-    # index of small-radius jet if Higgs is reconstructed
-    h1_bs = ak.local_index(higgs_idx)[higgs_idx == 1]
-    h2_bs = ak.local_index(higgs_idx)[higgs_idx == 2]
-    if n_tops == 3:
-        h3_bs = ak.local_index(higgs_idx)[higgs_idx == 3]
+    # index of small-radius jet if top is reconstructed
+    top_jet_idxs = {}
+    for i in range(n_tops):
+        top_jet_idxs[f"top{i+1}"] = ak.local_index(top_idx)[top_idx == i+1]
+        top_jet_idxs[f"top{i+1}_b"] = ak.local_index(top_b_idx)[top_b_idx == i+1]
+        top_jet_idxs[f"top{i+1}_q"] = ak.local_index(top_q_idx)[top_q_idx == i+1]
+    # h1_bs = ak.local_index(top_idx)[top_idx == 1]
+    # h2_bs = ak.local_index(top_idx)[top_idx == 2]
+    # if n_tops == 3:
+    #     h3_bs = ak.local_index(higgs_idx)[higgs_idx == 3]
 
     # index of large-radius jet if Higgs is reconstructed
-    h1_bb = ak.local_index(fj_higgs_idx)[fj_higgs_idx == 1]
-    h2_bb = ak.local_index(fj_higgs_idx)[fj_higgs_idx == 2]
-    if n_tops == 3:
-        h3_bb = ak.local_index(fj_higgs_idx)[fj_higgs_idx == 3]
+    top_fjet_idxs = {}
+    for i in range(n_tops):
+        top_fjet_idxs[f"top{i+1}"] = ak.local_index(fj_top_idx)[fj_top_idx == i+1]
+        top_fjet_idxs[f"top{i+1}_bqq"] = ak.local_index(fj_top_bqq_idx)[fj_top_bqq_idx == i+1]
+        top_fjet_idxs[f"top{i+1}_bq"] = ak.local_index(fj_top_bq_idx)[fj_top_bq_idx == i+1]
+        top_fjet_idxs[f"top{i+1}_qq"] = ak.local_index(fj_top_qq_idx)[fj_top_qq_idx == i+1]
+    # h1_bb = ak.local_index(fj_higgs_idx)[fj_higgs_idx == 1]
+    # h2_bb = ak.local_index(fj_higgs_idx)[fj_higgs_idx == 2]
+    # if n_tops == 3:
+    #     h3_bb = ak.local_index(fj_higgs_idx)[fj_higgs_idx == 3]
 
-    # check/fix small-radius jet truth (ensure max 2 small-radius jets per higgs)
-    check = np.unique(ak.count(h1_bs, axis=-1)).to_list() + np.unique(ak.count(h2_bs, axis=-1)).to_list()
-    if n_tops == 3:
-        check += np.unique(ak.count(h3_bs, axis=-1)).to_list()
-
-    if 3 in check:
-        logging.warning("some Higgs bosons match to 3 small-radius jets! Check truth")
+    # check/fix small-radius jet truth (ensure max 3 small-radius jets per top)
+    
+    check, check_b, check_q = [], [], []
+    for i in range(n_tops):
+        print('='*60 + '\n' + '='*60)
+        print(top_jet_idxs[f"top{i+1}"])
+        print(np.unique(ak.count(top_jet_idxs[f"top{i+1}"], axis=-1)))
+        print(top_jet_idxs[f"top{i+1}"][ak.count(top_jet_idxs[f"top{i+1}"], axis=-1) == 4])
+        print('-'*60)
+        print(top_jet_idxs[f"top{i+1}_b"])
+        print(np.unique(ak.count(top_jet_idxs[f"top{i+1}_b"], axis=-1)))
+        print(top_jet_idxs[f"top{i+1}_b"][ak.count(top_jet_idxs[f"top{i+1}_b"], axis=-1) == 2])
+        print('-'*60)
+        print(top_jet_idxs[f"top{i+1}_q"])
+        print(np.unique(ak.count(top_jet_idxs[f"top{i+1}_q"], axis=-1)))
+        print(top_jet_idxs[f"top{i+1}_q"][ak.count(top_jet_idxs[f"top{i+1}_q"], axis=-1) == 3])
+        check += np.unique(ak.count(top_jet_idxs[f"top{i+1}"], axis=-1)).to_list()
+        check_b += np.unique(ak.count(top_jet_idxs[f"top{i+1}_b"], axis=-1)).to_list()
+        check_q += np.unique(ak.count(top_jet_idxs[f"top{i+1}_q"], axis=-1)).to_list()
+    if 4 in check:
+        logging.warning(" Some tops match to 4 small-radius jets! Check truth")
+    if 2 in check_b:
+        logging.warning(" Some tops match to having 2 daughter bjets (i.e. 2 bjets directly from tops)! Check truth")
+    if 3 in check_q:
+        logging.warning(" Some tops match to having 3 W-daughter jets (i.e. 3 jets directly from Ws)! Check truth")
+    print(f"All proper numbers of jets: {ak.all(np.array(check) < 4) & ak.all(np.array(check_b) < 2) & ak.all(np.array(check_q) < 3)}")
+    # np.unique(ak.count(h1_bs, axis=-1)).to_list() + np.unique(ak.count(h2_bs, axis=-1)).to_list()
+    # if n_tops == 3:
+    #     check += np.unique(ak.count(h3_bs, axis=-1)).to_list()
+    # if 3 in check:
+    #     logging.warning("some Higgs bosons match to 3 small-radius jets! Check truth")
 
     # check/fix large-radius jet truth (ensure max 1 large-radius jet per higgs)
-    fj_check = np.unique(ak.count(h1_bb, axis=-1)).to_list() + np.unique(ak.count(h2_bb, axis=-1)).to_list()
-    if n_tops == 3:
-        fj_check += np.unique(ak.count(h3_bb, axis=-1)).to_list()
-
+    fj_check, fj_check_bqq, fj_check_bq, fj_check_qq = [], [], [], []
+    for i in range(n_tops):
+        fj_check += np.unique(ak.count(top_fjet_idxs[f"top{i+1}"], axis=-1)).to_list()
+        fj_check_bqq += np.unique(ak.count(top_fjet_idxs[f"top{i+1}_bqq"], axis=-1)).to_list()
+        fj_check_bq += np.unique(ak.count(top_fjet_idxs[f"top{i+1}_bq"], axis=-1)).to_list()
+        fj_check_qq += np.unique(ak.count(top_fjet_idxs[f"top{i+1}_qq"], axis=-1)).to_list()
     if 2 in fj_check:
-        logging.warning("some Higgs bosons match to 2 large-radius jets! Check truth")
+        logging.warning(" Some tops match to 2 large-radius jets in fj_check! Check truth")
+    if 2 in fj_check_bqq:
+        logging.warning(" Some tops match to 2 large-radius jets in fj_check_bqq! Check truth")
+    if 2 in fj_check_bq:
+        logging.warning(" Some tops match to 2 large-radius jets in fj_check_bq! Check truth")
+    if 2 in fj_check_qq:
+        logging.warning(" Some tops match to 2 large-radius jets in fj_check_qq! Check truth")
+    print(f"All proper numbers of fjets: {ak.all(np.array(fj_check) < 2) & ak.all(np.array(fj_check_bqq) < 2) & ak.all(np.array(fj_check_bq) < 2) & ak.all(np.array(fj_check_qq) < 2)}")
+    # fj_check = np.unique(ak.count(h1_bb, axis=-1)).to_list() + np.unique(ak.count(h2_bb, axis=-1)).to_list()
+    # if n_tops == 3:
+    #     fj_check += np.unique(ak.count(h3_bb, axis=-1)).to_list()
+    # if 2 in fj_check:
+    #     logging.warning("some Higgs bosons match to 2 large-radius jets! Check truth")
 
     h1_bs = ak.fill_none(ak.pad_none(h1_bs, 2, clip=True), -1)
     h2_bs = ak.fill_none(ak.pad_none(h2_bs, 2, clip=True), -1)
