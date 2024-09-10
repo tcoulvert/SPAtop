@@ -22,7 +22,7 @@ ak.numba.register_and_check()
 
 logging.basicConfig(level=logging.INFO)
 
-N_JETS = 10
+N_JETS = 16
 MIN_JET_PT = 20
 MIN_FJET_PT = 200
 PROJECT_DIR = Path(__file__).resolve().parents[3]
@@ -49,10 +49,14 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     # print(f"all top d1 are bjets? = {ak.all(part_pid[part_d1[part_pid == 6]][:, -1] == 5)}\n{'='*60}")
     # print(f"top d2 = \n{part_pid[part_d2[part_pid == 6]][:, -1]}\n{'='*60}")
     # print(f"all top d2 are Ws? = {ak.all((part_pid[part_d2[part_pid == 6]][:, -1] == 24) | (part_pid[part_d2[part_pid == 6]][:, -1] == -24))}\n{'='*60}")
-    print(f"d1 of W-: \n{part_pid[part_d1[part_pid == -24]][:, -1]}\n{'='*60}")
-    print(f"d1 of W+: \n{part_pid[part_d1[part_pid == 24]][:, -1]}\n{'='*60}")
-    print(f"d2 of W-: \n{part_pid[part_d2[part_pid == -24]][:, -1]}\n{'='*60}")
-    print(f"d2 of W+: \n{part_pid[part_d2[part_pid == 24]][:, -1]}\n{'='*60}")
+    # print(f"d1 of W-: \n{part_pid[part_d1[part_pid == -24]][:, -1]}\n{'='*60}")
+    # print(f"d1 of W+: \n{part_pid[part_d1[part_pid == 24]][:, -1]}\n{'='*60}")
+    # print(f"d2 of W-: \n{part_pid[part_d2[part_pid == -24]][:, -1]}\n{'='*60}")
+    # print(f"d2 of W+: \n{part_pid[part_d2[part_pid == 24]][:, -1]}\n{'='*60}")
+    # print(f"how many None d1 of W-: \n{ak.sum(ak.is_none(part_pid[part_d1[part_pid == -24]][:, -1]))}\n{'='*60}")
+    # print(f"how many None d1 of W+: \n{ak.sum(ak.is_none(part_pid[part_d1[part_pid == 24]][:, -1]))}\n{'='*60}")
+    # print(f"how many None d2 of W-: \n{ak.sum(ak.is_none(part_pid[part_d2[part_pid == -24]][:, -1]))}\n{'='*60}")
+    # print(f"how many None d2 of W+: \n{ak.sum(ak.is_none(part_pid[part_d2[part_pid == 24]][:, -1]))}\n{'='*60}")
 
     # small-radius jet info
     pt = arrays["Jet/Jet.PT"]
@@ -61,6 +65,10 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     mass = arrays["Jet/Jet.Mass"]
     btag = arrays["Jet/Jet.BTag"]
     flavor = arrays["Jet/Jet.Flavor"]
+    # print(f"btag = \n{btag}\n{'='*60}")
+    # print(f"btag of top d1 = \n{btag[part_d1[part_pid == 6]][:, -1]}\n{'='*60}")
+    # print(f"W- d1: \n{part_pid[part_d1[part_pid == -24]][:, -1]}\n{'='*60}")
+    # print(f"btag of W- d1: \n{btag[part_d1[part_pid == -24]][:, -1]}\n{'='*60}")
 
     # large-radius jet info
     fj_pt = arrays["FatJet/FatJet.PT"]
@@ -100,12 +108,24 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         with_name="Momentum4D",
     )
 
-    tops_condition = np.logical_and(particles.pid == 6, np.abs(particles.pid[particles.d1]) == 5)  # do we know the bquarks are going to be daughter 1? yes, confirmed.
+    tops_condition = np.logical_and(
+        particles.pid == 6, np.logical_and(
+            np.abs(particles.pid[particles.d1]) == 5, np.abs(particles.pid[particles.d2]) == 24
+        )   # do we know the bquarks are going to be daughter 1? yes, confirmed.
+    )
     topquarks = ak.to_regular(particles[tops_condition], axis=1)
+    print('not tops')
     bquark_condition = np.logical_and(np.abs(particles.pid) == 5, particles.pid[particles.m1] == 6)
     bquarks = ak.to_regular(particles[bquark_condition], axis=1)
+    print('not bs')
     wbosons_condition = np.logical_and(np.abs(particles.pid) == 24, particles.pid[particles.m1] == 6)
     wbosons = ak.to_regular(particles[wbosons_condition], axis=1)
+    print('not ws')
+    # print(np.abs(particles.pid[particles.m1]) == 24)
+    # print(particles.pid[particles.m1[particles.m1]] == 6)
+    wquarks_condition = np.abs(particles.pid[particles.m1]) == 24
+    wquarks = ak.to_regular(particles[wquarks_condition], axis=1)
+    print('not wquarks')
 
     jets = ak.zip(
         {
@@ -129,6 +149,10 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         },
         with_name="Momentum4D",
     )
+    for tops_event, bquarks_event, wbosons_event, jets_event in zip(topquarks, bquarks, wbosons, jets):
+        for i, (jet, jet_flv) in enumerate(zip(jets_event, jets_event.flavor)):
+            match_idx = -1
+            print(f"{bquarks_event}, \n{bquarks_event.m1}, \n{wquarks[:, 0]}, \n{wquarks[:, 1]}, \n{wbosons_event.m1}")
     ## PICK UP FROM HERE ## -> working on changing the amtching to include Ws for the tops
     top_idx = match_top_to_jet(topquarks, bquarks, wbosons, jets, ak.ArrayBuilder()).snapshot()
     matched_fj_idx = match_fjet_to_jet(fjets, jets, ak.ArrayBuilder()).snapshot()
@@ -174,7 +198,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     fj_chargedenergyfrac = fj_chargedenergyfrac[sorted_by_fj_pt][mask_minjets]
     fj_nneutral = fj_nneutral[sorted_by_fj_pt][mask_minjets]
     fj_ncharged = fj_ncharged[sorted_by_fj_pt][mask_minjets]
-    fj_higgs_idx = fj_higgs_idx[sorted_by_fj_pt][mask_minjets]
+    fj_top_idx = fj_top_idx[sorted_by_fj_pt][mask_minjets]
 
     # keep only top n_fjets
     n_fjets = n_tops
