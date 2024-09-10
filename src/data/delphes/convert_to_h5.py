@@ -10,8 +10,10 @@ import vector
 
 from src.data.delphes.matching import (
     match_fjet_to_jet,
-    match_higgs_to_fjet,
-    match_higgs_to_jet,
+    # match_higgs_to_fjet,
+    # match_higgs_to_jet,
+    match_top_to_fjet,
+    match_top_to_jet,
 )
 
 vector.register_awkward()
@@ -128,12 +130,12 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         with_name="Momentum4D",
     )
     ## PICK UP FROM HERE ## -> working on changing the amtching to include Ws for the tops
-    higgs_idx = match_higgs_to_jet(topquarks, bquarks, jets, ak.ArrayBuilder()).snapshot()
+    top_idx = match_top_to_jet(topquarks, bquarks, wbosons, jets, ak.ArrayBuilder()).snapshot()
     matched_fj_idx = match_fjet_to_jet(fjets, jets, ak.ArrayBuilder()).snapshot()
-    fj_higgs_idx = match_higgs_to_fjet(topquarks, bquarks, fjets, ak.ArrayBuilder()).snapshot()
+    fj_top_idx = match_top_to_fjet(topquarks, bquarks, wbosons, fjets, ak.ArrayBuilder()).snapshot()
 
     # keep events with >= min_jets small-radius jets
-    min_jets = 2 * n_tops
+    min_jets = 3 * n_tops
     mask_minjets = ak.num(pt[pt > MIN_JET_PT]) >= min_jets
     # sort by btag first, then pt
     sorted_by_pt = ak.argsort(pt, ascending=False, axis=-1)
@@ -144,7 +146,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     phi = phi[sorted][mask_minjets]
     mass = mass[sorted][mask_minjets]
     flavor = flavor[sorted][mask_minjets]
-    higgs_idx = higgs_idx[sorted][mask_minjets]
+    top_idx = top_idx[sorted][mask_minjets]
     matched_fj_idx = matched_fj_idx[sorted][mask_minjets]
 
     # keep only top N_JETS
@@ -154,7 +156,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     phi = phi[:, :N_JETS]
     mass = mass[:, :N_JETS]
     flavor = flavor[:, :N_JETS]
-    higgs_idx = higgs_idx[:, :N_JETS]
+    top_idx = top_idx[:, :N_JETS]
     matched_fj_idx = matched_fj_idx[:, :N_JETS]
 
     # sort by btag first, then pt
@@ -192,12 +194,20 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     fj_higgs_idx = fj_higgs_idx[:, :n_fjets]
 
     # add H pT info
-    H_pt = topquarks[mask_minjets].pt
-    H_pt = ak.fill_none(ak.pad_none(H_pt, target=3, axis=1, clip=True), -1)
+    top_pt = topquarks[mask_minjets].pt
+    top_pt = ak.fill_none(ak.pad_none(top_pt, target=3, axis=1, clip=True), -1)
 
-    h1_pt, bh1_pt = H_pt[:, 0], H_pt[:, 0]
-    h2_pt, bh2_pt = H_pt[:, 1], H_pt[:, 1]
-    h3_pt, bh3_pt = H_pt[:, 2], H_pt[:, 2]
+    top_pt_dict = {}
+    for i in range(n_tops):
+        top_pt_dict[f"top{i+1}_pt"] = top_pt[:, i]
+        top_pt_dict[f"bqq_top{i+1}_pt"] = top_pt[:, i]
+        top_pt_dict[f"bq_top{i+1}_pt"] = top_pt[:, i]
+        top_pt_dict[f"qq_top{i+1}_pt"] = top_pt[:, i]
+    
+    # h1_pt, bh1_pt = top_pt[:, 0], top_pt[:, 0]
+    # h2_pt, bh2_pt = top_pt[:, 1], top_pt[:, 1]
+    # if n_tops == 3:
+    #     h3_pt, bh3_pt = top_pt[:, 2], top_pt[:, 2]
 
     # mask to define zero-padded small-radius jets
     mask = pt > MIN_JET_PT
