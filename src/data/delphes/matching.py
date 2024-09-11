@@ -168,12 +168,6 @@ def match_top_to_jet(tops, bquarks, wbosons, wquarks, jets, builder, match_type=
     for tops_event, bquarks_event, wbosons_event, wquarks1_event, wquarks2_event, jets_event in zip(
         tops, bquarks, wbosons, wquarks.d1, wquarks.d2, jets
     ):
-        print(f"tops_event: \n{tops_event}\n{'-'*60}")
-        print(f"bquarks_event: \n{bquarks_event}\n{'-'*60}")
-        print(f"wbosons_event: \n{wbosons_event}\n{'-'*60}")
-        print(f"wquarks1_event: \n{wquarks1_event}\n{'-'*60}")
-        print(f"wquarks2_event: \n{wquarks2_event}\n{'-'*60}")
-        print(f"jets_event: \n{jets_event}\n{'-'*60}")
         builder.begin_list()
         for i, (jet, jet_flv) in enumerate(zip(jets_event, jets_event.flavor)):
             match_idx = -1

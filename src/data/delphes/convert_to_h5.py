@@ -49,10 +49,10 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     # print(f"all top d1 are bjets? = {ak.all(part_pid[part_d1[part_pid == 6]][:, -1] == 5)}\n{'='*60}")
     # print(f"top d2 = \n{part_pid[part_d2[part_pid == 6]][:, -1]}\n{'='*60}")
     # print(f"all top d2 are Ws? = {ak.all((part_pid[part_d2[part_pid == 6]][:, -1] == 24) | (part_pid[part_d2[part_pid == 6]][:, -1] == -24))}\n{'='*60}")
-    print(f"d1 of W-: \n{part_pid[part_d1[part_pid == -24]][:, -1]}\n{'='*60}")
-    print(f"d1 of W+: \n{part_pid[part_d1[part_pid == 24]][:, -1]}\n{'='*60}")
-    print(f"d2 of W-: \n{part_pid[part_d2[part_pid == -24]][:, -1]}\n{'='*60}")
-    print(f"d2 of W+: \n{part_pid[part_d2[part_pid == 24]][:, -1]}\n{'='*60}")
+    # print(f"d1 of W-: \n{part_pid[part_d1[part_pid == -24]][:, -1]}\n{'='*60}")
+    # print(f"d1 of W+: \n{part_pid[part_d1[part_pid == 24]][:, -1]}\n{'='*60}")
+    # print(f"d2 of W-: \n{part_pid[part_d2[part_pid == -24]][:, -1]}\n{'='*60}")
+    # print(f"d2 of W+: \n{part_pid[part_d2[part_pid == 24]][:, -1]}\n{'='*60}")
     # print(f"how many None d1 of W-: \n{ak.sum(ak.is_none(part_pid[part_d1[part_pid == -24]][:, -1]))}\n{'='*60}")
     # print(f"how many None d1 of W+: \n{ak.sum(ak.is_none(part_pid[part_d1[part_pid == 24]][:, -1]))}\n{'='*60}")
     # print(f"how many None d2 of W-: \n{ak.sum(ak.is_none(part_pid[part_d2[part_pid == -24]][:, -1]))}\n{'='*60}")
@@ -107,7 +107,6 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         },
         with_name="Momentum4D",
     )
-    print(f"particles d1: \n{particles.d1}")
 
     tops_condition = np.logical_and(
         np.abs(particles.pid) == 6, np.logical_and(
@@ -124,18 +123,48 @@ def get_datasets(arrays, n_tops):  # noqa: C901
             particles.pid >= -6, particles.pid <= 6
         )
     )
-    wquarks = ak.to_regular(particles[wquarks_condition], axis=1)
+    wquarks_temp = ak.to_regular(particles[wquarks_condition], axis=1)
+    w1_mask = wquarks_temp.m1 < np.tile(ak.singletons(wbosons.idx[:, 1]), (1, 4))
+    w2_mask = wquarks_temp.m1 >= np.tile(ak.singletons(wbosons.idx[:, 1]), (1, 4))
+    w1quarks = ak.drop_none(ak.mask(wquarks_temp, w1_mask))
+    w2quarks = ak.drop_none(ak.mask(wquarks_temp, w2_mask))
     # print(f"wquarks_condition: \n{wquarks_condition}")
-    print(f"wquarks: \n{particles[wquarks_condition]}")
-    print(f"wquarks nums: \n{np.unique(ak.num(particles[wquarks_condition]))}")
-    print(f"wquarks.m1: \n{wquarks.m1}")
-    print(f"wbosons.idx: \n{wbosons.idx}\n -> wbosons.idx[:,0]: {wbosons.idx[:, 0]}")
-    print(ak.zip([wbosons.idx[:, 0] for _ in range(len(wquarks.m1[0]))]))
-    print(f"wquarks from w1: \n{wquarks[wquarks.m1 > ak.zip([ak.singletons(wbosons.idx[:, 0]) for _ in range(len(wquarks.m1[0]))])]}")
-    print(f"wquarks from w2: \n{wquarks[wquarks.m1 > ak.singletons(wbosons.idx[:, 1])]}")
+    # print(f"wquarks: \n{particles[wquarks_condition]}")
+    # print(f"wquarks nums: \n{np.unique(ak.num(particles[wquarks_condition]))}")
+    # print(f"wquarks.m1: \n{wquarks_temp.m1}")
+    # print(f"wbosons.idx: \n{wbosons.idx}\n -> wbosons.idx[:,0]: {wbosons.idx[:, 0]}")
+    # print(np.tile(ak.singletons(wbosons.idx[:, 1]), (1, 4)))
+    # print(np.shape(np.tile(ak.singletons(wbosons.idx[:, 1]), (1, 4))))
+    # print(f"wquarks from w1: \n{wquarks_temp[wquarks_temp.m1 < np.tile(ak.singletons(wbosons.idx[:, 1]), (1, 4))]}")
+    # print(f"wquarks from w2: \n{wquarks_temp[wquarks_temp.m1 > np.tile(ak.singletons(wbosons.idx[:, 1]), (1, 4))]}")
+    # print(f"wquarks.m1: \n{wquarks_temp.m1}\n{'-'*60}")
+    # print(f"w2_idx: \n{np.tile(ak.singletons(wbosons.idx[:, 1]), (1, 4))}\n{'-'*60}")
+    # print(f"w1_mask -> wquarks.m1 < w2_idx: \n{w1_mask}\n{'-'*60}")
+    # print(f"w2_mask -> wquarks.m1 > w2_idx: \n{w2_mask}\n{'-'*60}")
+    # print(f"masks or = {ak.all(w1_mask | w2_mask)}")
+    # bad_idxs = ~(w1_mask | w2_mask)
+    # print(f"masks not or \n-> w1mask: \n{w1_mask[bad_idxs]}\n-> w2mask: \n{w2_mask[bad_idxs]}")
+    # print(f"wquarks.m1[bad_idxs]: \n{wquarks_temp.m1[bad_idxs]}")
+    # print(f"wbosons.idx[bad_idxs]: \n{np.tile(ak.singletons(wbosons.idx[:, 1]), (1, 4))[bad_idxs]}")
+    # print(f"wquarks.pid[bad_idxs]: \n{wquarks_temp.pid[bad_idxs]}")
+    # print(f"wbosons.pid[bad_idxs]: \n{np.tile(ak.singletons(wbosons.pid[:, 1]), (1, 4))[bad_idxs]}")
+    # print(f"masks and = {ak.all(~(w1_mask & w2_mask))}")
+    # print(f"masks both = {ak.all(w1_mask | w2_mask) & ak.all(~(w1_mask & w2_mask))}")
+    # print(f"w1quarks shape: ({ak.num(w1quarks, axis=0)}, {np.unique(ak.num(w1quarks))})")
+    # print(f"w2quarks shape: ({ak.num(w2quarks, axis=0)}, {np.unique(ak.num(w2quarks))})")
+    # print(f"w1quarks: \n{w1quarks}\n{'-'*60}")
+    # print(f"w2quarks: \n{w2quarks}\n{'-'*60}")
+    # print(f"w1quarks.d1: \n{w1quarks[:, 0]}")
+    # print(f"ak.singletons(w1quarks.d1): \n{ak.singletons(w1quarks[:, 0])}")
+    # print(f"concat lists: \n{ak.concatenate([ak.singletons(w1quarks[:, 0]), ak.singletons(w2quarks[:, 0])], axis=1)}")
+    # concat_temp = ak.concatenate([ak.singletons(w1quarks[:, 0]), ak.singletons(w2quarks[:, 0])], axis=1)
+    # print(f"concat lists shape = ({ak.num(concat_temp, axis=0)}, {np.unique(ak.num(concat_temp))})")
     wquarks = ak.to_regular(
         ak.zip(
-            {'d1': wquarks[wquarks.m1 == wbosons.idx[:, 0]], 'd2': wquarks[wquarks.m1 == wbosons.idx[:, 1]]}
+            {
+                'd1': ak.concatenate([ak.singletons(w1quarks[:, 0]), ak.singletons(w2quarks[:, 0])], axis=1), 
+                'd2': ak.concatenate([ak.singletons(w1quarks[:, 1]), ak.singletons(w2quarks[:, 1])], axis=1)
+            }
         )
     )
     # print(f"topquarks: \n{topquarks}\n{'-'*60}")
@@ -173,22 +202,6 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         },
         with_name="Momentum4D",
     )
-    for tops_event, bquarks_event, wbosons_event, wquarks1_event, wquarks2_event, jets_event in zip(
-        topquarks, bquarks, wbosons, wquarks.d1, wquarks.d2, jets
-    ):
-        print(f"tops_event: \n{tops_event}\n{'-'*60}")
-        print(f"tops_event shape = {np.shape(tops_event)}\n{'-'*60}")
-        print(f"bquarks_event: \n{bquarks_event}\n{'-'*60}")
-        print(f"bquarks_event shape = {np.shape(bquarks_event)}\n{'-'*60}")
-        print(f"wbosons_event: \n{wbosons_event}\n{'-'*60}")
-        print(f"wbosons_event shape = {np.shape(wbosons_event)}\n{'-'*60}")
-        print(f"wquarks1_event: \n{wquarks1_event}\n{'-'*60}")
-        print(f"wquarks1_event shape = {np.shape(wquarks1_event)}\n{'-'*60}")
-        print(f"wquarks2_event: \n{wquarks2_event}\n{'-'*60}")
-        print(f"wquarks2_event shape = {np.shape(wquarks2_event)}\n{'-'*60}")
-        print(f"jets_event: \n{jets_event}\n{'-'*60}")
-        print(f"jets_event shape = {np.shape(jets_event)}\n{'-'*60}")
-        break
     
     top_idx = match_top_to_jet(topquarks, bquarks, wbosons, wquarks, jets, ak.ArrayBuilder()).snapshot()
     top_b_idx = match_top_to_jet(topquarks, bquarks, wbosons, wquarks, jets, ak.ArrayBuilder(), match_type='b').snapshot()
@@ -228,7 +241,6 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     print(f"top_b_idx where problems: \n{top_b_idx[problem_indices != -1]}")
     print(f"top_q_idx where problems: \n{top_q_idx[problem_indices != -1]}")
     print(f"fatjets where problems: \n{fj_top_idx[problem_indices != -1]}")
-
 
     # keep events with >= min_jets small-radius jets
     min_jets = 3 * n_tops
