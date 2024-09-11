@@ -128,6 +128,12 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     w2_mask = wquarks_temp.m1 >= np.tile(ak.singletons(wbosons.idx[:, 1]), (1, 4))
     w1quarks = ak.drop_none(ak.mask(wquarks_temp, w1_mask))
     w2quarks = ak.drop_none(ak.mask(wquarks_temp, w2_mask))
+    wquarks_d1 = ak.to_regular(
+        ak.concatenate([ak.singletons(w1quarks[:, 0]), ak.singletons(w2quarks[:, 0])], axis=1), axis=1
+    )
+    wquarks_d2 = ak.to_regular(
+        ak.concatenate([ak.singletons(w1quarks[:, 1]), ak.singletons(w2quarks[:, 1])], axis=1), axis=1
+    )
     # print(f"wquarks_condition: \n{wquarks_condition}")
     # print(f"wquarks: \n{particles[wquarks_condition]}")
     # print(f"wquarks nums: \n{np.unique(ak.num(particles[wquarks_condition]))}")
@@ -159,14 +165,14 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     # print(f"concat lists: \n{ak.concatenate([ak.singletons(w1quarks[:, 0]), ak.singletons(w2quarks[:, 0])], axis=1)}")
     # concat_temp = ak.concatenate([ak.singletons(w1quarks[:, 0]), ak.singletons(w2quarks[:, 0])], axis=1)
     # print(f"concat lists shape = ({ak.num(concat_temp, axis=0)}, {np.unique(ak.num(concat_temp))})")
-    wquarks = ak.to_regular(
-        ak.zip(
-            {
-                'd1': ak.concatenate([ak.singletons(w1quarks[:, 0]), ak.singletons(w2quarks[:, 0])], axis=1), 
-                'd2': ak.concatenate([ak.singletons(w1quarks[:, 1]), ak.singletons(w2quarks[:, 1])], axis=1)
-            }
-        )
-    )
+    # wquarks = ak.to_regular(
+    #     ak.zip(
+    #         {
+    #             'd1': ak.concatenate([ak.singletons(w1quarks[:, 0]), ak.singletons(w2quarks[:, 0])], axis=1), 
+    #             'd2': ak.concatenate([ak.singletons(w1quarks[:, 1]), ak.singletons(w2quarks[:, 1])], axis=1)
+    #         }
+    #     )
+    # )
     # print(f"topquarks: \n{topquarks}\n{'-'*60}")
     # print(f"num topquarks: \n{ak.num(topquarks)}\n{'-'*60}")
     # print(f"num topquarks = n_tops?: \n{ak.all(ak.num(topquarks) == n_tops)}\n{'-'*60 + '-'*60}")
@@ -202,29 +208,32 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         },
         with_name="Momentum4D",
     )
-    
-    top_idx = match_top_to_jet(topquarks, bquarks, wbosons, wquarks, jets, ak.ArrayBuilder()).snapshot()
-    top_b_idx = match_top_to_jet(topquarks, bquarks, wbosons, wquarks, jets, ak.ArrayBuilder(), match_type='b').snapshot()
-    top_q_idx = match_top_to_jet(topquarks, bquarks, wbosons, wquarks, jets, ak.ArrayBuilder(), match_type='q').snapshot()
-    top_idx = match_top_to_jet(topquarks, bquarks, wbosons, wquarks, jets, ak.ArrayBuilder()).snapshot()
+    # print(f"wquarks pid: \n{wquarks_d1.pid}")
+    # print(f"wquarks pid: \n{(wquarks_d1[0]).pid}")
+    # for quark in wquarks_d1:
+    #     print(quark.pid)
+    #     break
+    top_b_idx, top_q_idx = match_top_to_jet(topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2, jets, ak.ArrayBuilder(), ak.ArrayBuilder())
+    top_b_idx, top_q_idx = top_b_idx.snapshot(), top_q_idx.snapshot()
+    top_idx = np.where(top_b_idx != -1, top_b_idx, top_q_idx)
     matched_fj_idx = match_fjet_to_jet(fjets, jets, ak.ArrayBuilder()).snapshot()
-    fj_top_idx = match_top_to_fjet(topquarks, bquarks, wbosons, wquarks, fjets, ak.ArrayBuilder()).snapshot()
-    fj_top_bqq_idx = match_top_to_fjet(topquarks, bquarks, wbosons, wquarks, fjets, ak.ArrayBuilder(), match_type='bqq').snapshot()
-    fj_top_bq_idx = match_top_to_fjet(topquarks, bquarks, wbosons, wquarks, fjets, ak.ArrayBuilder(), match_type='bq').snapshot()
-    fj_top_qq_idx = match_top_to_fjet(topquarks, bquarks, wbosons, wquarks, fjets, ak.ArrayBuilder(), match_type='qq').snapshot()
-    # print(f"fjets: \n{fjets}\n{'='*60}")
-    # print(f"empty at same places fjets-any: \n{ak.all(ak.num(fjets) == ak.num(fj_top_idx))}\n{'='*60}")
-    # print(f"empty at same places fjets-bqq: \n{ak.all(ak.num(fjets) == ak.num(fj_top_bqq_idx))}\n{'='*60}")
-    # print(f"empty at same places fjets-bq: \n{ak.all(ak.num(fjets) == ak.num(fj_top_bq_idx))}\n{'='*60}")
-    # print(f"empty at same places fjets-qq: \n{ak.all(ak.num(fjets) == ak.num(fj_top_qq_idx))}\n{'='*60}")
-    # print(f"fjet any boosted: \n{fj_top_idx}\n{'='*60}")
-    # print(f"fjet all boosted: \n{fj_top_bqq_idx}\n{'='*60}")
-    # print(f"fjet bq boosted: \n{fj_top_bq_idx}\n{'='*60}")
-    # print(f"fjet qq boosted: \n{fj_top_qq_idx}\n{'='*60}")
-    # total_arr = np.where(fj_top_idx > 0, 1, -1) + np.where(fj_top_bqq_idx > 0, 1, -1) + np.where(fj_top_bq_idx > 0, 1, -1) + np.where(fj_top_qq_idx > 0, 1, -1)
-    # print(f"only 2 arrays have fatjets: \n{ak.all((total_arr == 0) | (total_arr == -4))}\n{'='*60}")
-    # less_total_arr = np.where(fj_top_bqq_idx > 0, 1, -1) + np.where(fj_top_bq_idx > 0, 1, -1) + np.where(fj_top_qq_idx > 0, 1, -1)
-    # print(f"only 1 array has fatjets: \n{ak.all((less_total_arr == -1) | (less_total_arr == -3))}\n{'='*60}")
+    fj_top_idx = match_top_to_fjet(topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2, fjets, ak.ArrayBuilder()).snapshot()
+    fj_top_bqq_idx = match_top_to_fjet(topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2, fjets, ak.ArrayBuilder(), match_type='bqq').snapshot()
+    fj_top_bq_idx = match_top_to_fjet(topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2, fjets, ak.ArrayBuilder(), match_type='bq').snapshot()
+    fj_top_qq_idx = match_top_to_fjet(topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2, fjets, ak.ArrayBuilder(), match_type='qq').snapshot()
+    print(f"fjets: \n{fjets}\n{'='*60}")
+    print(f"empty at same places fjets-any: \n{ak.all(ak.num(fjets) == ak.num(fj_top_idx))}\n{'='*60}")
+    print(f"empty at same places fjets-bqq: \n{ak.all(ak.num(fjets) == ak.num(fj_top_bqq_idx))}\n{'='*60}")
+    print(f"empty at same places fjets-bq: \n{ak.all(ak.num(fjets) == ak.num(fj_top_bq_idx))}\n{'='*60}")
+    print(f"empty at same places fjets-qq: \n{ak.all(ak.num(fjets) == ak.num(fj_top_qq_idx))}\n{'='*60}")
+    print(f"fjet any boosted: \n{fj_top_idx}\n{'='*60}")
+    print(f"fjet all boosted: \n{fj_top_bqq_idx}\n{'='*60}")
+    print(f"fjet bq boosted: \n{fj_top_bq_idx}\n{'='*60}")
+    print(f"fjet qq boosted: \n{fj_top_qq_idx}\n{'='*60}")
+    total_arr = np.where(fj_top_idx > 0, 1, -1) + np.where(fj_top_bqq_idx > 0, 1, -1) + np.where(fj_top_bq_idx > 0, 1, -1) + np.where(fj_top_qq_idx > 0, 1, -1)
+    print(f"only 2 arrays have fatjets: \n{ak.all((total_arr == 0) | (total_arr == -4))}\n{'='*60}")
+    less_total_arr = np.where(fj_top_bqq_idx > 0, 1, -1) + np.where(fj_top_bq_idx > 0, 1, -1) + np.where(fj_top_qq_idx > 0, 1, -1)
+    print(f"only 1 array has fatjets: \n{ak.all((less_total_arr == -1) | (less_total_arr == -3))}\n{'='*60}")
     print(f"jet any: \n{top_idx}\n{'='*60}")
     print(f"jet t->b: \n{top_b_idx}\n{'='*60}")
     print(f"jet w->q: \n{top_q_idx}\n{'='*60}")
