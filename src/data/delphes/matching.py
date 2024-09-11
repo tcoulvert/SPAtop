@@ -113,14 +113,73 @@ def match_jets_to_higgs(tops, bquarks, jets, builder):
 #     return builder
 
 
+# @nb.njit
+# def match_top_to_fjet(
+#     tops, bquarks, wbosons, wquarks_d1, wquarks_d2, fjets, 
+#     builder, match_type='none'
+# ):
+#     for tops_event, bquarks_event, wbosons_event, wquarks1_event, wquarks2_event, fjets_event in zip(
+#         tops, bquarks, wbosons, wquarks_d1, wquarks_d2, fjets
+#     ):
+#         builder.begin_list()
+#         for i, fjet in enumerate(fjets_event):
+#             match_idx = -1
+#             for j, (top, top_idx) in enumerate(zip(tops_event, tops_event.idx)):
+#                 bdaughter = []
+#                 wdaughters = []
+#                 for bquark, bquark_m1, wboson_d1, wboson_d2, wboson_m1 in zip(
+#                     bquarks_event, bquarks_event.m1, 
+#                     wquarks1_event, wquarks2_event, wbosons_event.m1
+#                 ):
+#                     if bquark_m1 == top_idx:
+#                         bdaughter.append(bquark)
+#                     if wboson_m1 == top_idx:
+#                         wdaughters.extend([wboson_d1, wboson_d2])
+#                 dr_t = fjet.deltaR(top)
+#                 dr_b = fjet.deltaR(bdaughter[0])
+#                 dr_w1 = fjet.deltaR(wdaughters[0])
+#                 dr_w2 = fjet.deltaR(wdaughters[1])
+#                 if not dr_t < FJET_DR:
+#                     continue
+#                 if match_type == 'bqq':
+#                     if dr_b < FJET_DR and dr_w1 < FJET_DR and dr_w2 < FJET_DR:
+#                         match_idx = j + 1  # index top as 1, 2, 3
+#                 elif match_type == 'qq':
+#                     if not (dr_b < FJET_DR) and dr_w1 < FJET_DR and dr_w2 < FJET_DR:
+#                         match_idx = j + 1  # index top as 1, 2, 3
+#                 elif match_type == 'bq':
+#                     if (
+#                         dr_b < FJET_DR and dr_w1 < FJET_DR and not (dr_w2 < FJET_DR)
+#                     ) or (
+#                         dr_b < FJET_DR and not (dr_w1 < FJET_DR) and dr_w2 < FJET_DR
+#                     ):
+#                         match_idx = j + 1  # index top as 1, 2, 3
+#                 else:
+#                     if (
+#                         dr_b < FJET_DR and dr_w1 < FJET_DR
+#                     ) or (
+#                         dr_b < FJET_DR and dr_w2 < FJET_DR
+#                     ) or (
+#                         dr_w1 < FJET_DR and dr_w2 < FJET_DR
+#                     ):
+#                         match_idx = j + 1  # index top as 1, 2, 3
+#             builder.append(match_idx)
+#         builder.end_list()
+#     return builder
+
 @nb.njit
-def match_top_to_fjet(tops, bquarks, wbosons, wquarks_d1, wquarks_d2, fjets, builder, match_type='none'):
+def match_top_to_fjet(
+    tops, bquarks, wbosons, wquarks_d1, wquarks_d2, fjets, 
+    all_fjet_builder, bqq_fjet_builder, bq_fjet_builder, qq_fjet_builder):
     for tops_event, bquarks_event, wbosons_event, wquarks1_event, wquarks2_event, fjets_event in zip(
         tops, bquarks, wbosons, wquarks_d1, wquarks_d2, fjets
     ):
-        builder.begin_list()
+        all_fjet_builder.begin_list()
+        bqq_fjet_builder.begin_list()
+        bq_fjet_builder.begin_list()
+        qq_fjet_builder.begin_list()
         for i, fjet in enumerate(fjets_event):
-            match_idx = -1
+            all_match_idx, bqq_match_idx, bqq_match_idx, bqq_match_idx = -1, -1, -1, -1
             for j, (top, top_idx) in enumerate(zip(tops_event, tops_event.idx)):
                 bdaughter = []
                 wdaughters = []
@@ -136,37 +195,51 @@ def match_top_to_fjet(tops, bquarks, wbosons, wquarks_d1, wquarks_d2, fjets, bui
                 dr_b = fjet.deltaR(bdaughter[0])
                 dr_w1 = fjet.deltaR(wdaughters[0])
                 dr_w2 = fjet.deltaR(wdaughters[1])
-                if not dr_t < FJET_DR:
+
+                if not dr_t < FJET_DR:  # top isnt in fatjet, so ignore
                     continue
-                if match_type == 'bqq':
-                    if dr_b < FJET_DR and dr_w1 < FJET_DR and dr_w2 < FJET_DR:
-                        match_idx = j + 1  # index top as 1, 2, 3
-                elif match_type == 'qq':
-                    if not (dr_b < FJET_DR) and dr_w1 < FJET_DR and dr_w2 < FJET_DR:
-                        match_idx = j + 1  # index top as 1, 2, 3
-                elif match_type == 'bq':
-                    if (
-                        dr_b < FJET_DR and dr_w1 < FJET_DR and not (dr_w2 < FJET_DR)
-                    ) or (
-                        dr_b < FJET_DR and not (dr_w1 < FJET_DR) and dr_w2 < FJET_DR
-                    ):
-                        match_idx = j + 1  # index top as 1, 2, 3
-                else:
-                    if (
-                        dr_b < FJET_DR and dr_w1 < FJET_DR
-                    ) or (
-                        dr_b < FJET_DR and dr_w2 < FJET_DR
-                    ) or (
-                        dr_w1 < FJET_DR and dr_w2 < FJET_DR
-                    ):
-                        match_idx = j + 1  # index top as 1, 2, 3
-            builder.append(match_idx)
-        builder.end_list()
-    return builder
+                bqq_match_bool = (
+                    dr_b < FJET_DR and dr_w1 < FJET_DR and dr_w2 < FJET_DR
+                )
+                bq_match_bool = (
+                    dr_b < FJET_DR and dr_w1 < FJET_DR and (not dr_w2 < FJET_DR)
+                ) or (
+                    dr_b < FJET_DR and (not dr_w1 < FJET_DR) and dr_w2 < FJET_DR
+                )
+                qq_match_bool = (
+                    (not dr_b < FJET_DR) and dr_w1 < FJET_DR and dr_w2 < FJET_DR
+                )
+                
+                if bqq_match_bool or bq_match_bool or qq_match_bool:
+                    all_match_idx = j + 1  # index top as 1, 2, 3
+                    break
+                if bqq_match_bool:
+                    bqq_match_idx = j + 1  # index top as 1, 2, 3
+                    break
+                elif bq_match_bool:
+                    bq_match_idx = j + 1  # index top as 1, 2, 3
+                    break
+                elif qq_match_bool:
+                    qq_match_idx = j + 1  # index top as 1, 2, 3
+                    break
+            all_fjet_builder.append(all_match_idx)
+            bqq_fjet_builder.append(bqq_match_idx)
+            bq_fjet_builder.append(bq_match_idx)
+            qq_fjet_builder.append(qq_match_idx)
+
+        all_fjet_builder.end_list()
+        bqq_fjet_builder.end_list()
+        bq_fjet_builder.end_list()
+        qq_fjet_builder.end_list()
+
+    return all_fjet_builder, bqq_fjet_builder, bq_fjet_builder, qq_fjet_builder
 
 
 @nb.njit
-def match_top_to_jet(tops, bquarks, wbosons, wquarks_d1, wquarks_d2, jets, alljet_builder, bjet_builder, wjet_builder):
+def match_top_to_jet(
+    tops, bquarks, wbosons, wquarks_d1, wquarks_d2, jets, 
+    alljet_builder, bjet_builder, wjet_builder
+):
     for tops_event, bquarks_event, wbosons_event, wquarks1_event, wquarks2_event, jets_event in zip(
         tops, bquarks, wbosons, wquarks_d1, wquarks_d2, jets
     ):
@@ -174,45 +247,42 @@ def match_top_to_jet(tops, bquarks, wbosons, wquarks_d1, wquarks_d2, jets, allje
         bjet_builder.begin_list()
         wjet_builder.begin_list()
         for i, (jet, jet_flv) in enumerate(zip(jets_event, jets_event.flavor)):
-            for j, (top_idx, bquark, bquark_m1, wquark1, wquark1_pid, wquark2, wquark2_pid, wboson_m1) in enumerate(zip(
-                tops_event.idx,
-                bquarks_event, bquarks_event.m1,
-                wquarks1_event, wquarks1_event.pid, 
-                wquarks2_event, wquarks2_event.pid, wbosons_event.m1
-            )):
-                bquark_match_bool = (bquark_m1 == top_idx) and (
-                    jet.deltaR(bquark) < JET_DR and np.abs(jet_flv) == 5
-                )  # conditions for bjet match
-                wquark_match_bool = (wboson_m1 == top_idx) and (
-                    (
-                        jet.deltaR(wquark1) < JET_DR and np.abs(jet_flv) == np.abs(wquark1_pid)
-                    ) or (
-                        jet.deltaR(wquark2) < JET_DR and np.abs(jet_flv) == np.abs(wquark2_pid)
-                    )
-                )  # conditions for wjet match
+            alljet_match_idx, bjet_match_idx, wjet_match_idx = -1, -1, -1
+            for j, (_, top_idx) in enumerate(zip(tops_event, tops_event.idx)):
+                for bquark, bquark_m1, wquark1, wquark1_pid, wquark2, wquark2_pid, wboson_m1 in zip(
+                    bquarks_event, bquarks_event.m1,
+                    wquarks1_event, wquarks1_event.pid, 
+                    wquarks2_event, wquarks2_event.pid, wbosons_event.m1
+                ):
+                    bquark_match_bool = (bquark_m1 == top_idx) and (
+                        jet.deltaR(bquark) < JET_DR and np.abs(jet_flv) == 5
+                    )  # conditions for bjet match
+                    wquark_match_bool = (wboson_m1 == top_idx) and (
+                        (
+                            jet.deltaR(wquark1) < JET_DR and np.abs(jet_flv) == np.abs(wquark1_pid)
+                        ) or (
+                            jet.deltaR(wquark2) < JET_DR and np.abs(jet_flv) == np.abs(wquark2_pid)
+                        )
+                    )  # conditions for wjet match
 
-                if bquark_match_bool or wquark_match_bool:
-                    alljet_builder.append(j + 1)  # index top as 1, 2, 3
-                else:
-                    alljet_builder.append(-1)
+                    if bquark_match_bool or wquark_match_bool:
+                        alljet_match_idx = j + 1  # index top as 1, 2, 3
+                    if bquark_match_bool and not wquark_match_bool:
+                        bjet_match_idx = j + 1  # index top as 1, 2, 3
+                        break
+                    elif not bquark_match_bool and wquark_match_bool:
+                        wjet_match_idx = j + 1  # index top as 1, 2, 3
+                        break
+                    elif bquark_match_bool and wquark_match_bool:
+                        if jet.deltaR(bquark) < jet.deltaR(wquark1) and jet.deltaR(bquark) < jet.deltaR(wquark2):
+                            bjet_match_idx = j + 1  # index top as 1, 2, 3
+                            break
+                        else:
+                            wjet_match_idx = j + 1  # index top as 1, 2, 3
+                            break
+                bjet_builder.append(bjet_match_idx)
+                wjet_builder.append(wjet_match_idx)
 
-                if bquark_match_bool and not wquark_match_bool:
-                    bjet_builder.append(j + 1)  # index top as 1, 2, 3
-                    wjet_builder.append(-1)
-                elif not bquark_match_bool and wquark_match_bool:
-                    wjet_builder.append(j + 1)  # index top as 1, 2, 3
-                    bjet_builder.append(-1)
-                elif bquark_match_bool and wquark_match_bool:
-                    if jet.deltaR(bquark) < jet.deltaR(wquark1) or jet.deltaR(bquark) < jet.deltaR(wquark2):
-                        bjet_builder.append(j + 1)  # index top as 1, 2, 3
-                        wjet_builder.append(-1)
-                    else:
-                        wjet_builder.append(j + 1)  # index top as 1, 2, 3
-                        bjet_builder.append(-1)
-                else:
-                    wjet_builder.append(-1)  # index top as 1, 2, 3
-                    bjet_builder.append(-1)
-                    
         alljet_builder.end_list()
         bjet_builder.end_list()
         wjet_builder.end_list()
