@@ -213,9 +213,11 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     # for quark in wquarks_d1:
     #     print(quark.pid)
     #     break
-    top_b_idx, top_q_idx = match_top_to_jet(topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2, jets, ak.ArrayBuilder(), ak.ArrayBuilder())
-    top_b_idx, top_q_idx = top_b_idx.snapshot(), top_q_idx.snapshot()
-    top_idx = np.where(top_b_idx != -1, top_b_idx, top_q_idx)
+    top_idx, top_b_idx, top_q_idx = match_top_to_jet(
+        topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2, jets, 
+        ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder()
+    )
+    top_idx, top_b_idx, top_q_idx = top_idx.snapshot(), top_b_idx.snapshot(), top_q_idx.snapshot()
     matched_fj_idx = match_fjet_to_jet(fjets, jets, ak.ArrayBuilder()).snapshot()
     fj_top_idx = match_top_to_fjet(topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2, fjets, ak.ArrayBuilder()).snapshot()
     fj_top_bqq_idx = match_top_to_fjet(topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2, fjets, ak.ArrayBuilder(), match_type='bqq').snapshot()
@@ -364,18 +366,18 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     
     check, check_b, check_q = [], [], []
     for i in range(n_tops):
-        print('='*60 + '\n' + '='*60)
-        print(top_jet_idxs[f"top{i+1}"])
-        print(np.unique(ak.count(top_jet_idxs[f"top{i+1}"], axis=-1)))
-        print(top_jet_idxs[f"top{i+1}"][ak.count(top_jet_idxs[f"top{i+1}"], axis=-1) == 4])
-        print('-'*60)
-        print(top_jet_idxs[f"top{i+1}_b"])
-        print(np.unique(ak.count(top_jet_idxs[f"top{i+1}_b"], axis=-1)))
-        print(top_jet_idxs[f"top{i+1}_b"][ak.count(top_jet_idxs[f"top{i+1}_b"], axis=-1) == 2])
-        print('-'*60)
-        print(top_jet_idxs[f"top{i+1}_q"])
-        print(np.unique(ak.count(top_jet_idxs[f"top{i+1}_q"], axis=-1)))
-        print(top_jet_idxs[f"top{i+1}_q"][ak.count(top_jet_idxs[f"top{i+1}_q"], axis=-1) == 3])
+        # print('='*60 + '\n' + '='*60)
+        # print(top_jet_idxs[f"top{i+1}"])
+        # print(np.unique(ak.count(top_jet_idxs[f"top{i+1}"], axis=-1)))
+        # print(top_jet_idxs[f"top{i+1}"][ak.count(top_jet_idxs[f"top{i+1}"], axis=-1) == 4])
+        # print('-'*60)
+        # print(top_jet_idxs[f"top{i+1}_b"])
+        # print(np.unique(ak.count(top_jet_idxs[f"top{i+1}_b"], axis=-1)))
+        # print(top_jet_idxs[f"top{i+1}_b"][ak.count(top_jet_idxs[f"top{i+1}_b"], axis=-1) == 2])
+        # print('-'*60)
+        # print(top_jet_idxs[f"top{i+1}_q"])
+        # print(np.unique(ak.count(top_jet_idxs[f"top{i+1}_q"], axis=-1)))
+        # print(top_jet_idxs[f"top{i+1}_q"][ak.count(top_jet_idxs[f"top{i+1}_q"], axis=-1) == 3])
         check += np.unique(ak.count(top_jet_idxs[f"top{i+1}"], axis=-1)).to_list()
         check_b += np.unique(ak.count(top_jet_idxs[f"top{i+1}_b"], axis=-1)).to_list()
         check_q += np.unique(ak.count(top_jet_idxs[f"top{i+1}_q"], axis=-1)).to_list()

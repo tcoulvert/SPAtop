@@ -166,10 +166,11 @@ def match_top_to_fjet(tops, bquarks, wbosons, wquarks_d1, wquarks_d2, fjets, bui
 
 
 @nb.njit
-def match_top_to_jet(tops, bquarks, wbosons, wquarks_d1, wquarks_d2, jets, bjet_builder, wjet_builder):
+def match_top_to_jet(tops, bquarks, wbosons, wquarks_d1, wquarks_d2, jets, alljet_builder, bjet_builder, wjet_builder):
     for tops_event, bquarks_event, wbosons_event, wquarks1_event, wquarks2_event, jets_event in zip(
         tops, bquarks, wbosons, wquarks_d1, wquarks_d2, jets
     ):
+        alljet_builder.begin_list()
         bjet_builder.begin_list()
         wjet_builder.begin_list()
         for i, (jet, jet_flv) in enumerate(zip(jets_event, jets_event.flavor)):
@@ -189,7 +190,12 @@ def match_top_to_jet(tops, bquarks, wbosons, wquarks_d1, wquarks_d2, jets, bjet_
                         jet.deltaR(wquark2) < JET_DR and np.abs(jet_flv) == np.abs(wquark2_pid)
                     )
                 )  # conditions for wjet match
-                
+
+                if bquark_match_bool or wquark_match_bool:
+                    alljet_builder.append(j + 1)  # index top as 1, 2, 3
+                else:
+                    alljet_builder.append(-1)
+
                 if bquark_match_bool and not wquark_match_bool:
                     bjet_builder.append(j + 1)  # index top as 1, 2, 3
                     wjet_builder.append(-1)
@@ -207,10 +213,11 @@ def match_top_to_jet(tops, bquarks, wbosons, wquarks_d1, wquarks_d2, jets, bjet_
                     wjet_builder.append(-1)  # index top as 1, 2, 3
                     bjet_builder.append(-1)
                     
+        alljet_builder.end_list()
         bjet_builder.end_list()
         wjet_builder.end_list()
 
-    return bjet_builder, wjet_builder
+    return alljet_builder, bjet_builder, wjet_builder
 
 @nb.njit
 def match_fjet_to_jet(fjets, jets, builder):
