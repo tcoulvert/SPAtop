@@ -57,6 +57,16 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     # print(f"how many None d1 of W+: \n{ak.sum(ak.is_none(part_pid[part_d1[part_pid == 24]][:, -1]))}\n{'='*60}")
     # print(f"how many None d2 of W-: \n{ak.sum(ak.is_none(part_pid[part_d2[part_pid == -24]][:, -1]))}\n{'='*60}")
     # print(f"how many None d2 of W+: \n{ak.sum(ak.is_none(part_pid[part_d2[part_pid == 24]][:, -1]))}\n{'='*60}")
+    print(f"t statuses: {arrays['Particle/Particle.Status'][np.abs(part_pid) == 6][1]}")
+    print(f"b statuses: {arrays['Particle/Particle.Status'][(np.abs(part_pid) == 5)][1]}")
+    print(f"W statuses: {arrays['Particle/Particle.Status'][(np.abs(part_pid) == 24)][1]}")
+    print(f"b parents: {arrays['Particle/Particle.Status'][part_m1[(np.abs(part_pid) == 5)]][1]}")
+    print(f"W parents: {arrays['Particle/Particle.Status'][part_m1[(np.abs(part_pid) == 24)]][1]}")
+    print(f"unique t statuses: {np.unique(arrays['Particle/Particle.Status'][np.abs(part_pid) == 6][1])}")
+    print(f"unique b statuses: {np.unique(arrays['Particle/Particle.Status'][(np.abs(part_pid) == 5)][1])}")
+    print(f"unique W statuses: {np.unique(arrays['Particle/Particle.Status'][(np.abs(part_pid) == 24)][1])}")
+    # print(f"b statuses: {arrays['Particle/Particle.Status'][np.logical_and(np.abs(part_pid) == 5, np.abs(part_pid[part_m1]) == 6)][0]}")
+    # print(f"W statuses: {arrays['Particle/Particle.Status'][np.logical_and(np.abs(part_pid) == 24, np.abs(part_pid[part_m1]) == 6)][0]}")
 
     # small-radius jet info
     pt = arrays["Jet/Jet.PT"]
@@ -119,9 +129,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     wbosons_condition = np.logical_and(np.abs(particles.pid) == 24, np.abs(particles.pid[particles.m1]) == 6)
     wbosons = ak.to_regular(particles[wbosons_condition], axis=1)
     wquarks_condition = np.logical_and(
-        np.abs(particles.pid[particles.m1]) == 24, np.logical_and(
-            particles.pid >= -6, particles.pid <= 6
-        )
+        np.abs(particles.pid[particles.m1]) == 24, np.abs(particles.pid) <= 6
     )
     wquarks_temp = ak.to_regular(particles[wquarks_condition], axis=1)
     w1_mask = wquarks_temp.m1 < np.tile(ak.singletons(wbosons.idx[:, 1]), (1, 4))
@@ -134,6 +142,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     wquarks_d2 = ak.to_regular(
         ak.concatenate([ak.singletons(w1quarks[:, 1]), ak.singletons(w2quarks[:, 1])], axis=1), axis=1
     )
+
     # print(f"wquarks_condition: \n{wquarks_condition}")
     # print(f"wquarks: \n{particles[wquarks_condition]}")
     # print(f"wquarks nums: \n{np.unique(ak.num(particles[wquarks_condition]))}")
@@ -214,7 +223,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     #     print(quark.pid)
     #     break
     top_idx, top_b_idx, top_q_idx = match_top_to_jet(
-        topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2, jets, 
+        topquarks, bquarks, wbosons, jets, 
         ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder()
     )
     top_idx, top_b_idx, top_q_idx = top_idx.snapshot(), top_b_idx.snapshot(), top_q_idx.snapshot()
@@ -537,8 +546,8 @@ def main(in_files, out_file, train_frac, n_tops):
                 + [key for key in events.keys() if "Jet/Jet." in key]
                 + [key for key in events.keys() if "FatJet/FatJet." in key and "fBits" not in key]
             )
-            # for key in keys:
-            #     print(f"{key}\n{'-'*60}")
+            for key in keys:
+                print(f"{key}\n{'-'*60}")
             arrays = events.arrays(keys, entry_start=entry_start, entry_stop=entry_stop)
             datasets = get_datasets(arrays, n_tops)
             for dataset_name, data in datasets.items():
