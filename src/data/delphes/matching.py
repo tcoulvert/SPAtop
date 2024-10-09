@@ -234,59 +234,133 @@ def match_top_to_fjet(
 
     return all_fjet_builder, bqq_fjet_builder, bq_fjet_builder, qq_fjet_builder
 
+def jet_check(jet, quarks, jet_flav):
+    return np.array([
+        jet.deltaR(quark) < JET_DR and np.abs(jet_flav) == np.abs(quark.pid) for quark in quarks
+    ]), np.array([jet.deltaR(quark) for quark in quarks])
 
-@nb.njit
+# def jet_deltaR(jet, quarks, jet_fav):
+#     return np.array(
+#         [jet.deltaR(quark) if jet.deltaR(quark) < JET_DR and np.abs(jet_fav) == np.abs(quark.pid) else 999 for quark in quarks]
+#     )
+
+# @nb.njit
 def match_top_to_jet(
     tops, bquarks, wbosons, wquarks_d1, wquarks_d2, jets, 
     alljet_builder, bjet_builder, wjet_builder
 ):
-    for tops_event, bquarks_event, wbosons_event, wquarks1_event, wquarks2_event, jets_event in zip(
-        tops, bquarks, wbosons, wquarks_d1, wquarks_d2, jets
+    running_num_diftopjets_overlap = 0
+    for bquarks_event, wquarks1_event, wquarks2_event, jets_event in zip(
+        bquarks, wquarks_d1, wquarks_d2, jets
     ):
         alljet_builder.begin_list()
         bjet_builder.begin_list()
         wjet_builder.begin_list()
-        for i, (jet, jet_flv) in enumerate(zip(jets_event, jets_event.flavor)):
+        for i, (jet, jet_flav) in enumerate(zip(jets_event, jets_event.flavor)):
             alljet_match_idx, bjet_match_idx, wjet_match_idx = -1, -1, -1
-            for j, (_, top_idx) in enumerate(zip(tops_event, tops_event.idx)):
-                for bquark, bquark_m1, wquark1, wquark1_pid, wquark2, wquark2_pid, wboson_m1 in zip(
-                    bquarks_event, bquarks_event.m1,
-                    wquarks1_event, wquarks1_event.pid, 
-                    wquarks2_event, wquarks2_event.pid, wbosons_event.m1
-                ):
-                    bquark_match_bool = (bquark_m1 == top_idx) and (
-                        jet.deltaR(bquark) < JET_DR and np.abs(jet_flv) == 5
-                    )  # conditions for bjet match
-                    wquark_match_bool = (wboson_m1 == top_idx) and (
-                        (
-                            jet.deltaR(wquark1) < JET_DR and np.abs(jet_flv) == np.abs(wquark1_pid)
-                        ) or (
-                            jet.deltaR(wquark2) < JET_DR and np.abs(jet_flv) == np.abs(wquark2_pid)
-                        )
-                    )  # conditions for wjet match
 
-                    if bquark_match_bool or wquark_match_bool:
-                        alljet_match_idx = j + 1  # index top as 1, 2, 3
-                    if bquark_match_bool and not wquark_match_bool:
-                        bjet_match_idx = j + 1  # index top as 1, 2, 3
-                        break
-                    elif not bquark_match_bool and wquark_match_bool:
-                        wjet_match_idx = j + 1  # index top as 1, 2, 3
-                        break
-                    elif bquark_match_bool and wquark_match_bool:
-                        if jet.deltaR(bquark) < jet.deltaR(wquark1) and jet.deltaR(bquark) < jet.deltaR(wquark2):
-                            bjet_match_idx = j + 1  # index top as 1, 2, 3
-                            break
-                        else:
-                            wjet_match_idx = j + 1  # index top as 1, 2, 3
-                            break
+            bquarks_bool, bquarks_deltaR = [
+                jet.deltaR(quark) < JET_DR and np.abs(jet_flav) == np.abs(quark_pid) for quark, quark_pid in zip(bquarks_event, bquarks_event.pid)
+            ], [jet.deltaR(quark) for quark in bquarks_event]
+            wquarks1_bool, wquarks1_deltaR = [
+                jet.deltaR(quark) < JET_DR and np.abs(jet_flav) == np.abs(quark_pid) for quark, quark_pid in zip(wquarks1_event, wquarks1_event.pid)
+            ], [jet.deltaR(quark) for quark in wquarks1_event]
+            wquarks2_bool, wquarks2_deltaR = [
+                jet.deltaR(quark) < JET_DR and np.abs(jet_flav) == np.abs(quark_pid) for quark, quark_pid in zip(wquarks2_event, wquarks2_event.pid)
+            ], [jet.deltaR(quark) for quark in wquarks2_event]
+
+            
+            # for j, (bquark, wquark1, wquark1_pid, wquark2, wquark2_pid) in enumerate(zip(
+            #     bquarks_event,
+            #     wquarks1_event, wquarks1_event.pid, 
+            #     wquarks2_event, wquarks2_event.pid
+            # )):  # dont need to check b and w mother index b/c made them match by construction
+
+            if np.sum(np.logical_or(
+                np.logical_or(bquarks_bool, wquarks1_bool), wquarks2_bool
+            )) == 1:
+                j = np.nonzero(np.logical_or(
+                    np.logical_or(bquarks_bool, wquarks1_bool), wquarks2_bool
+                ))[0][0]
+                alljet_match_idx = j + 1  # index top as 1, 2, 3, etc
+            elif np.sum(np.logical_or(
+                np.logical_or(bquarks_bool, wquarks1_bool), wquarks2_bool
+            )) > 1:
+                print("jets from different tops overlapping!!")
+                running_num_diftopjets_overlap += 1
+
+                bquarks_filled_deltaR = np.where(bquarks_bool, bquarks_deltaR, 999)
+                wquarks1_filled_deltaR = np.where(wquarks1_bool, wquarks1_deltaR, 999)
+                wquarks2_filled_deltaR = np.where(wquarks2_bool, wquarks2_deltaR, 999)
+
+                j = np.argmin(np.min(
+                    [bquarks_filled_deltaR, wquarks1_filled_deltaR, wquarks2_filled_deltaR],
+                    axis=0
+                ))
+                alljet_match_idx = j + 1  # index top as 1, 2, 3, etc
+            else:
+                alljet_builder.append(alljet_match_idx)
                 bjet_builder.append(bjet_match_idx)
                 wjet_builder.append(wjet_match_idx)
+                continue
+
+            if bquarks_bool[j] and not (wquarks1_bool[j] or wquarks2_bool[j]):
+                bjet_match_idx = j + 1  # index top as 1, 2, 3, etc
+            elif not bquarks_bool[j] and (wquarks1_bool[j] or wquarks2_bool[j]):
+                wjet_match_idx = j + 1  # index top as 1, 2, 3, etc
+            elif bquarks_bool[j] and (wquarks1_bool[j] or wquarks2_bool[j]):
+                if bquarks_deltaR[j] < wquarks1_deltaR[j] and bquarks_deltaR[j] < wquarks2_deltaR[j]:
+                    bjet_match_idx = j + 1  # index top as 1, 2, 3, etc
+                else:
+                    wjet_match_idx = j + 1  # index top as 1, 2, 3, etc
+            
+            alljet_builder.append(alljet_match_idx)
+            bjet_builder.append(bjet_match_idx)
+            wjet_builder.append(wjet_match_idx)
+
+            # for j, (bquark, wquark1, wquark1_pid, wquark2, wquark2_pid) in enumerate(zip(
+            #     bquarks_event,
+            #     wquarks1_event, wquarks1_event.pid, 
+            #     wquarks2_event, wquarks2_event.pid
+            # )):  # dont need to check b and w mother index b/c made them match by construction
+                
+            #     bquark_match_bool = (
+            #         jet.deltaR(bquark) < JET_DR and np.abs(jet_flv) == 5
+            #     )  # conditions for bjet match
+            #     wquark_match_bool = (
+            #         (
+            #             jet.deltaR(wquark1) < JET_DR and np.abs(jet_flv) == np.abs(wquark1_pid)
+            #         ) or (
+            #             jet.deltaR(wquark2) < JET_DR and np.abs(jet_flv) == np.abs(wquark2_pid)
+            #         )
+            #     )  # conditions for wjet match
+
+            #     if bquark_match_bool or wquark_match_bool:
+            #         alljet_match_idx = j + 1  # index top as 1, 2, 3, etc
+            #     if bquark_match_bool and not wquark_match_bool:
+            #         bjet_match_idx = j + 1  # index top as 1, 2, 3, etc
+            #         break
+            #     elif not bquark_match_bool and wquark_match_bool:
+            #         wjet_match_idx = j + 1  # index top as 1, 2, 3, etc
+            #         break
+            #     elif bquark_match_bool and wquark_match_bool:
+            #         if jet.deltaR(bquark) < jet.deltaR(wquark1) and jet.deltaR(bquark) < jet.deltaR(wquark2):
+            #             bjet_match_idx = j + 1  # index top as 1, 2, 3, etc
+            #             break
+            #         else:
+            #             wjet_match_idx = j + 1  # index top as 1, 2, 3, etc
+            #             break
+                
+            #     alljet_builder.append(alljet_match_idx)
+            #     bjet_builder.append(bjet_match_idx)
+            #     wjet_builder.append(wjet_match_idx)
 
         alljet_builder.end_list()
         bjet_builder.end_list()
         wjet_builder.end_list()
 
+    print(f"num events where jets from different tops overlap: {running_num_diftopjets_overlap}")
+    print(f"fraction of events where jets from different tops overlap: {running_num_diftopjets_overlap / np.shape(bquarks)[0]}")
     return alljet_builder, bjet_builder, wjet_builder
 
 @nb.njit

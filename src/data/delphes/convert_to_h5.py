@@ -31,6 +31,19 @@ PROJECT_DIR = Path(__file__).resolve().parents[3]
 def to_np_array(ak_array, max_n=10, pad=0):
     return ak.fill_none(ak.pad_none(ak_array, max_n, clip=True, axis=-1), pad).to_numpy()
 
+def final_particle(particle_pdgid, mother_pdgid, particles, intermediate_particles=None):
+    if intermediate_particles is None:
+        intermediate_particles = particles[np.logical_and(
+            np.abs(particles.pid) == particle_pdgid, np.abs(particles.pid[particles.m1]) == mother_pdgid
+        )]
+    while ak.any(ak.any(np.abs(particles.pid[intermediate_particles.d1]) == particle_pdgid, axis=1), axis=0):
+        intermediate_particles = ak.where(
+            np.abs(particles.pid[intermediate_particles.d1]) == particle_pdgid,
+            particles[intermediate_particles.d1],
+            intermediate_particles
+        )
+    return intermediate_particles
+
 
 def get_datasets(arrays, n_tops):  # noqa: C901
     part_pid = arrays["Particle/Particle.PID"]  # PDG ID
@@ -125,36 +138,76 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         with_name="Momentum4D",
     )
 
+
+
     tops_condition = np.logical_and(
         np.abs(particles.pid) == 6, np.logical_and(
             np.abs(particles.pid[particles.d1]) == 5, np.abs(particles.pid[particles.d2]) == 24
         )   # do we know the bquarks are going to be daughter 1? yes, confirmed.
     )
     topquarks = ak.to_regular(particles[tops_condition], axis=1)
-    print(f"top idx before sort: \n{topquarks.idx}")
-    topquarks = topquarks[ak.argsort(topquarks.idx, axis=-1)]
+    topquark_idx_sort = ak.argsort(topquarks.idx, axis=-1)
+    topquarks = topquarks[topquark_idx_sort]
     print(f"top idx after sort: \n{topquarks.idx}")
+    print('-'*60)
+    print('-'*60)
 
-    bquark_condition = np.logical_and(np.abs(particles.pid) == 5, np.abs(particles.pid[particles.m1]) == 6)
-    bquarks = ak.to_regular(particles[bquark_condition], axis=1)
-    print(f"b mother idx before sort: \n{particles.idx[bquarks.m1]}")
-    bquarks = bquarks[ak.argsort(particles.idx[bquarks.m1], axis=-1)]
-    print(f"b after idx before sort: \n{particles.idx[bquarks.m1]}")
+    # bquark_condition = np.logical_and(np.abs(particles.pid) == 5, np.abs(particles.pid[particles.m1]) == 6)
+    # bquarks = ak.to_regular(particles[bquark_condition], axis=1)
+    # bquarks = bquarks[topquark_idx_sort]
+    # print(f"b mother idx after sort: \n{particles.idx[bquarks.m1]}")
+    # print(f"b status after sort: \n{bquarks.status}")
+    # print('-'*60)
 
-    wbosons_condition = np.logical_and(np.abs(particles.pid) == 24, np.abs(particles.pid[particles.m1]) == 6)
-    wbosons = ak.to_regular(particles[wbosons_condition], axis=1)
-    print(f"W mother idx before sort: \n{particles.idx[wbosons.m1]}")
-    wbosons = wbosons[ak.argsort(particles.idx[wbosons.m1], axis=-1)]
-    print(f"W mother idx after sort: \n{particles.idx[wbosons.m1]}")
-    print(f"W idx after sort: \n{wbosons.idx}")
+    bquarks = ak.to_regular(final_particle(5, 6, particles), axis=1)
+    bquarks = bquarks[topquark_idx_sort]
+    print(f"b_func idx: \n{bquarks.idx}")
+    print(f"b_func status: \n{bquarks.status}")
+    print('-'*60)
+    print('-'*60)
 
-    wquarks_condition = np.logical_and(
-        np.abs(particles.pid[particles.m1]) == 24, np.abs(particles.pid) <= 6
-    )
-    wquarks = ak.to_regular(particles[wquarks_condition], axis=1)
-    print(f"Wquark mother idx before sort: \n{particles.idx[wquarks.m1]}")
-    wquarks = wquarks[ak.argsort(particles.idx[wquarks.m1], axis=-1)]
-    print(f"Wquark mother idx after sort: \n{particles.idx[wquarks.m1]}")
+    # wbosons_condition = np.logical_and(np.abs(particles.pid) == 24, np.abs(particles.pid[particles.m1]) == 6)
+    # wbosons = ak.to_regular(particles[wbosons_condition], axis=1)
+    # wbosons = wbosons[topquark_idx_sort]
+    # print(f"W mother idx after sort: \n{particles.idx[wbosons.m1]}")
+    # print(f"W status after sort: \n{wbosons.status}")
+    # print(f"W idx after sort: \n{wbosons.idx}")
+    # print('-'*60)
+
+    wbosons = ak.to_regular(final_particle(24, 6, particles), axis=1)
+    wbosons = wbosons[topquark_idx_sort]
+    print(f"w idx: \n{wbosons.idx}")
+    print(f"w status: \n{wbosons.status}")
+    print('-'*60)
+    print('-'*60)
+
+    # wquarks_condition = np.logical_and(
+    #     np.abs(particles.pid[particles.m1]) == 24, np.abs(particles.pid) <= 6
+    # )
+    # wquarks = ak.to_regular(particles[wquarks_condition], axis=1)
+    # print(f"Wquark mother idx before sort: \n{wquarks.m1}")
+    # wquarks = wquarks[ak.argsort(wquarks.m1, axis=-1)]
+    # print(f"Wquark mother idx after sort: \n{wquarks.m1}")
+    # print(f"unique mother idx of wquarks: \n{wquarks.m1[:,::2]}")
+    # print(ak.all(wquarks.m1[:,::2] == wbosons_func.idx))
+    # print('-'*60)
+    # print('-'*60)
+    # w1quarks = ak.concatenate(
+    #     [ak.singletons(particles[wbosons.d1][:, 0]), ak.singletons(particles[wbosons.d2][:, 0])], 
+    #     axis=1
+    # )
+    # w2quarks = ak.concatenate(
+    #     [ak.singletons(wbosons.d1[:, 0]), ak.singletons(wbosons.d2[:, 0])], 
+    #     axis=1
+    # )
+
+    wquarks_d1 = ak.to_regular(particles[wbosons.d1], axis=1)
+    wquarks_d2 = ak.to_regular(particles[wbosons.d2], axis=1)
+    
+    print(f"w.d1 pid: \n{wquarks_d1.pid}")
+    print(f"w.d1 m1: \n{wquarks_d1.m1}")
+    print(f"w.d2 pid: \n{wquarks_d2.pid}")
+    print(f"w.d2 m1: \n{wquarks_d2.m1}")
 
     # w1_quarks = 
     # w1_mask = wquarks_temp.m1 < np.tile(ak.singletons(wbosons.idx[:, 1]), (1, 4))
@@ -571,8 +624,8 @@ def main(in_files, out_file, train_frac, n_tops):
                 + [key for key in events.keys() if "Jet/Jet." in key]
                 + [key for key in events.keys() if "FatJet/FatJet." in key and "fBits" not in key]
             )
-            for key in keys:
-                print(f"{key}\n{'-'*60}")
+            # for key in keys:
+            #     print(f"{key}\n{'-'*60}")
             arrays = events.arrays(keys, entry_start=entry_start, entry_stop=entry_stop)
             datasets = get_datasets(arrays, n_tops)
             for dataset_name, data in datasets.items():
