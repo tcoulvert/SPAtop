@@ -237,11 +237,11 @@ def match_top_to_fjet(
 
 @nb.njit
 def match_top_to_jet(
-    tops, bquarks, wbosons, jets, 
+    tops, bquarks, wbosons, wquarks_d1, wquarks_d2, jets, 
     alljet_builder, bjet_builder, wjet_builder
 ):
-    for tops_event, bquarks_event, wbosons_event, jets_event in zip(
-        tops, bquarks, wbosons, jets
+    for tops_event, bquarks_event, wbosons_event, wquarks1_event, wquarks2_event, jets_event in zip(
+        tops, bquarks, wbosons, wquarks_d1, wquarks_d2, jets
     ):
         alljet_builder.begin_list()
         bjet_builder.begin_list()

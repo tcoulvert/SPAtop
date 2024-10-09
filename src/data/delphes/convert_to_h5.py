@@ -34,7 +34,10 @@ def to_np_array(ak_array, max_n=10, pad=0):
 
 def get_datasets(arrays, n_tops):  # noqa: C901
     part_pid = arrays["Particle/Particle.PID"]  # PDG ID
+    part_status = arrays["Particle/Particle.Status"]
     part_m1 = arrays["Particle/Particle.M1"]
+    part_d1 = arrays["Particle/Particle.D1"]
+    part_d2 = arrays["Particle/Particle.D2"]
     # condition_hbb = np.logical_and(np.abs(part_pid) == 5, part_pid[part_m1] == 25)
     # mask_hbb = ak.count(part_pid[condition_hbb], axis=-1) == 2 * n_tops
     # part_pid = part_pid
@@ -42,9 +45,6 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     part_eta = arrays["Particle/Particle.Eta"]
     part_phi = arrays["Particle/Particle.Phi"]
     part_mass = arrays["Particle/Particle.Mass"]
-    part_m1 = arrays["Particle/Particle.M1"]
-    part_d1 = arrays["Particle/Particle.D1"]
-    part_d2 = arrays["Particle/Particle.D2"]
     # print(f"top d1 = \n{part_pid[part_d1[part_pid == 6]][:, -1]}\n{'='*60}")
     # print(f"all top d1 are bjets? = {ak.all(part_pid[part_d1[part_pid == 6]][:, -1] == 5)}\n{'='*60}")
     # print(f"top d2 = \n{part_pid[part_d2[part_pid == 6]][:, -1]}\n{'='*60}")
@@ -57,14 +57,20 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     # print(f"how many None d1 of W+: \n{ak.sum(ak.is_none(part_pid[part_d1[part_pid == 24]][:, -1]))}\n{'='*60}")
     # print(f"how many None d2 of W-: \n{ak.sum(ak.is_none(part_pid[part_d2[part_pid == -24]][:, -1]))}\n{'='*60}")
     # print(f"how many None d2 of W+: \n{ak.sum(ak.is_none(part_pid[part_d2[part_pid == 24]][:, -1]))}\n{'='*60}")
-    print(f"t statuses: {arrays['Particle/Particle.Status'][np.abs(part_pid) == 6][1]}")
-    print(f"b statuses: {arrays['Particle/Particle.Status'][(np.abs(part_pid) == 5)][1]}")
-    print(f"W statuses: {arrays['Particle/Particle.Status'][(np.abs(part_pid) == 24)][1]}")
-    print(f"b parents: {arrays['Particle/Particle.Status'][part_m1[(np.abs(part_pid) == 5)]][1]}")
-    print(f"W parents: {arrays['Particle/Particle.Status'][part_m1[(np.abs(part_pid) == 24)]][1]}")
-    print(f"unique t statuses: {np.unique(arrays['Particle/Particle.Status'][np.abs(part_pid) == 6][1])}")
-    print(f"unique b statuses: {np.unique(arrays['Particle/Particle.Status'][(np.abs(part_pid) == 5)][1])}")
-    print(f"unique W statuses: {np.unique(arrays['Particle/Particle.Status'][(np.abs(part_pid) == 24)][1])}")
+    # print(f"t statuses: {arrays['Particle/Particle.Status'][np.abs(part_pid) == 6][1]}")
+    # print(f"b statuses: {arrays['Particle/Particle.Status'][(np.abs(part_pid) == 5)][1]}")
+    # print(f"W statuses: {arrays['Particle/Particle.Status'][(np.abs(part_pid) == 24)][1]}")
+    # print(f"b parents: {arrays['Particle/Particle.Status'][part_m1[(np.abs(part_pid) == 5)]][1]}")
+    # print(f"W parents: {arrays['Particle/Particle.Status'][part_m1[(np.abs(part_pid) == 24)]][1]}")
+    # print(f"W d1 PID: {arrays['Particle/Particle.PID'][part_d1[(np.abs(part_pid) == 24)]][1]}")
+    # print(f"W d2 PID: {arrays['Particle/Particle.PID'][part_d2[(np.abs(part_pid) == 24)]][1]}")
+    # print(f"W d1 mother PID: {arrays['Particle/Particle.PID'][part_m1[(np.abs(part_pid) == 24)]][1]}")
+    # print(f"W d2 mother PID: {arrays['Particle/Particle.PID'][part_m1[(np.abs(part_pid) == 24)]][1]}")
+    # print(f"W d1 mother Status: {arrays['Particle/Particle.Status'][part_m1[(np.abs(part_pid) == 24)]][1]}")
+    # print(f"W d2 mother Status: {arrays['Particle/Particle.Status'][part_m1[(np.abs(part_pid) == 24)]][1]}")
+    # print(f"unique t statuses: {np.unique(arrays['Particle/Particle.Status'][np.abs(part_pid) == 6][1])}")
+    # print(f"unique b statuses: {np.unique(arrays['Particle/Particle.Status'][(np.abs(part_pid) == 5)][1])}")
+    # print(f"unique W statuses: {np.unique(arrays['Particle/Particle.Status'][(np.abs(part_pid) == 24)][1])}")
     # print(f"b statuses: {arrays['Particle/Particle.Status'][np.logical_and(np.abs(part_pid) == 5, np.abs(part_pid[part_m1]) == 6)][0]}")
     # print(f"W statuses: {arrays['Particle/Particle.Status'][np.logical_and(np.abs(part_pid) == 24, np.abs(part_pid[part_m1]) == 6)][0]}")
 
@@ -110,6 +116,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
             "phi": part_phi,
             "mass": part_mass,
             "pid": part_pid,
+            "status": part_status,
             "m1": part_m1,
             "d1": part_d1,
             "d2": part_d2,
@@ -124,24 +131,42 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         )   # do we know the bquarks are going to be daughter 1? yes, confirmed.
     )
     topquarks = ak.to_regular(particles[tops_condition], axis=1)
+    print(f"top idx before sort: \n{topquarks.idx}")
+    topquarks = topquarks[ak.argsort(topquarks.idx, axis=-1)]
+    print(f"top idx after sort: \n{topquarks.idx}")
+
     bquark_condition = np.logical_and(np.abs(particles.pid) == 5, np.abs(particles.pid[particles.m1]) == 6)
     bquarks = ak.to_regular(particles[bquark_condition], axis=1)
+    print(f"b mother idx before sort: \n{particles.idx[bquarks.m1]}")
+    bquarks = bquarks[ak.argsort(particles.idx[bquarks.m1], axis=-1)]
+    print(f"b after idx before sort: \n{particles.idx[bquarks.m1]}")
+
     wbosons_condition = np.logical_and(np.abs(particles.pid) == 24, np.abs(particles.pid[particles.m1]) == 6)
     wbosons = ak.to_regular(particles[wbosons_condition], axis=1)
+    print(f"W mother idx before sort: \n{particles.idx[wbosons.m1]}")
+    wbosons = wbosons[ak.argsort(particles.idx[wbosons.m1], axis=-1)]
+    print(f"W mother idx after sort: \n{particles.idx[wbosons.m1]}")
+    print(f"W idx after sort: \n{wbosons.idx}")
+
     wquarks_condition = np.logical_and(
         np.abs(particles.pid[particles.m1]) == 24, np.abs(particles.pid) <= 6
     )
-    wquarks_temp = ak.to_regular(particles[wquarks_condition], axis=1)
-    w1_mask = wquarks_temp.m1 < np.tile(ak.singletons(wbosons.idx[:, 1]), (1, 4))
-    w2_mask = wquarks_temp.m1 >= np.tile(ak.singletons(wbosons.idx[:, 1]), (1, 4))
-    w1quarks = ak.drop_none(ak.mask(wquarks_temp, w1_mask))
-    w2quarks = ak.drop_none(ak.mask(wquarks_temp, w2_mask))
-    wquarks_d1 = ak.to_regular(
-        ak.concatenate([ak.singletons(w1quarks[:, 0]), ak.singletons(w2quarks[:, 0])], axis=1), axis=1
-    )
-    wquarks_d2 = ak.to_regular(
-        ak.concatenate([ak.singletons(w1quarks[:, 1]), ak.singletons(w2quarks[:, 1])], axis=1), axis=1
-    )
+    wquarks = ak.to_regular(particles[wquarks_condition], axis=1)
+    print(f"Wquark mother idx before sort: \n{particles.idx[wquarks.m1]}")
+    wquarks = wquarks[ak.argsort(particles.idx[wquarks.m1], axis=-1)]
+    print(f"Wquark mother idx after sort: \n{particles.idx[wquarks.m1]}")
+
+    # w1_quarks = 
+    # w1_mask = wquarks_temp.m1 < np.tile(ak.singletons(wbosons.idx[:, 1]), (1, 4))
+    # w2_mask = wquarks_temp.m1 >= np.tile(ak.singletons(wbosons.idx[:, 1]), (1, 4))
+    # w1quarks = ak.drop_none(ak.mask(wquarks_temp, w1_mask))
+    # w2quarks = ak.drop_none(ak.mask(wquarks_temp, w2_mask))
+    # wquarks_d1 = ak.to_regular(
+    #     ak.concatenate([ak.singletons(w1quarks[:, 0]), ak.singletons(w2quarks[:, 0])], axis=1), axis=1
+    # )
+    # wquarks_d2 = ak.to_regular(
+    #     ak.concatenate([ak.singletons(w1quarks[:, 1]), ak.singletons(w2quarks[:, 1])], axis=1), axis=1
+    # )
 
     # print(f"wquarks_condition: \n{wquarks_condition}")
     # print(f"wquarks: \n{particles[wquarks_condition]}")
@@ -223,7 +248,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     #     print(quark.pid)
     #     break
     top_idx, top_b_idx, top_q_idx = match_top_to_jet(
-        topquarks, bquarks, wbosons, jets, 
+        topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2, jets, 
         ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder()
     )
     top_idx, top_b_idx, top_q_idx = top_idx.snapshot(), top_b_idx.snapshot(), top_q_idx.snapshot()
