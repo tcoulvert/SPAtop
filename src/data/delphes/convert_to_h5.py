@@ -51,9 +51,6 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     part_m1 = arrays["Particle/Particle.M1"]
     part_d1 = arrays["Particle/Particle.D1"]
     part_d2 = arrays["Particle/Particle.D2"]
-    # condition_hbb = np.logical_and(np.abs(part_pid) == 5, part_pid[part_m1] == 25)
-    # mask_hbb = ak.count(part_pid[condition_hbb], axis=-1) == 2 * n_tops
-    # part_pid = part_pid
     part_pt = arrays["Particle/Particle.PT"]
     part_eta = arrays["Particle/Particle.Eta"]
     part_phi = arrays["Particle/Particle.Phi"]
@@ -94,10 +91,6 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     mass = arrays["Jet/Jet.Mass"]
     btag = arrays["Jet/Jet.BTag"]
     flavor = arrays["Jet/Jet.Flavor"]
-    # print(f"btag = \n{btag}\n{'='*60}")
-    # print(f"btag of top d1 = \n{btag[part_d1[part_pid == 6]][:, -1]}\n{'='*60}")
-    # print(f"W- d1: \n{part_pid[part_d1[part_pid == -24]][:, -1]}\n{'='*60}")
-    # print(f"btag of W- d1: \n{btag[part_d1[part_pid == -24]][:, -1]}\n{'='*60}")
 
     # large-radius jet info
     fj_pt = arrays["FatJet/FatJet.PT"]
@@ -148,66 +141,20 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     topquarks = ak.to_regular(particles[tops_condition], axis=1)
     topquark_idx_sort = ak.argsort(topquarks.idx, axis=-1)
     topquarks = topquarks[topquark_idx_sort]
-    print(f"top idx after sort: \n{topquarks.idx}")
-    print('-'*60)
-    print('-'*60)
-
-    # bquark_condition = np.logical_and(np.abs(particles.pid) == 5, np.abs(particles.pid[particles.m1]) == 6)
-    # bquarks = ak.to_regular(particles[bquark_condition], axis=1)
-    # bquarks = bquarks[topquark_idx_sort]
-    # print(f"b mother idx after sort: \n{particles.idx[bquarks.m1]}")
-    # print(f"b status after sort: \n{bquarks.status}")
-    # print('-'*60)
 
     bquarks = ak.to_regular(final_particle(5, 6, particles), axis=1)
     bquarks = bquarks[topquark_idx_sort]
-    print(f"b_func idx: \n{bquarks.idx}")
-    print(f"b_func status: \n{bquarks.status}")
-    print('-'*60)
-    print('-'*60)
-
-    # wbosons_condition = np.logical_and(np.abs(particles.pid) == 24, np.abs(particles.pid[particles.m1]) == 6)
-    # wbosons = ak.to_regular(particles[wbosons_condition], axis=1)
-    # wbosons = wbosons[topquark_idx_sort]
-    # print(f"W mother idx after sort: \n{particles.idx[wbosons.m1]}")
-    # print(f"W status after sort: \n{wbosons.status}")
-    # print(f"W idx after sort: \n{wbosons.idx}")
-    # print('-'*60)
 
     wbosons = ak.to_regular(final_particle(24, 6, particles), axis=1)
     wbosons = wbosons[topquark_idx_sort]
-    print(f"w idx: \n{wbosons.idx}")
-    print(f"w status: \n{wbosons.status}")
-    print('-'*60)
-    print('-'*60)
-
-    # wquarks_condition = np.logical_and(
-    #     np.abs(particles.pid[particles.m1]) == 24, np.abs(particles.pid) <= 6
-    # )
-    # wquarks = ak.to_regular(particles[wquarks_condition], axis=1)
-    # print(f"Wquark mother idx before sort: \n{wquarks.m1}")
-    # wquarks = wquarks[ak.argsort(wquarks.m1, axis=-1)]
-    # print(f"Wquark mother idx after sort: \n{wquarks.m1}")
-    # print(f"unique mother idx of wquarks: \n{wquarks.m1[:,::2]}")
-    # print(ak.all(wquarks.m1[:,::2] == wbosons_func.idx))
-    # print('-'*60)
-    # print('-'*60)
-    # w1quarks = ak.concatenate(
-    #     [ak.singletons(particles[wbosons.d1][:, 0]), ak.singletons(particles[wbosons.d2][:, 0])], 
-    #     axis=1
-    # )
-    # w2quarks = ak.concatenate(
-    #     [ak.singletons(wbosons.d1[:, 0]), ak.singletons(wbosons.d2[:, 0])], 
-    #     axis=1
-    # )
-
+    
     wquarks_d1 = ak.to_regular(particles[wbosons.d1], axis=1)
     wquarks_d2 = ak.to_regular(particles[wbosons.d2], axis=1)
     
-    print(f"w.d1 pid: \n{wquarks_d1.pid}")
-    print(f"w.d1 m1: \n{wquarks_d1.m1}")
-    print(f"w.d2 pid: \n{wquarks_d2.pid}")
-    print(f"w.d2 m1: \n{wquarks_d2.m1}")
+    # print(f"w.d1 pid: \n{wquarks_d1.pid}")
+    # print(f"w.d1 m1: \n{wquarks_d1.m1}")
+    # print(f"w.d2 pid: \n{wquarks_d2.pid}")
+    # print(f"w.d2 m1: \n{wquarks_d2.m1}")
 
     # w1_quarks = 
     # w1_mask = wquarks_temp.m1 < np.tile(ak.singletons(wbosons.idx[:, 1]), (1, 4))
@@ -295,50 +242,52 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         },
         with_name="Momentum4D",
     )
-    # print(f"wquarks pid: \n{wquarks_d1.pid}")
-    # print(f"wquarks pid: \n{(wquarks_d1[0]).pid}")
-    # for quark in wquarks_d1:
-    #     print(quark.pid)
-    #     break
+    
     top_idx, top_b_idx, top_q_idx = match_top_to_jet(
-        topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2, jets, 
+        bquarks, wquarks_d1, wquarks_d2, jets, 
         ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder()
     )
-    top_idx, top_b_idx, top_q_idx = top_idx.snapshot(), top_b_idx.snapshot(), top_q_idx.snapshot()
+    top_idx, top_b_idx, top_q_idx = (
+        top_idx.snapshot(), top_b_idx.snapshot(), top_q_idx.snapshot()
+    )
+
     matched_fj_idx = match_fjet_to_jet(fjets, jets, ak.ArrayBuilder()).snapshot()
-    fj_top_idx = match_top_to_fjet(topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2, fjets, ak.ArrayBuilder()).snapshot()
-    fj_top_bqq_idx = match_top_to_fjet(topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2, fjets, ak.ArrayBuilder(), match_type='bqq').snapshot()
-    fj_top_bq_idx = match_top_to_fjet(topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2, fjets, ak.ArrayBuilder(), match_type='bq').snapshot()
-    fj_top_qq_idx = match_top_to_fjet(topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2, fjets, ak.ArrayBuilder(), match_type='qq').snapshot()
-    print(f"fjets: \n{fjets}\n{'='*60}")
-    print(f"empty at same places fjets-any: \n{ak.all(ak.num(fjets) == ak.num(fj_top_idx))}\n{'='*60}")
-    print(f"empty at same places fjets-bqq: \n{ak.all(ak.num(fjets) == ak.num(fj_top_bqq_idx))}\n{'='*60}")
-    print(f"empty at same places fjets-bq: \n{ak.all(ak.num(fjets) == ak.num(fj_top_bq_idx))}\n{'='*60}")
-    print(f"empty at same places fjets-qq: \n{ak.all(ak.num(fjets) == ak.num(fj_top_qq_idx))}\n{'='*60}")
+    fj_top_idx, fj_top_bqq_idx, fj_top_bq_idx, fj_top_qq_idx = match_top_to_fjet(
+        topquarks, bquarks, wquarks_d1, wquarks_d2, fjets, 
+        ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder()
+    )
+    fj_top_idx, fj_top_bqq_idx, fj_top_bq_idx, fj_top_qq_idx = (
+        fj_top_idx.snapshot(), fj_top_bqq_idx.snapshot(), fj_top_bq_idx.snapshot(), fj_top_qq_idx.snapshot()
+    )
+    # print(f"fjets: \n{fjets}\n{'='*60}")
+    # print(f"empty at same places fjets-any: \n{ak.all(ak.num(fjets) == ak.num(fj_top_idx))}\n{'='*60}")
+    # print(f"empty at same places fjets-bqq: \n{ak.all(ak.num(fjets) == ak.num(fj_top_bqq_idx))}\n{'='*60}")
+    # print(f"empty at same places fjets-bq: \n{ak.all(ak.num(fjets) == ak.num(fj_top_bq_idx))}\n{'='*60}")
+    # print(f"empty at same places fjets-qq: \n{ak.all(ak.num(fjets) == ak.num(fj_top_qq_idx))}\n{'='*60}")
     print(f"fjet any boosted: \n{fj_top_idx}\n{'='*60}")
     print(f"fjet all boosted: \n{fj_top_bqq_idx}\n{'='*60}")
     print(f"fjet bq boosted: \n{fj_top_bq_idx}\n{'='*60}")
     print(f"fjet qq boosted: \n{fj_top_qq_idx}\n{'='*60}")
-    total_arr = np.where(fj_top_idx > 0, 1, -1) + np.where(fj_top_bqq_idx > 0, 1, -1) + np.where(fj_top_bq_idx > 0, 1, -1) + np.where(fj_top_qq_idx > 0, 1, -1)
-    print(f"only 2 arrays have fatjets: \n{ak.all((total_arr == 0) | (total_arr == -4))}\n{'='*60}")
-    less_total_arr = np.where(fj_top_bqq_idx > 0, 1, -1) + np.where(fj_top_bq_idx > 0, 1, -1) + np.where(fj_top_qq_idx > 0, 1, -1)
-    print(f"only 1 array has fatjets: \n{ak.all((less_total_arr == -1) | (less_total_arr == -3))}\n{'='*60}")
+    # total_arr = np.where(fj_top_idx > 0, 1, -1) + np.where(fj_top_bqq_idx > 0, 1, -1) + np.where(fj_top_bq_idx > 0, 1, -1) + np.where(fj_top_qq_idx > 0, 1, -1)
+    # print(f"only 2 arrays have fatjets: \n{ak.all((total_arr == 0) | (total_arr == -4))}\n{'='*60}")
+    # less_total_arr = np.where(fj_top_bqq_idx > 0, 1, -1) + np.where(fj_top_bq_idx > 0, 1, -1) + np.where(fj_top_qq_idx > 0, 1, -1)
+    # print(f"only 1 array has fatjets: \n{ak.all((less_total_arr == -1) | (less_total_arr == -3))}\n{'='*60}")
     print(f"jet any: \n{top_idx}\n{'='*60}")
     print(f"jet t->b: \n{top_b_idx}\n{'='*60}")
     print(f"jet w->q: \n{top_q_idx}\n{'='*60}")
-    total_arr = np.where(top_idx > 0, 1, -1) + np.where(top_b_idx > 0, 1, -1) + np.where(top_q_idx > 0, 1, -1)
-    print(f"only 2 arrays have jets: \n{ak.all((total_arr == 1) | (total_arr == -3))}\n{'='*60}")
-    less_total_arr = np.where(top_b_idx > 0, 1, -1) + np.where(top_q_idx > 0, 1, -1)
-    print(f"only 1 array has jets: \n{ak.all((less_total_arr == 0) | (less_total_arr == -2))}\n{'='*60}")
-    print(f"total arr where problems: \n{ak.drop_none(ak.firsts(total_arr[(total_arr != 1) & (total_arr != -3)]))}")
-    print(f"less total arr where problems: \n{ak.drop_none(ak.firsts(less_total_arr[(less_total_arr != 0) & (less_total_arr != -2)]))}")
-    problem_indices = ak.where(
-        ak.is_none(ak.firsts(total_arr[(total_arr != 1) & (total_arr != -3)])), -1, range(len(ak.firsts(total_arr[(total_arr != 1) & (total_arr != -3)])))
-    )
-    print(f"top_idx where problems: \n{top_idx[problem_indices != -1]}")
-    print(f"top_b_idx where problems: \n{top_b_idx[problem_indices != -1]}")
-    print(f"top_q_idx where problems: \n{top_q_idx[problem_indices != -1]}")
-    print(f"fatjets where problems: \n{fj_top_idx[problem_indices != -1]}")
+    # total_arr = np.where(top_idx > 0, 1, -1) + np.where(top_b_idx > 0, 1, -1) + np.where(top_q_idx > 0, 1, -1)
+    # print(f"only 2 arrays have jets: \n{ak.all((total_arr == 1) | (total_arr == -3))}\n{'='*60}")
+    # less_total_arr = np.where(top_b_idx > 0, 1, -1) + np.where(top_q_idx > 0, 1, -1)
+    # print(f"only 1 array has jets: \n{ak.all((less_total_arr == 0) | (less_total_arr == -2))}\n{'='*60}")
+    # print(f"total arr where problems: \n{ak.drop_none(ak.firsts(total_arr[(total_arr != 1) & (total_arr != -3)]))}")
+    # print(f"less total arr where problems: \n{ak.drop_none(ak.firsts(less_total_arr[(less_total_arr != 0) & (less_total_arr != -2)]))}")
+    # problem_indices = ak.where(
+    #     ak.is_none(ak.firsts(total_arr[(total_arr != 1) & (total_arr != -3)])), -1, range(len(ak.firsts(total_arr[(total_arr != 1) & (total_arr != -3)])))
+    # )
+    # print(f"top_idx where problems: \n{top_idx[problem_indices != -1]}")
+    # print(f"top_b_idx where problems: \n{top_b_idx[problem_indices != -1]}")
+    # print(f"top_q_idx where problems: \n{top_q_idx[problem_indices != -1]}")
+    # print(f"fatjets where problems: \n{fj_top_idx[problem_indices != -1]}")
 
     # keep events with >= min_jets small-radius jets
     min_jets = 3 * n_tops
