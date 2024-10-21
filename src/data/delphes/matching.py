@@ -109,9 +109,12 @@ def match_top_to_jet(
                 wquarks1_event, wquarks1_event.pid, 
                 wquarks2_event, wquarks2_event.pid
             )):  # dont need to check b and w mother index b/c made them match by construction
-                bquark_deltaR = jet.deltaR(bquark) if jet.deltaR(bquark) < JET_DR and np.abs(jet_flav) == 5 else 999
-                wquark1_deltaR = jet.deltaR(wquark1) if jet.deltaR(wquark1) < JET_DR and np.abs(jet_flav) == np.abs(wquark1_pid) else 999
-                wquark2_deltaR = jet.deltaR(wquark2) if jet.deltaR(wquark2) < JET_DR and np.abs(jet_flav) == np.abs(wquark2_pid) else 999
+                # bquark_deltaR = jet.deltaR(bquark) if jet.deltaR(bquark) < JET_DR and np.abs(jet_flav) == 5 else 999
+                # wquark1_deltaR = jet.deltaR(wquark1) if jet.deltaR(wquark1) < JET_DR and np.abs(jet_flav) == np.abs(wquark1_pid) else 999
+                # wquark2_deltaR = jet.deltaR(wquark2) if jet.deltaR(wquark2) < JET_DR and np.abs(jet_flav) == np.abs(wquark2_pid) else 999
+                bquark_deltaR = jet.deltaR(bquark) if jet.deltaR(bquark) < JET_DR else 999
+                wquark1_deltaR = jet.deltaR(wquark1) if jet.deltaR(wquark1) < JET_DR else 999
+                wquark2_deltaR = jet.deltaR(wquark2) if jet.deltaR(wquark2) < JET_DR else 999
 
                 wquark_deltaR = wquark1_deltaR if wquark1_deltaR < wquark2_deltaR else wquark2_deltaR
                 min_j_deltaR, q = (bquark_deltaR, 1) if bquark_deltaR < wquark_deltaR else (wquark_deltaR, 2)  # 1 means bquark, 2 means wquark

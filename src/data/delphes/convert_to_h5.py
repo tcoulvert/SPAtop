@@ -289,6 +289,128 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     # print(f"top_q_idx where problems: \n{top_q_idx[problem_indices != -1]}")
     # print(f"fatjets where problems: \n{fj_top_idx[problem_indices != -1]}")
 
+    print(f"total number of events = {ak.num(top_idx, axis=0)}")
+
+    # two fully resolved tops
+    two_fullyResolved = (
+        (ak.sum(top_idx == 1, axis=1) == 3) & (ak.sum(top_idx == 2, axis=1) == 3)
+    )
+    print(f"number of reco. 2 tops fully-resolved events = {ak.sum(two_fullyResolved)}")
+    
+    # one fully resolved top, one semi-resolved top
+    one_fullyResolved_one_bqFjet = (
+        (
+            (ak.sum(top_idx == 2, axis=1) == 3) 
+            & (ak.sum(top_q_idx == 1, axis=1) == 1) 
+            & (ak.sum(fj_top_bq_idx == 1, axis=1) == 1)
+        ) | (
+            (ak.sum(top_idx == 1, axis=1) == 3) 
+            & (ak.sum(top_q_idx == 2, axis=1) == 1) 
+            & (ak.sum(fj_top_bq_idx == 2, axis=1) == 1)
+        )
+    )
+    print(f"number of reco. 1 top fully-resolved, 1 top semi-resolved (bq) events = {ak.sum(one_fullyResolved_one_bqFjet)}")
+    one_fullyResolved_one_qqFjet = (
+        (
+            (ak.sum(top_idx == 2, axis=1) == 3) 
+            & (ak.sum(top_b_idx == 1, axis=1) == 1) 
+            & (ak.sum(fj_top_qq_idx == 1, axis=1) == 1)
+        ) | (
+            (ak.sum(top_idx == 1, axis=1) == 3) 
+            & (ak.sum(top_b_idx == 2, axis=1) == 1) 
+            & (ak.sum(fj_top_qq_idx == 2, axis=1) == 1)
+        )
+    )
+    print(f"number of reco. 1 top fully-resolved, 1 top semi-resolved (qq) events = {ak.sum(one_fullyResolved_one_qqFjet)}")
+    one_fullyResolved_one_semiResolved = one_fullyResolved_one_bqFjet | one_fullyResolved_one_qqFjet
+    print(f"number of reco. 1 top fully-resolved, 1 top semi-resolved (bq or qq) events = {ak.sum(one_fullyResolved_one_semiResolved)}")
+    
+    # two semi-resolved tops
+    two_bqFjet = (
+        (ak.sum(top_q_idx == 2, axis=1) == 1) 
+        & (ak.sum(fj_top_bq_idx == 2, axis=1) == 1)
+        & (ak.sum(top_q_idx == 1, axis=1) == 1) 
+        & (ak.sum(fj_top_bq_idx == 1, axis=1) == 1)
+    )
+    print(f"number of reco. 2 tops semi-resolved (bq) events = {ak.sum(two_bqFjet)}")
+    one_bqFjet_one_qqFjet = (
+        (
+            (ak.sum(top_b_idx == 2, axis=1) == 1) 
+            & (ak.sum(fj_top_qq_idx == 2, axis=1) == 1)
+            & (ak.sum(top_q_idx == 1, axis=1) == 1) 
+            & (ak.sum(fj_top_bq_idx == 1, axis=1) == 1)
+        ) | (
+            (ak.sum(top_b_idx == 1, axis=1) == 1) 
+            & (ak.sum(fj_top_qq_idx == 1, axis=1) == 1)
+            & (ak.sum(top_q_idx == 2, axis=1) == 1) 
+            & (ak.sum(fj_top_bq_idx == 2, axis=1) == 1)
+        )
+    )
+    print(f"number of reco. 1 top semi-resolved (bq), 1 top semi-resolved (qq) events = {ak.sum(one_bqFjet_one_qqFjet)}")
+    two_qqFjet = (
+        (ak.sum(top_b_idx == 2, axis=1) == 1) 
+        & (ak.sum(fj_top_qq_idx == 2, axis=1) == 1)
+        & (ak.sum(top_b_idx == 1, axis=1) == 1) 
+        & (ak.sum(fj_top_qq_idx == 1, axis=1) == 1)
+    )
+    print(f"number of reco. 2 tops semi-resolved (qq) events = {ak.sum(two_qqFjet)}")
+    two_semiResolved = two_bqFjet | one_bqFjet_one_qqFjet | two_qqFjet
+    print(f"number of reco. 2 tops semi-resolved (bq or qq) events = {ak.sum(two_semiResolved)}")
+
+    # one fully resolved top, one fully-boosted top
+    one_fullyResolved_one_bqqFjet = (
+        (
+            (ak.sum(top_idx == 2, axis=1) == 3)
+            & (ak.sum(fj_top_bqq_idx == 1, axis=1) == 1)
+        ) | (
+            (ak.sum(top_idx == 1, axis=1) == 3)
+            & (ak.sum(fj_top_bqq_idx == 2, axis=1) == 1)
+        )
+    )
+    print(f"number of reco. 1 top fully-resolved, 1 top fully-boosted events = {ak.sum(one_fullyResolved_one_bqqFjet)}")
+    
+    # one semi-resolved top, one fully-boosted top
+    one_bqFjet_one_bqqFjet = (
+        (
+            (ak.sum(top_q_idx == 2, axis=1) == 1) 
+            & (ak.sum(fj_top_bq_idx == 2, axis=1) == 1)
+            & (ak.sum(fj_top_bqq_idx == 1, axis=1) == 1)
+        ) | (
+            (ak.sum(top_q_idx == 1, axis=1) == 1) 
+            & (ak.sum(fj_top_bq_idx == 1, axis=1) == 1)
+            & (ak.sum(fj_top_bqq_idx == 2, axis=1) == 1)
+        )
+    )
+    print(f"number of reco. 1 top semi-resolved (bq), 1 top fully-boosted events = {ak.sum(one_bqFjet_one_bqqFjet)}")
+    one_qqFjet_one_bqqFjet = (
+        (
+            (ak.sum(top_b_idx == 2, axis=1) == 1) 
+            & (ak.sum(fj_top_qq_idx == 2, axis=1) == 1)
+            & (ak.sum(fj_top_bqq_idx == 1, axis=1) == 1)
+        ) | (
+            (ak.sum(top_b_idx == 1, axis=1) == 1) 
+            & (ak.sum(fj_top_qq_idx == 1, axis=1) == 1)
+            & (ak.sum(fj_top_bqq_idx == 2, axis=1) == 1)
+        )
+    )
+    print(f"number of reco. 1 top semi-resolved (qq), 1 top fully-boosted events = {ak.sum(one_qqFjet_one_bqqFjet)}")
+    one_semiResolved_one_fullyBoosted = one_bqFjet_one_bqqFjet | one_qqFjet_one_bqqFjet
+    print(f"number of reco. 1 top semi-resolved (bq or qq), 1 top fully-boosted events = {ak.sum(one_semiResolved_one_fullyBoosted)}")
+    
+    # two fully-boosted tops
+    two_fullyBoosted = (
+        (
+            (ak.sum(top_q_idx == 2, axis=1) == 1) 
+            & (ak.sum(fj_top_bq_idx == 2, axis=1) == 1)
+            & (ak.sum(fj_top_bqq_idx == 1, axis=1) == 1)
+        ) | (
+            (ak.sum(top_q_idx == 1, axis=1) == 1) 
+            & (ak.sum(fj_top_bq_idx == 1, axis=1) == 1)
+            & (ak.sum(fj_top_bqq_idx == 2, axis=1) == 1)
+        )
+    )
+    print(f"number of reco. 2 tops fully-boosted events = {ak.sum(two_fullyBoosted)}")
+
     # keep events with >= min_jets small-radius jets
     min_jets = 3 * n_tops
     mask_minjets = ak.num(pt[pt > MIN_JET_PT]) >= min_jets
@@ -417,13 +539,13 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         check += np.unique(ak.count(top_jet_idxs[f"top{i+1}"], axis=-1)).to_list()
         check_b += np.unique(ak.count(top_jet_idxs[f"top{i+1}_b"], axis=-1)).to_list()
         check_q += np.unique(ak.count(top_jet_idxs[f"top{i+1}_q"], axis=-1)).to_list()
-    if 4 in check:
+    if 4 in check: 
         logging.warning(" Some tops match to 4 small-radius jets! Check truth")
     if 2 in check_b:
         logging.warning(" Some tops match to having 2 daughter bjets (i.e. 2 bjets directly from tops)! Check truth")
     if 3 in check_q:
         logging.warning(" Some tops match to having 3 W-daughter jets (i.e. 3 jets directly from Ws)! Check truth")
-    print(f"All proper numbers of jets: {ak.all(np.array(check) < 4) & ak.all(np.array(check_b) < 2) & ak.all(np.array(check_q) < 3)}")
+    print(f"All proper numbers of jets: {ak.all(np.array(check) <= 6) & ak.all(np.array(check_b) <= 2) & ak.all(np.array(check_q) <= 4)}")
     # np.unique(ak.count(h1_bs, axis=-1)).to_list() + np.unique(ak.count(h2_bs, axis=-1)).to_list()
     # if n_tops == 3:
     #     check += np.unique(ak.count(h3_bs, axis=-1)).to_list()
@@ -445,7 +567,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         logging.warning(" Some tops match to 2 large-radius jets in fj_check_bq! Check truth")
     if 2 in fj_check_qq:
         logging.warning(" Some tops match to 2 large-radius jets in fj_check_qq! Check truth")
-    print(f"All proper numbers of fjets: {ak.all(np.array(fj_check) < 2) & ak.all(np.array(fj_check_bqq) < 2) & ak.all(np.array(fj_check_bq) < 2) & ak.all(np.array(fj_check_qq) < 2)}")
+    print(f"All proper numbers of fjets: {ak.all(np.array(fj_check) <= 2) & ak.all(np.array(fj_check_bqq) <= 2) & ak.all(np.array(fj_check_bq) <= 2) & ak.all(np.array(fj_check_qq) <= 2)}")
     # fj_check = np.unique(ak.count(h1_bb, axis=-1)).to_list() + np.unique(ak.count(h2_bb, axis=-1)).to_list()
     # if n_tops == 3:
     #     fj_check += np.unique(ak.count(h3_bb, axis=-1)).to_list()
