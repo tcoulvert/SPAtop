@@ -48,6 +48,7 @@ def final_particle(particle_pdgid, mother_pdgid, particles, intermediate_particl
 def get_datasets(arrays, n_tops):  # noqa: C901
     part_pid = arrays["Particle/Particle.PID"]  # PDG ID
     part_status = arrays["Particle/Particle.Status"]
+    part_fUniqueID = arrays["Particle/Particle.fUniqueID"]  # Unique ID for jet matching
     part_m1 = arrays["Particle/Particle.M1"]
     part_d1 = arrays["Particle/Particle.D1"]
     part_d2 = arrays["Particle/Particle.D2"]
@@ -55,6 +56,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     part_eta = arrays["Particle/Particle.Eta"]
     part_phi = arrays["Particle/Particle.Phi"]
     part_mass = arrays["Particle/Particle.Mass"]
+
     # print(f"top d1 = \n{part_pid[part_d1[part_pid == 6]][:, -1]}\n{'='*60}")
     # print(f"all top d1 are bjets? = {ak.all(part_pid[part_d1[part_pid == 6]][:, -1] == 5)}\n{'='*60}")
     # print(f"top d2 = \n{part_pid[part_d2[part_pid == 6]][:, -1]}\n{'='*60}")
@@ -91,6 +93,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     mass = arrays["Jet/Jet.Mass"]
     btag = arrays["Jet/Jet.BTag"]
     flavor = arrays["Jet/Jet.Flavor"]
+    particle_fUniqueID = arrays["Jet/Jet.Particles"].refs
 
     # large-radius jet info
     fj_pt = arrays["FatJet/FatJet.PT"]
@@ -114,6 +117,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     fj_chargedenergyfrac = arrays["FatJet/FatJet.ChargedEnergyFraction"]
     fj_nneutral = arrays["FatJet/FatJet.NNeutrals"]
     fj_ncharged = arrays["FatJet/FatJet.NCharged"]
+    particle_fUniqueID = arrays["FatJet/FatJet.Particles"].refs
 
     particles = ak.zip(
         {
@@ -127,11 +131,10 @@ def get_datasets(arrays, n_tops):  # noqa: C901
             "d1": part_d1,
             "d2": part_d2,
             "idx": ak.local_index(part_pid),
+            "fUniqueID": part_fUniqueID,
         },
         with_name="Momentum4D",
     )
-
-
 
     tops_condition = np.logical_and(
         np.abs(particles.pid) == 6, np.logical_and(
@@ -148,8 +151,30 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     wbosons = ak.to_regular(final_particle(24, 6, particles), axis=1)
     wbosons = ak.to_regular(wbosons[topquark_idx_sort])
     
-    wquarks_d1 = ak.to_regular(particles[wbosons.d1], axis=1)
-    wquarks_d2 = ak.to_regular(particles[wbosons.d2], axis=1)
+    wquarks_d1 = ak.to_regular(
+        final_particle(
+            np.abs(ak.to_regular(particles.pid[wbosons.d1], axis=1)), None, particles, 
+            intermediate_particles=particles[wbosons.d1]
+        ), axis=1
+    )
+    wquarks_d2 = ak.to_regular(
+        final_particle(
+            np.abs(ak.to_regular(particles.pid[wbosons.d2], axis=1)), None, particles, 
+            intermediate_particles=particles[wbosons.d2]
+        ), axis=1
+    )
+
+    # for i in range(3):
+    #     print(f"Jet/Jet.Particles.refs = {arrays['Jet/Jet.Particles'].refs}")
+    #     print(f"Jet/Jet.Particles[{i}] = {arrays['Jet/Jet.Particles'][i].refs}")
+    #     print(f"Jet/Jet.Particles[{i}][0] = {arrays['Jet/Jet.Particles'][i][0]}")
+    #     print(f"Jet/Jet.Particles[{i}][0].refs = {arrays['Jet/Jet.Particles'][i][0].refs}")
+    #     print(f"Particle/Particle.fUniqueID = {arrays['Particle/Particle.fUniqueID']}")
+    #     print(f"Particle/Particle.fUniqueID[{i}] = {arrays['Particle/Particle.fUniqueID'][i]}")
+    #     print(f"Particles[{i}] = {particles[0]}")
+    #     print(f"Particles[Jet/Jet.Particles[{i}][0]] = {particles[0][arrays['Jet/Jet.Particles'][i][0].refs[0]]}")
+    #     print(f"Particles.pid[Jet/Jet.Particles[{i}][0]] = {particles.pid[0][arrays['Jet/Jet.Particles'][i][0].refs[0]]}")
+    #     print(f"FatJet/FatJet.Particles[{i}] = {arrays['FatJet/FatJet.Particles'][i]}")
     
     # print(f"w.d1 pid: \n{wquarks_d1.pid}")
     # print(f"w.d1 m1: \n{wquarks_d1.m1}")
@@ -216,9 +241,10 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     # print(f"wbosons: \n{wbosons}\n{'-'*60}")
     # print(f"num wbosons: \n{ak.num(wbosons)}\n{'-'*60}")
     # print(f"num wbosons = n_tops?: \n{ak.all(ak.num(wbosons) == n_tops)}\n{'-'*60 + '-'*60}")
-    # print(f"wquarks: \n{wquarks}\n{'-'*60}")
-    # print(f"num wquarks: \n{ak.num(wquarks)}\n{'-'*60}")
-    # print(f"num wquarks = 2 * n_tops?: \n{ak.all(ak.num(wquarks.d1) == n_tops) & ak.all(ak.num(wquarks.d2) == n_tops)}\n{'-'*60}")
+    # print(f"wquarks_d1: \n{wquarks_d1}\n{'-'*60}")
+    # print(f"wquarks_d2: \n{wquarks_d2}\n{'-'*60}")
+    # print(f"num wquarks: \n{ak.num(wquarks_d1) + ak.num(wquarks_d2)}\n{'-'*60}")
+    # print(f"num wquarks = 2 * n_tops?: \n{ak.all(ak.num(wquarks_d1) == n_tops) & ak.all(ak.num(wquarks_d2) == n_tops)}\n{'-'*60}")
 
     jets = ak.zip(
         {
@@ -228,6 +254,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
             "mass": mass,
             "flavor": flavor,
             "idx": ak.local_index(pt),
+            # "particle_fUniqueID": particle_fUniqueID,
         },
         with_name="Momentum4D",
     )
@@ -242,6 +269,33 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         },
         with_name="Momentum4D",
     )
+
+    print(ak.type(arrays["Jet/Jet.Particles"].refs))
+    print(ak.type(bquarks))
+    bquark_jets = ak.argcartesian(
+        {'bquark_ID': bquarks.fUniqueID, 'jet': arrays["Jet/Jet.Particles"].refs}, axis=1
+    )
+    print(bquark_jets)
+    print(ak.type(bquark_jets))
+
+    temp = ak.any(
+        arrays["Jet/Jet.Particles"].refs == bquarks.fUniqueID, axis=-1
+    )
+    print(ak.type(temp))
+    print(temp)
+
+    def bjet_matching(quark_fUniqueID, jet_ref_arrays):
+        for quark_event, jet_event in zip(quark_fUniqueID, jet_ref_arrays):
+            for top_idx, quark_ID in enumerate(quark_event):
+                
+                for jet_ref_array in jet_event:
+                    for jet_ref in jet_ref_array:
+                        if jet_ref == quark_ID:
+                            match_idx = top_idx
+                            break
+
+    # bjets_idx = ak.where(
+    #     jets.particle_fUniqueID == bquarks.fUniqueID
     
     top_idx, top_b_idx, top_q_idx = match_top_to_jet(
         bquarks, wquarks_d1, wquarks_d2, jets, 
@@ -253,7 +307,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
 
     matched_fj_idx = match_fjet_to_jet(fjets, jets, ak.ArrayBuilder()).snapshot()
     fj_top_idx, fj_top_bqq_idx, fj_top_bq_idx, fj_top_qq_idx = match_top_to_fjet(
-        topquarks, bquarks, wquarks_d1, wquarks_d2, fjets, 
+        bquarks, wquarks_d1, wquarks_d2, fjets, 
         ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder()
     )
     fj_top_idx, fj_top_bqq_idx, fj_top_bq_idx, fj_top_qq_idx = (

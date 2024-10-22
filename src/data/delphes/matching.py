@@ -15,11 +15,11 @@ FJET_DR = 0.8  # https://github.com/delphes/delphes/blob/master/cards/delphes_ca
 
 @nb.njit
 def match_top_to_fjet(
-    tops, bquarks, wquarks1, wquarks2, fjets, 
+    bquarks, wquarks1, wquarks2, fjets, 
     all_fjet_builder, bqq_fjet_builder, bq_fjet_builder, qq_fjet_builder
 ):
-    for tops_event, bquarks_event, wquarks1_event, wquarks2_event, fjets_event in zip(
-        tops, bquarks, wquarks1, wquarks2, fjets
+    for bquarks_event, wquarks1_event, wquarks2_event, fjets_event in zip(
+        bquarks, wquarks1, wquarks2, fjets
     ):
         all_fjet_builder.begin_list()
         bqq_fjet_builder.begin_list()
@@ -29,19 +29,18 @@ def match_top_to_fjet(
             all_match_idx, bqq_match_idx, bq_match_idx, qq_match_idx = -1, -1, -1, -1
 
             mindeltaR, mindeltaR_idxs = 999, (0, 0)  # mindeltaR, (mindeltaR_topidx, mindeltaR_quarktype)
-            for j, (top, bquark, wquark1, wquark2) in enumerate(zip(
-                tops_event, bquarks_event,
+            for j, (bquark, wquark1, wquark2) in enumerate(zip(
+                bquarks_event,
                 wquarks1_event, wquarks2_event
             )):  # dont need to check b and w mother index b/c made them match by construction
-                top_deltaR = fjet.deltaR(top)
                 bquark_deltaR = fjet.deltaR(bquark)
                 wquark1_deltaR = fjet.deltaR(wquark1)
                 wquark2_deltaR = fjet.deltaR(wquark2)
 
                 bqq_avg_deltaR = (
-                    top_deltaR + bquark_deltaR + wquark1_deltaR + wquark2_deltaR
-                )/4 if (
-                    top_deltaR < FJET_DR and bquark_deltaR < FJET_DR and 
+                    bquark_deltaR + wquark1_deltaR + wquark2_deltaR
+                )/3 if (
+                    bquark_deltaR < FJET_DR and 
                     wquark1_deltaR < FJET_DR and wquark2_deltaR < FJET_DR
                 ) else 999
                 if bqq_avg_deltaR < mindeltaR or (bqq_avg_deltaR < 999 and mindeltaR_idxs[1] != 1):  # 1 means bqq fatjet
@@ -100,15 +99,16 @@ def match_top_to_jet(
         alljet_builder.begin_list()
         bjet_builder.begin_list()
         wjet_builder.begin_list()
-        for i, (jet, jet_flav) in enumerate(zip(jets_event, jets_event.flavor)):
-            alljet_match_idx, bjet_match_idx, wjet_match_idx = -1, -1, -1
-
+        for j, (bquark, wquark1, wquark1_pid, wquark2, wquark2_pid) in enumerate(zip(
+            bquarks_event,
+            wquarks1_event, wquarks1_event.pid, 
+            wquarks2_event, wquarks2_event.pid
+        )):  # dont need to check b and w mother index b/c made them match by construction
+            
             mindeltaR, mindeltaR_idxs = 999, (0, 0)  # mindeltaR, (mindeltaR_topidx, mindeltaR_quarktype)
-            for j, (bquark, wquark1, wquark1_pid, wquark2, wquark2_pid) in enumerate(zip(
-                bquarks_event,
-                wquarks1_event, wquarks1_event.pid, 
-                wquarks2_event, wquarks2_event.pid
-            )):  # dont need to check b and w mother index b/c made them match by construction
+            for i, (jet, jet_flav) in enumerate(zip(jets_event, jets_event.flavor)):
+                alljet_match_idx, bjet_match_idx, wjet_match_idx = -1, -1, -1
+            
                 # bquark_deltaR = jet.deltaR(bquark) if jet.deltaR(bquark) < JET_DR and np.abs(jet_flav) == 5 else 999
                 # wquark1_deltaR = jet.deltaR(wquark1) if jet.deltaR(wquark1) < JET_DR and np.abs(jet_flav) == np.abs(wquark1_pid) else 999
                 # wquark2_deltaR = jet.deltaR(wquark2) if jet.deltaR(wquark2) < JET_DR and np.abs(jet_flav) == np.abs(wquark2_pid) else 999
@@ -137,6 +137,55 @@ def match_top_to_jet(
         wjet_builder.end_list()
 
     return alljet_builder, bjet_builder, wjet_builder
+
+# @nb.njit
+# def match_top_to_jet(
+#     bquarks, wquarks1, wquarks2, jets, 
+#     alljet_builder, bjet_builder, wjet_builder
+# ):
+#     for bquarks_event, wquarks1_event, wquarks2_event, jets_event in zip(
+#         bquarks, wquarks1, wquarks2, jets
+#     ):
+#         alljet_builder.begin_list()
+#         bjet_builder.begin_list()
+#         wjet_builder.begin_list()
+#         for i, (jet, jet_flav) in enumerate(zip(jets_event, jets_event.flavor)):
+#             alljet_match_idx, bjet_match_idx, wjet_match_idx = -1, -1, -1
+
+#             mindeltaR, mindeltaR_idxs = 999, (0, 0)  # mindeltaR, (mindeltaR_topidx, mindeltaR_quarktype)
+#             for j, (bquark, wquark1, wquark1_pid, wquark2, wquark2_pid) in enumerate(zip(
+#                 bquarks_event,
+#                 wquarks1_event, wquarks1_event.pid, 
+#                 wquarks2_event, wquarks2_event.pid
+#             )):  # dont need to check b and w mother index b/c made them match by construction
+#                 # bquark_deltaR = jet.deltaR(bquark) if jet.deltaR(bquark) < JET_DR and np.abs(jet_flav) == 5 else 999
+#                 # wquark1_deltaR = jet.deltaR(wquark1) if jet.deltaR(wquark1) < JET_DR and np.abs(jet_flav) == np.abs(wquark1_pid) else 999
+#                 # wquark2_deltaR = jet.deltaR(wquark2) if jet.deltaR(wquark2) < JET_DR and np.abs(jet_flav) == np.abs(wquark2_pid) else 999
+#                 bquark_deltaR = jet.deltaR(bquark) if jet.deltaR(bquark) < JET_DR else 999
+#                 wquark1_deltaR = jet.deltaR(wquark1) if jet.deltaR(wquark1) < JET_DR else 999
+#                 wquark2_deltaR = jet.deltaR(wquark2) if jet.deltaR(wquark2) < JET_DR else 999
+
+#                 wquark_deltaR = wquark1_deltaR if wquark1_deltaR < wquark2_deltaR else wquark2_deltaR
+#                 min_j_deltaR, q = (bquark_deltaR, 1) if bquark_deltaR < wquark_deltaR else (wquark_deltaR, 2)  # 1 means bquark, 2 means wquark
+
+#                 if min_j_deltaR < mindeltaR:
+#                     mindeltaR = min_j_deltaR
+#                     mindeltaR_idxs = (j+1, q)  # j+1 b/c index top as 1, 2, 3, etc
+
+#             if mindeltaR != 999:
+#                 alljet_match_idx = mindeltaR_idxs[0]
+#                 bjet_match_idx = mindeltaR_idxs[0] if mindeltaR_idxs[1] == 1 else bjet_match_idx
+#                 wjet_match_idx = mindeltaR_idxs[0] if mindeltaR_idxs[1] == 2 else wjet_match_idx
+
+#             alljet_builder.append(alljet_match_idx)
+#             bjet_builder.append(bjet_match_idx)
+#             wjet_builder.append(wjet_match_idx)
+
+#         alljet_builder.end_list()
+#         bjet_builder.end_list()
+#         wjet_builder.end_list()
+
+#     return alljet_builder, bjet_builder, wjet_builder
 
 @nb.njit
 def match_fjet_to_jet(fjets, jets, builder):
