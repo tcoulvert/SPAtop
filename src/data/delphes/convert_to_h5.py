@@ -140,13 +140,13 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     )
     topquarks = ak.to_regular(particles[tops_condition], axis=1)
     topquark_idx_sort = ak.argsort(topquarks.idx, axis=-1)
-    topquarks = topquarks[topquark_idx_sort]
+    topquarks = ak.to_regular(topquarks[topquark_idx_sort])
 
     bquarks = ak.to_regular(final_particle(5, 6, particles), axis=1)
-    bquarks = bquarks[topquark_idx_sort]
+    bquarks = ak.to_regular(bquarks[topquark_idx_sort])
 
     wbosons = ak.to_regular(final_particle(24, 6, particles), axis=1)
-    wbosons = wbosons[topquark_idx_sort]
+    wbosons = ak.to_regular(wbosons[topquark_idx_sort])
     
     wquarks_d1 = ak.to_regular(particles[wbosons.d1], axis=1)
     wquarks_d2 = ak.to_regular(particles[wbosons.d2], axis=1)
@@ -410,6 +410,64 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         )
     )
     print(f"number of reco. 2 tops fully-boosted events = {ak.sum(two_fullyBoosted)}")
+
+    # number matched bjets
+    matched_bjet = (
+        (ak.sum(top_b_idx == 1, axis=1) == 1) & (ak.sum(top_b_idx == 2, axis=1) == 1)
+    )
+    print(f"number of reco. events w/ exactly 1 resolved-bjet matched to each top = {ak.sum(matched_bjet)}")
+    matched_bjet_in_fjet = (
+        (
+            (ak.sum(fj_top_bq_idx == 1, axis=1) == 1) 
+            | (ak.sum(fj_top_bqq_idx == 1, axis=1) == 1)
+        ) & (
+            (ak.sum(fj_top_bq_idx == 2, axis=1) == 1) 
+            | (ak.sum(fj_top_bqq_idx == 2, axis=1) == 1)
+        )
+    )
+    print(f"number of reco. events w/ exactly 1 boosted-bjet matched to each top = {ak.sum(matched_bjet_in_fjet)}")
+    matched_bjet_total = matched_bjet | matched_bjet_in_fjet | (
+        (
+            (
+                (ak.sum(fj_top_bq_idx == 1, axis=1) == 1) 
+                | (ak.sum(fj_top_bqq_idx == 1, axis=1) == 1)
+            ) & (ak.sum(top_b_idx == 2, axis=1) == 1)
+        ) | (
+            (
+                (ak.sum(fj_top_bq_idx == 2, axis=1) == 1) 
+                | (ak.sum(fj_top_bqq_idx == 2, axis=1) == 1)
+            ) & (ak.sum(top_b_idx == 1, axis=1) == 1)
+        )
+    )
+    print(f"total number of reco. events w/ a bjet matched to each top (boosted+resolved) = {ak.sum(matched_bjet_total)}")
+    matched_qjet = (
+        (ak.sum(top_q_idx == 1, axis=1) == 2) & (ak.sum(top_q_idx == 2, axis=1) == 2)
+    )
+    print(f"number of reco. events w/ exactly 2 resolved-qjets matched to each top = {ak.sum(matched_qjet)}")
+
+    # print(ak.firsts(particles).deltaR(jets))
+    # print(wquarks_d1)
+    # print(wquarks_d2)
+    # print(ak.local_index(wquarks_d1))
+    # print(wquarks_d1[ak.local_index(wquarks_d1) == 0])
+    # print(bquarks)
+    # print(bquarks[ak.local_index(bquarks) == 0])
+    # print(ak.type(wquarks_d1))
+    # print(ak.type(bquarks))
+    # print(f"always 2 bquarks? = {ak.all(ak.num(bquarks) == 2)}")
+    print(f"min DeltaR btwn bquark1 and jets = {ak.min(bquarks[ak.local_index(bquarks) == 0].deltaR(jets), axis=1)}")
+    print(f"min DeltaR btwn bquark2 and jets = {ak.min(bquarks[ak.local_index(bquarks) == 1].deltaR(jets), axis=1)}")
+    print(f"min DeltaR btwn w1quark1 and jets = {ak.min(wquarks_d1[ak.local_index(wquarks_d1) == 0].deltaR(jets), axis=1)}")
+    print(f"min DeltaR btwn w1quark2 and jets = {ak.min(wquarks_d2[ak.local_index(wquarks_d2) == 0].deltaR(jets), axis=1)}")
+    print(f"min DeltaR btwn w2quark1 and jets = {ak.min(wquarks_d1[ak.local_index(wquarks_d1) == 1].deltaR(jets), axis=1)}")
+    print(f"min DeltaR btwn w2quark2 and jets = {ak.min(wquarks_d2[ak.local_index(wquarks_d2) == 1].deltaR(jets), axis=1)}")
+
+    print(f"min Delta pT btwn bquark1 and jets = {ak.min(ak.where(bquarks.pt[ak.local_index(bquarks) == 0] - jets.pt > 0, bquarks.pt[ak.local_index(bquarks) == 0] - jets.pt, -(bquarks.pt[ak.local_index(bquarks) == 0] - jets.pt)), axis=1)}")
+    print(f"min Delta pT btwn bquark2 and jets = {ak.min(ak.where(bquarks.pt[ak.local_index(bquarks) == 1] - jets.pt > 0, bquarks.pt[ak.local_index(bquarks) == 1] - jets.pt, -(bquarks.pt[ak.local_index(bquarks) == 1] - jets.pt)), axis=1)}")
+    print(f"min Delta pT btwn w1quark1 and jets = {ak.min(ak.where(wquarks_d1.pt[ak.local_index(wquarks_d1) == 0] - jets.pt > 0, wquarks_d1.pt[ak.local_index(wquarks_d1) == 0] - jets.pt, -(wquarks_d1.pt[ak.local_index(wquarks_d1) == 0] - jets.pt)), axis=1)}")
+    print(f"min Delta pT btwn w1quark2 and jets = {ak.min(ak.where(wquarks_d2.pt[ak.local_index(wquarks_d2) == 0] - jets.pt > 0, wquarks_d2.pt[ak.local_index(wquarks_d2) == 0] - jets.pt, -(wquarks_d2.pt[ak.local_index(wquarks_d2) == 0] - jets.pt)), axis=1)}")
+    print(f"min Delta pT btwn w2quark1 and jets = {ak.min(ak.where(wquarks_d1.pt[ak.local_index(wquarks_d1) == 1] - jets.pt > 0, wquarks_d1.pt[ak.local_index(wquarks_d1) == 1] - jets.pt, -(wquarks_d1.pt[ak.local_index(wquarks_d1) == 1] - jets.pt)), axis=1)}")
+    print(f"min Delta pT btwn w2quark2 and jets = {ak.min(ak.where(wquarks_d2.pt[ak.local_index(wquarks_d2) == 1] - jets.pt > 0, wquarks_d2.pt[ak.local_index(wquarks_d2) == 1] - jets.pt, -(wquarks_d2.pt[ak.local_index(wquarks_d2) == 1] - jets.pt)), axis=1)}")
 
     # keep events with >= min_jets small-radius jets
     min_jets = 3 * n_tops
@@ -690,13 +748,21 @@ def main(in_files, out_file, train_frac, n_tops):
                 entry_start = int(train_frac * num_entries)
                 entry_stop = None
 
+            # for key in events.keys():
+            #     print(f"{key}\n{'-'*60}")
+            # print('='*60)
+            # print('='*60)
+            # print('='*60)
+
             keys = (
                 [key for key in events.keys() if "Particle/Particle." in key and "fBits" not in key]
                 + [key for key in events.keys() if "Jet/Jet." in key]
                 + [key for key in events.keys() if "FatJet/FatJet." in key and "fBits" not in key]
             )
+
             # for key in keys:
             #     print(f"{key}\n{'-'*60}")
+            
             arrays = events.arrays(keys, entry_start=entry_start, entry_stop=entry_stop)
             datasets = get_datasets(arrays, n_tops)
             for dataset_name, data in datasets.items():
