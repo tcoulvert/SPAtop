@@ -90,53 +90,83 @@ def match_top_to_fjet(
 
 @nb.njit
 def match_top_to_jet(
-    bquarks, wquarks1, wquarks2, jets, 
-    alljet_builder, bjet_builder, wjet_builder
+    quark_fUniqueID, jet_ref_arrays,
+    jet_builder
 ):
-    for bquarks_event, wquarks1_event, wquarks2_event, jets_event in zip(
-        bquarks, wquarks1, wquarks2, jets
-    ):
-        alljet_builder.begin_list()
-        bjet_builder.begin_list()
-        wjet_builder.begin_list()
-        for j, (bquark, wquark1, wquark1_pid, wquark2, wquark2_pid) in enumerate(zip(
-            bquarks_event,
-            wquarks1_event, wquarks1_event.pid, 
-            wquarks2_event, wquarks2_event.pid
-        )):  # dont need to check b and w mother index b/c made them match by construction
+    for quark_event, jet_event in zip(quark_fUniqueID, jet_ref_arrays):
+        jet_builder.begin_list()
+
+        for jet_ref_array in jet_event:
+            match_flag, match_idx = False, -1
             
-            mindeltaR, mindeltaR_idxs = 999, (0, 0)  # mindeltaR, (mindeltaR_topidx, mindeltaR_quarktype)
-            for i, (jet, jet_flav) in enumerate(zip(jets_event, jets_event.flavor)):
-                alljet_match_idx, bjet_match_idx, wjet_match_idx = -1, -1, -1
+            for top_idx, quark_ID in enumerate(quark_event):
+                # if match_flag:
+                #     break
+                # print(quark_ID)
+                # print(jet_ref_array)
+                
+                # for jet_ref in jet_ref_array:
+                #     if jet_ref == quark_ID:
+                #         match_idx = top_idx + 1  # +1 b/c index top as 1, 2, 3, etc
+                #         match_flag = True
+                #         break
+                match_idx = top_idx if quark_ID in set(jet_ref_array) else -1
             
-                # bquark_deltaR = jet.deltaR(bquark) if jet.deltaR(bquark) < JET_DR and np.abs(jet_flav) == 5 else 999
-                # wquark1_deltaR = jet.deltaR(wquark1) if jet.deltaR(wquark1) < JET_DR and np.abs(jet_flav) == np.abs(wquark1_pid) else 999
-                # wquark2_deltaR = jet.deltaR(wquark2) if jet.deltaR(wquark2) < JET_DR and np.abs(jet_flav) == np.abs(wquark2_pid) else 999
-                bquark_deltaR = jet.deltaR(bquark) if jet.deltaR(bquark) < JET_DR else 999
-                wquark1_deltaR = jet.deltaR(wquark1) if jet.deltaR(wquark1) < JET_DR else 999
-                wquark2_deltaR = jet.deltaR(wquark2) if jet.deltaR(wquark2) < JET_DR else 999
+            jet_builder.append(match_idx)
+        
+        jet_builder.end_list()
 
-                wquark_deltaR = wquark1_deltaR if wquark1_deltaR < wquark2_deltaR else wquark2_deltaR
-                min_j_deltaR, q = (bquark_deltaR, 1) if bquark_deltaR < wquark_deltaR else (wquark_deltaR, 2)  # 1 means bquark, 2 means wquark
+    return jet_builder
 
-                if min_j_deltaR < mindeltaR:
-                    mindeltaR = min_j_deltaR
-                    mindeltaR_idxs = (j+1, q)  # j+1 b/c index top as 1, 2, 3, etc
+# @nb.njit
+# def match_top_to_jet(
+#     bquarks, wquarks1, wquarks2, jets, 
+#     alljet_builder, bjet_builder, wjet_builder
+# ):
+#     for bquarks_event, wquarks1_event, wquarks2_event, jets_event in zip(
+#         bquarks, wquarks1, wquarks2, jets
+#     ):
+#         alljet_builder.begin_list()
+#         bjet_builder.begin_list()
+#         wjet_builder.begin_list()
+#         for j, (bquark, wquark1, wquark1_pid, wquark2, wquark2_pid) in enumerate(zip(
+#             bquarks_event,
+#             wquarks1_event, wquarks1_event.pid, 
+#             wquarks2_event, wquarks2_event.pid
+#         )):  # dont need to check b and w mother index b/c made them match by construction
+            
+#             mindeltaR, mindeltaR_idxs = 999, (0, 0)  # mindeltaR, (mindeltaR_topidx, mindeltaR_quarktype)
+#             for i, (jet, jet_flav) in enumerate(zip(jets_event, jets_event.flavor)):
+#                 alljet_match_idx, bjet_match_idx, wjet_match_idx = -1, -1, -1
+            
+#                 # bquark_deltaR = jet.deltaR(bquark) if jet.deltaR(bquark) < JET_DR and np.abs(jet_flav) == 5 else 999
+#                 # wquark1_deltaR = jet.deltaR(wquark1) if jet.deltaR(wquark1) < JET_DR and np.abs(jet_flav) == np.abs(wquark1_pid) else 999
+#                 # wquark2_deltaR = jet.deltaR(wquark2) if jet.deltaR(wquark2) < JET_DR and np.abs(jet_flav) == np.abs(wquark2_pid) else 999
+#                 bquark_deltaR = jet.deltaR(bquark) if jet.deltaR(bquark) < JET_DR else 999
+#                 wquark1_deltaR = jet.deltaR(wquark1) if jet.deltaR(wquark1) < JET_DR else 999
+#                 wquark2_deltaR = jet.deltaR(wquark2) if jet.deltaR(wquark2) < JET_DR else 999
 
-            if mindeltaR != 999:
-                alljet_match_idx = mindeltaR_idxs[0]
-                bjet_match_idx = mindeltaR_idxs[0] if mindeltaR_idxs[1] == 1 else bjet_match_idx
-                wjet_match_idx = mindeltaR_idxs[0] if mindeltaR_idxs[1] == 2 else wjet_match_idx
+#                 wquark_deltaR = wquark1_deltaR if wquark1_deltaR < wquark2_deltaR else wquark2_deltaR
+#                 min_j_deltaR, q = (bquark_deltaR, 1) if bquark_deltaR < wquark_deltaR else (wquark_deltaR, 2)  # 1 means bquark, 2 means wquark
 
-            alljet_builder.append(alljet_match_idx)
-            bjet_builder.append(bjet_match_idx)
-            wjet_builder.append(wjet_match_idx)
+#                 if min_j_deltaR < mindeltaR:
+#                     mindeltaR = min_j_deltaR
+#                     mindeltaR_idxs = (j+1, q)  # j+1 b/c index top as 1, 2, 3, etc
 
-        alljet_builder.end_list()
-        bjet_builder.end_list()
-        wjet_builder.end_list()
+#             if mindeltaR != 999:
+#                 alljet_match_idx = mindeltaR_idxs[0]
+#                 bjet_match_idx = mindeltaR_idxs[0] if mindeltaR_idxs[1] == 1 else bjet_match_idx
+#                 wjet_match_idx = mindeltaR_idxs[0] if mindeltaR_idxs[1] == 2 else wjet_match_idx
 
-    return alljet_builder, bjet_builder, wjet_builder
+#             alljet_builder.append(alljet_match_idx)
+#             bjet_builder.append(bjet_match_idx)
+#             wjet_builder.append(wjet_match_idx)
+
+#         alljet_builder.end_list()
+#         bjet_builder.end_list()
+#         wjet_builder.end_list()
+
+#     return alljet_builder, bjet_builder, wjet_builder
 
 # @nb.njit
 # def match_top_to_jet(

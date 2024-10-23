@@ -270,29 +270,42 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         with_name="Momentum4D",
     )
 
-    print(ak.type(arrays["Jet/Jet.Particles"].refs))
-    print(ak.type(bquarks))
-    bquark_jets = ak.argcartesian(
-        {'bquark_ID': bquarks.fUniqueID, 'jet': arrays["Jet/Jet.Particles"].refs}, axis=1
-    )
-    print(bquark_jets)
-    print(ak.type(bquark_jets))
+    # print(ak.type(arrays["Jet/Jet.Particles"].refs))
+    # print(ak.type(bquarks))
+    # bquark_jets = ak.argcartesian(
+    #     {'bquark_ID': bquarks.fUniqueID, 'jet': arrays["Jet/Jet.Particles"].refs}, axis=1
+    # )
+    # print(bquark_jets)
+    # print(ak.type(bquark_jets))
 
-    temp = ak.any(
-        arrays["Jet/Jet.Particles"].refs == bquarks.fUniqueID, axis=-1
-    )
-    print(ak.type(temp))
-    print(temp)
+    # temp = ak.any(
+    #     arrays["Jet/Jet.Particles"].refs == bquarks.fUniqueID, axis=-1
+    # )
+    # print(ak.type(temp))
+    # print(temp)
 
-    def bjet_matching(quark_fUniqueID, jet_ref_arrays):
-        for quark_event, jet_event in zip(quark_fUniqueID, jet_ref_arrays):
-            for top_idx, quark_ID in enumerate(quark_event):
-                
-                for jet_ref_array in jet_event:
-                    for jet_ref in jet_ref_array:
-                        if jet_ref == quark_ID:
-                            match_idx = top_idx
-                            break
+    top_b_idx = match_top_to_jet(
+        bquarks.fUniqueID, arrays["Jet/Jet.Particles"].refs, ak.ArrayBuilder()
+    ).snapshot()
+    top_q1_idx = match_top_to_jet(
+        wquarks_d1.fUniqueID, arrays["Jet/Jet.Particles"].refs, ak.ArrayBuilder()
+    ).snapshot()
+    top_q2_idx = match_top_to_jet(
+        wquarks_d2.fUniqueID, arrays["Jet/Jet.Particles"].refs, ak.ArrayBuilder()
+    ).snapshot()
+    top_q_idx = ak.where(top_q1_idx > 0, top_q1_idx, top_q2_idx)
+    top_idx = ak.where(top_b_idx > 0, top_b_idx, top_q_idx)
+
+    print(ak.type(top_b_idx))
+    print(top_b_idx)
+    print(ak.type(top_q1_idx))
+    print(top_q1_idx)
+    print(ak.type(top_q2_idx))
+    print(top_q2_idx)
+    print(ak.type(top_q_idx))
+    print(top_q_idx)
+    print(ak.type(top_idx))
+    print(top_idx)
 
     # bjets_idx = ak.where(
     #     jets.particle_fUniqueID == bquarks.fUniqueID
