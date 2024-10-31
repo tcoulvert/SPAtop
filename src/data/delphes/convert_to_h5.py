@@ -31,14 +31,24 @@ PROJECT_DIR = Path(__file__).resolve().parents[3]
 def to_np_array(ak_array, max_n=10, pad=0):
     return ak.fill_none(ak.pad_none(ak_array, max_n, clip=True, axis=-1), pad).to_numpy()
 
-def final_particle(particle_pdgid, mother_pdgid, particles, intermediate_particles=None):
+def final_particle(particle_pdgid, mother_pdgid, particles, final_status=-1, intermediate_particles=None):
     if intermediate_particles is None:
         intermediate_particles = particles[np.logical_and(
             np.abs(particles.pid) == particle_pdgid, np.abs(particles.pid[particles.m1]) == mother_pdgid
         )]
-    while ak.any(ak.any(np.abs(particles.pid[intermediate_particles.d1]) == particle_pdgid, axis=1), axis=0):
+    while ak.any(
+        ak.any(
+            np.logical_and(
+                np.abs(particles.pid[intermediate_particles.d1]) == particle_pdgid,
+                intermediate_particles.status != final_status
+            ), axis=1
+        ), axis=0
+    ):
         intermediate_particles = ak.where(
-            np.abs(particles.pid[intermediate_particles.d1]) == particle_pdgid,
+            np.logical_and(
+                np.abs(particles.pid[intermediate_particles.d1]) == particle_pdgid,
+                intermediate_particles.status != final_status
+            ),
             particles[intermediate_particles.d1],
             intermediate_particles
         )
@@ -136,33 +146,61 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         with_name="Momentum4D",
     )
 
-    tops_condition = np.logical_and(
-        np.abs(particles.pid) == 6, np.logical_and(
-            np.abs(particles.pid[particles.d1]) == 5, np.abs(particles.pid[particles.d2]) == 24
-        )   # do we know the bquarks are going to be daughter 1? yes, confirmed.
-    )
-    topquarks = ak.to_regular(particles[tops_condition], axis=1)
-    topquark_idx_sort = ak.argsort(topquarks.idx, axis=-1)
-    topquarks = ak.to_regular(topquarks[topquark_idx_sort])
-
-    bquarks = ak.to_regular(final_particle(5, 6, particles), axis=1)
-    bquarks = ak.to_regular(bquarks[topquark_idx_sort])
-
-    wbosons = ak.to_regular(final_particle(24, 6, particles), axis=1)
-    wbosons = ak.to_regular(wbosons[topquark_idx_sort])
+    # tops_condition = np.logical_and(
+    #     np.abs(particles.pid) == 6, np.logical_and(
+    #         np.abs(particles.pid[particles.d1]) == 5, np.abs(particles.pid[particles.d2]) == 24
+    #     )   # do we know the bquarks are going to be daughter 1? yes, confirmed.
+    # )
+    # topquarks = ak.to_regular(particles[tops_condition], axis=1)
+    # topquark_idx_sort = ak.argsort(topquarks.idx, axis=-1)
+    # topquarks = ak.to_regular(topquarks[topquark_idx_sort])
     
-    wquarks_d1 = ak.to_regular(
-        final_particle(
-            np.abs(ak.to_regular(particles.pid[wbosons.d1], axis=1)), None, particles, 
-            intermediate_particles=particles[wbosons.d1]
-        ), axis=1
-    )
-    wquarks_d2 = ak.to_regular(
-        final_particle(
-            np.abs(ak.to_regular(particles.pid[wbosons.d2], axis=1)), None, particles, 
-            intermediate_particles=particles[wbosons.d2]
-        ), axis=1
-    )
+    # print(f"topquarks statuses = \n{topquarks.status}")
+    # print('gets to bquarks')
+
+    # bquarks = ak.to_regular(final_particle(5, 6, particles, final_status=52), axis=1)
+    # bquarks = ak.to_regular(bquarks[topquark_idx_sort])
+
+    # print(f"bquarks statuses = \n{bquarks.status}")
+    # print('gets to wbosons')
+
+    # wbosons = ak.to_regular(final_particle(24, 6, particles, final_status=52), axis=1)
+    # wbosons = ak.to_regular(wbosons[topquark_idx_sort])
+
+    # print(f"wbosons statuses = \n{wbosons.status}")
+    # print('gets to wquarks_d1')
+    
+    # wquarks_d1 = ak.to_regular(
+    #     final_particle(
+    #         np.abs(ak.to_regular(particles.pid[wbosons.d1], axis=1)), None, particles, 
+    #         final_status=52, intermediate_particles=particles[wbosons.d1]
+    #     ), axis=1
+    # )
+    # print(f"wquarks_d1 statuses = \n{wquarks_d1.status}")
+    # print('gets to wquarks_d2')
+    # wquarks_d2 = ak.to_regular(
+    #     final_particle(
+    #         np.abs(ak.to_regular(particles.pid[wbosons.d2], axis=1)), None, particles, 
+    #         final_status=52, intermediate_particles=particles[wbosons.d2]
+    #     ), axis=1
+    # )
+    
+    # print(f"wquarks_d2 statuses = \n{wquarks_d2.status}")
+
+    # print(f"all topquarks statuses = \n{particles.status[tops_condition]}")
+    # bquarks_condition = np.logical_and(
+    #     np.abs(particles.pid) == 5, np.logical_or(
+    #         np.abs(particles.pid[particles.m1]) == 5, np.abs(particles.pid[particles.m1]) == 6
+    #     )
+    # )
+    # print(f"all bquarks statuses = \n{particles.status[bquarks_condition]}")
+    # wbosons_condition = np.logical_and(
+    #     np.abs(particles.pid) == 24, np.logical_or(
+    #         np.abs(particles.pid[particles.m1]) == 24, np.abs(particles.pid[particles.m1]) == 6
+    #     )
+    # )
+    # print(f"all wbosons statuses = \n{particles.status[wbosons_condition]}")
+
 
     # for i in range(3):
     #     print(f"Jet/Jet.Particles.refs = {arrays['Jet/Jet.Particles'].refs}")
@@ -270,6 +308,9 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         with_name="Momentum4D",
     )
 
+    print(f"id of min deltaR \n{particles.pid[np.argmin(particles.deltaR(jets))]}")
+
+
     # print(ak.type(arrays["Jet/Jet.Particles"].refs))
     # print(ak.type(bquarks))
     # bquark_jets = ak.argcartesian(
@@ -284,28 +325,28 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     # print(ak.type(temp))
     # print(temp)
 
-    top_b_idx = match_top_to_jet(
-        bquarks.fUniqueID, arrays["Jet/Jet.Particles"].refs, ak.ArrayBuilder()
-    ).snapshot()
-    top_q1_idx = match_top_to_jet(
-        wquarks_d1.fUniqueID, arrays["Jet/Jet.Particles"].refs, ak.ArrayBuilder()
-    ).snapshot()
-    top_q2_idx = match_top_to_jet(
-        wquarks_d2.fUniqueID, arrays["Jet/Jet.Particles"].refs, ak.ArrayBuilder()
-    ).snapshot()
-    top_q_idx = ak.where(top_q1_idx > 0, top_q1_idx, top_q2_idx)
-    top_idx = ak.where(top_b_idx > 0, top_b_idx, top_q_idx)
+    # top_b_idx = match_top_to_jet(
+    #     bquarks.fUniqueID, arrays["Jet/Jet.Particles"].refs, ak.ArrayBuilder()
+    # ).snapshot()
+    # top_q1_idx = match_top_to_jet(
+    #     wquarks_d1.fUniqueID, arrays["Jet/Jet.Particles"].refs, ak.ArrayBuilder()
+    # ).snapshot()
+    # top_q2_idx = match_top_to_jet(
+    #     wquarks_d2.fUniqueID, arrays["Jet/Jet.Particles"].refs, ak.ArrayBuilder()
+    # ).snapshot()
+    # top_q_idx = ak.where(top_q1_idx > 0, top_q1_idx, top_q2_idx)
+    # top_idx = ak.where(top_b_idx > 0, top_b_idx, top_q_idx)
 
-    print(ak.type(top_b_idx))
-    print(top_b_idx)
-    print(ak.type(top_q1_idx))
-    print(top_q1_idx)
-    print(ak.type(top_q2_idx))
-    print(top_q2_idx)
-    print(ak.type(top_q_idx))
-    print(top_q_idx)
-    print(ak.type(top_idx))
-    print(top_idx)
+    # print(ak.type(top_b_idx))
+    # print(top_b_idx)
+    # print(ak.type(top_q1_idx))
+    # print(top_q1_idx)
+    # print(ak.type(top_q2_idx))
+    # print(top_q2_idx)
+    # print(ak.type(top_q_idx))
+    # print(top_q_idx)
+    # print(ak.type(top_idx))
+    # print(top_idx)
 
     # bjets_idx = ak.where(
     #     jets.particle_fUniqueID == bquarks.fUniqueID
