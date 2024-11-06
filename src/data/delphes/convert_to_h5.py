@@ -304,7 +304,6 @@ def get_datasets(arrays, n_tops):  # noqa: C901
             "mass": mass,
             "flavor": flavor,
             "idx": ak.local_index(pt),
-            # "particle_fUniqueID": particle_fUniqueID,
         },
         with_name="Momentum4D",
     )
@@ -595,6 +594,15 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     min_dR_w2quark2 = ak.min(wquarks_d2[ak.local_index(wquarks_d2) == 1].deltaR(jets), axis=1)
     print(f"min DeltaR btwn w2quark2 and jets = {min_dR_w2quark2}")
 
+    bquark1_fiducial_mask = np.abs(bquarks.eta[ak.local_index(bquarks) == 0]) < 2.5
+    bquark2_fiducial_mask = np.abs(bquarks.eta[ak.local_index(bquarks) == 1]) < 2.5
+    w1quark1_fiducial_mask = np.abs(wquarks_d1.eta[ak.local_index(wquarks_d1) == 0]) < 2.5
+    w1quark2_fiducial_mask = np.abs(wquarks_d2.eta[ak.local_index(wquarks_d2) == 0]) < 2.5
+    w2quark1_fiducial_mask = np.abs(wquarks_d1.eta[ak.local_index(wquarks_d1) == 1]) < 2.5
+    w2quark2_fiducial_mask = np.abs(wquarks_d2.eta[ak.local_index(wquarks_d2) == 1]) < 2.5
+
+    num_measureable_events = bquark1_fiducial_mask & bquark2_fiducial_mask & w1quark1_fiducial_mask & w1quark2_fiducial_mask & w2quark1_fiducial_mask & w2quark2_fiducial_mask
+    print(f"num detectable events (|$\eta$| < 2.5) = {ak.sum(num_measureable_events)}")
     
     def weights_pt_hist(data, pt, n_bins: int=35, min_pt: float=0., max_pt: float=350.):
         bin_edges = np.array([(i * (max_pt-min_pt) / n_bins) + min_pt for i in range(n_bins+1)])
@@ -610,12 +618,12 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     hep.cms.text("Work in Progress", ax=ax)
     n_bins, min_pt, max_pt = 35, 0., 350.
     hist_axis = hist.axis.Regular(n_bins, min_pt, max_pt, name='var', label=r'$p_T$', growth=False, underflow=False, overflow=False)
-    bquark1_hist = hist.Hist(hist_axis, storage='weight').fill(var=bquarks.pt[ak.local_index(bquarks) == 0], weight=weights_pt_hist(min_dR_bquark1, bquarks.pt[ak.local_index(bquarks) == 0], n_bins, min_pt, max_pt))
-    bquark2_hist = hist.Hist(hist_axis, storage='weight').fill(var=bquarks.pt[ak.local_index(bquarks) == 1], weight=weights_pt_hist(min_dR_bquark2, bquarks.pt[ak.local_index(bquarks) == 1], n_bins, min_pt, max_pt))
-    w1quark1_hist = hist.Hist(hist_axis, storage='weight').fill(var=wquarks_d1.pt[ak.local_index(wquarks_d1) == 0], weight=weights_pt_hist(min_dR_w1quark1, wquarks_d1.pt[ak.local_index(wquarks_d1) == 0], n_bins, min_pt, max_pt))
-    w1quark2_hist = hist.Hist(hist_axis, storage='weight').fill(var=wquarks_d2.pt[ak.local_index(wquarks_d2) == 0], weight=weights_pt_hist(min_dR_w1quark2, wquarks_d2.pt[ak.local_index(wquarks_d2) == 0], n_bins, min_pt, max_pt))
-    w2quark1_hist = hist.Hist(hist_axis, storage='weight').fill(var=wquarks_d1.pt[ak.local_index(wquarks_d1) == 1], weight=weights_pt_hist(min_dR_w2quark1, wquarks_d1.pt[ak.local_index(wquarks_d1) == 1], n_bins, min_pt, max_pt))
-    w2quark2_hist = hist.Hist(hist_axis, storage='weight').fill(var=wquarks_d2.pt[ak.local_index(wquarks_d2) == 1], weight=weights_pt_hist(min_dR_w2quark2, wquarks_d2.pt[ak.local_index(wquarks_d2) == 1], n_bins, min_pt, max_pt))
+    bquark1_hist = hist.Hist(hist_axis, storage='weight').fill(var=bquarks.pt[ak.local_index(bquarks) == 0][bquark1_fiducial_mask], weight=weights_pt_hist(min_dR_bquark1[bquark1_fiducial_mask], bquarks.pt[ak.local_index(bquarks) == 0][bquark1_fiducial_mask], n_bins, min_pt, max_pt))
+    bquark2_hist = hist.Hist(hist_axis, storage='weight').fill(var=bquarks.pt[ak.local_index(bquarks) == 1][bquark2_fiducial_mask], weight=weights_pt_hist(min_dR_bquark2[bquark2_fiducial_mask], bquarks.pt[ak.local_index(bquarks) == 1][bquark2_fiducial_mask], n_bins, min_pt, max_pt))
+    w1quark1_hist = hist.Hist(hist_axis, storage='weight').fill(var=wquarks_d1.pt[ak.local_index(wquarks_d1) == 0][w1quark1_fiducial_mask], weight=weights_pt_hist(min_dR_w1quark1[w1quark1_fiducial_mask], wquarks_d1.pt[ak.local_index(wquarks_d1) == 0][w1quark1_fiducial_mask], n_bins, min_pt, max_pt))
+    w1quark2_hist = hist.Hist(hist_axis, storage='weight').fill(var=wquarks_d2.pt[ak.local_index(wquarks_d2) == 0][w1quark2_fiducial_mask], weight=weights_pt_hist(min_dR_w1quark2[w1quark2_fiducial_mask], wquarks_d2.pt[ak.local_index(wquarks_d2) == 0][w1quark2_fiducial_mask], n_bins, min_pt, max_pt))
+    w2quark1_hist = hist.Hist(hist_axis, storage='weight').fill(var=wquarks_d1.pt[ak.local_index(wquarks_d1) == 1][w2quark1_fiducial_mask], weight=weights_pt_hist(min_dR_w2quark1[w2quark1_fiducial_mask], wquarks_d1.pt[ak.local_index(wquarks_d1) == 1][w2quark1_fiducial_mask], n_bins, min_pt, max_pt))
+    w2quark2_hist = hist.Hist(hist_axis, storage='weight').fill(var=wquarks_d2.pt[ak.local_index(wquarks_d2) == 1][w2quark2_fiducial_mask], weight=weights_pt_hist(min_dR_w2quark2[w2quark2_fiducial_mask], wquarks_d2.pt[ak.local_index(wquarks_d2) == 1][w2quark2_fiducial_mask], n_bins, min_pt, max_pt))
     hep.histplot(
         [bquark1_hist, bquark2_hist, w1quark1_hist, w1quark2_hist, w2quark1_hist, w2quark2_hist], 
         yerr=True, alpha=0.5, histtype='step', label=['bquark1', 'bquark2', 'w1quark1', 'w1quark2', 'w2quark1', 'w2quark2']
@@ -648,17 +656,17 @@ def get_datasets(arrays, n_tops):  # noqa: C901
 
     print('-'*60)
     deltaR_cut = 0.5
-    frac_bquark1 = ak.sum(ak.min(bquarks[ak.local_index(bquarks) == 0].deltaR(jets), axis=1) < deltaR_cut) / ak.num(top_idx, axis=0)
+    frac_bquark1 = ak.sum(ak.min(bquarks[ak.local_index(bquarks) == 0][bquark1_fiducial_mask].deltaR(jets), axis=1) < deltaR_cut) / ak.num(top_idx[bquark1_fiducial_mask], axis=0)
     print(f"frac bquark1 within {deltaR_cut} = {frac_bquark1}")
-    frac_bquark2 = ak.sum(ak.min(bquarks[ak.local_index(bquarks) == 1].deltaR(jets), axis=1) < deltaR_cut) / ak.num(top_idx, axis=0)
+    frac_bquark2 = ak.sum(ak.min(bquarks[ak.local_index(bquarks) == 1][bquark2_fiducial_mask].deltaR(jets), axis=1) < deltaR_cut) / ak.num(top_idx[bquark2_fiducial_mask], axis=0)
     print(f"frac bquark2 within {deltaR_cut} = {frac_bquark2}")
-    frac_w1quark1 = ak.sum(ak.min(wquarks_d1[ak.local_index(wquarks_d1) == 0].deltaR(jets), axis=1) < deltaR_cut) / ak.num(top_idx, axis=0)
+    frac_w1quark1 = ak.sum(ak.min(wquarks_d1[ak.local_index(wquarks_d1) == 0][w1quark1_fiducial_mask].deltaR(jets), axis=1) < deltaR_cut) / ak.num(top_idx[w1quark1_fiducial_mask], axis=0)
     print(f"frac w1quark1 within {deltaR_cut} = {frac_w1quark1}")
-    frac_w1quark2 = ak.sum(ak.min(wquarks_d2[ak.local_index(wquarks_d2) == 0].deltaR(jets), axis=1) < deltaR_cut) / ak.num(top_idx, axis=0)
+    frac_w1quark2 = ak.sum(ak.min(wquarks_d2[ak.local_index(wquarks_d2) == 0][w1quark2_fiducial_mask].deltaR(jets), axis=1) < deltaR_cut) / ak.num(top_idx[w1quark2_fiducial_mask], axis=0)
     print(f"frac w1quark2 within {deltaR_cut} = {frac_w1quark2}")
-    frac_w2quark1 = ak.sum(ak.min(wquarks_d1[ak.local_index(wquarks_d1) == 1].deltaR(jets), axis=1) < deltaR_cut) / ak.num(top_idx, axis=0)
+    frac_w2quark1 = ak.sum(ak.min(wquarks_d1[ak.local_index(wquarks_d1) == 1][w2quark1_fiducial_mask].deltaR(jets), axis=1) < deltaR_cut) / ak.num(top_idx[w2quark1_fiducial_mask], axis=0)
     print(f"frac w2quark1 within {deltaR_cut} = {frac_w2quark1}")
-    frac_w2quark2 = ak.sum(ak.min(wquarks_d2[ak.local_index(wquarks_d2) == 1].deltaR(jets), axis=1) < deltaR_cut) / ak.num(top_idx, axis=0)
+    frac_w2quark2 = ak.sum(ak.min(wquarks_d2[ak.local_index(wquarks_d2) == 1][w2quark2_fiducial_mask].deltaR(jets), axis=1) < deltaR_cut) / ak.num(top_idx[w2quark2_fiducial_mask], axis=0)
     print(f"frac w2quark2 within {deltaR_cut} = {frac_w2quark2}")
     expected_resolved_efficiency = frac_bquark1 * frac_bquark2 * frac_w1quark1 * frac_w1quark2 * frac_w2quark1 * frac_w2quark2
     print(f"expected fully-resolved efficiency at dR {deltaR_cut} = {expected_resolved_efficiency}")
