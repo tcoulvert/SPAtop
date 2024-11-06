@@ -73,35 +73,6 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     part_phi = arrays["Particle/Particle.Phi"]
     part_mass = arrays["Particle/Particle.Mass"]
 
-    # print(f"top d1 = \n{part_pid[part_d1[part_pid == 6]][:, -1]}\n{'='*60}")
-    # print(f"all top d1 are bjets? = {ak.all(part_pid[part_d1[part_pid == 6]][:, -1] == 5)}\n{'='*60}")
-    # print(f"top d2 = \n{part_pid[part_d2[part_pid == 6]][:, -1]}\n{'='*60}")
-    # print(f"all top d2 are Ws? = {ak.all((part_pid[part_d2[part_pid == 6]][:, -1] == 24) | (part_pid[part_d2[part_pid == 6]][:, -1] == -24))}\n{'='*60}")
-    # print(f"d1 of W-: \n{part_pid[part_d1[part_pid == -24]][:, -1]}\n{'='*60}")
-    # print(f"d1 of W+: \n{part_pid[part_d1[part_pid == 24]][:, -1]}\n{'='*60}")
-    # print(f"d2 of W-: \n{part_pid[part_d2[part_pid == -24]][:, -1]}\n{'='*60}")
-    # print(f"d2 of W+: \n{part_pid[part_d2[part_pid == 24]][:, -1]}\n{'='*60}")
-    # print(f"how many None d1 of W-: \n{ak.sum(ak.is_none(part_pid[part_d1[part_pid == -24]][:, -1]))}\n{'='*60}")
-    # print(f"how many None d1 of W+: \n{ak.sum(ak.is_none(part_pid[part_d1[part_pid == 24]][:, -1]))}\n{'='*60}")
-    # print(f"how many None d2 of W-: \n{ak.sum(ak.is_none(part_pid[part_d2[part_pid == -24]][:, -1]))}\n{'='*60}")
-    # print(f"how many None d2 of W+: \n{ak.sum(ak.is_none(part_pid[part_d2[part_pid == 24]][:, -1]))}\n{'='*60}")
-    # print(f"t statuses: {arrays['Particle/Particle.Status'][np.abs(part_pid) == 6][1]}")
-    # print(f"b statuses: {arrays['Particle/Particle.Status'][(np.abs(part_pid) == 5)][1]}")
-    # print(f"W statuses: {arrays['Particle/Particle.Status'][(np.abs(part_pid) == 24)][1]}")
-    # print(f"b parents: {arrays['Particle/Particle.Status'][part_m1[(np.abs(part_pid) == 5)]][1]}")
-    # print(f"W parents: {arrays['Particle/Particle.Status'][part_m1[(np.abs(part_pid) == 24)]][1]}")
-    # print(f"W d1 PID: {arrays['Particle/Particle.PID'][part_d1[(np.abs(part_pid) == 24)]][1]}")
-    # print(f"W d2 PID: {arrays['Particle/Particle.PID'][part_d2[(np.abs(part_pid) == 24)]][1]}")
-    # print(f"W d1 mother PID: {arrays['Particle/Particle.PID'][part_m1[(np.abs(part_pid) == 24)]][1]}")
-    # print(f"W d2 mother PID: {arrays['Particle/Particle.PID'][part_m1[(np.abs(part_pid) == 24)]][1]}")
-    # print(f"W d1 mother Status: {arrays['Particle/Particle.Status'][part_m1[(np.abs(part_pid) == 24)]][1]}")
-    # print(f"W d2 mother Status: {arrays['Particle/Particle.Status'][part_m1[(np.abs(part_pid) == 24)]][1]}")
-    # print(f"unique t statuses: {np.unique(arrays['Particle/Particle.Status'][np.abs(part_pid) == 6][1])}")
-    # print(f"unique b statuses: {np.unique(arrays['Particle/Particle.Status'][(np.abs(part_pid) == 5)][1])}")
-    # print(f"unique W statuses: {np.unique(arrays['Particle/Particle.Status'][(np.abs(part_pid) == 24)][1])}")
-    # print(f"b statuses: {arrays['Particle/Particle.Status'][np.logical_and(np.abs(part_pid) == 5, np.abs(part_pid[part_m1]) == 6)][0]}")
-    # print(f"W statuses: {arrays['Particle/Particle.Status'][np.logical_and(np.abs(part_pid) == 24, np.abs(part_pid[part_m1]) == 6)][0]}")
-
     # small-radius jet info
     pt = arrays["Jet/Jet.PT"]
     eta = arrays["Jet/Jet.Eta"]
@@ -145,7 +116,6 @@ def get_datasets(arrays, n_tops):  # noqa: C901
             "d1": part_d1,
             "d2": part_d2,
             "idx": ak.local_index(part_pid),
-            "fUniqueID": part_fUniqueID,
         },
         with_name="Momentum4D",
     )
@@ -186,103 +156,6 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         ), axis=1
     )
 
-    # print(f"all topquarks statuses = \n{particles.status[tops_condition]}")
-    # bquarks_condition = np.logical_and(
-    #     np.abs(particles.pid) == 5, np.logical_or(
-    #         np.abs(particles.pid[particles.m1]) == 5, np.abs(particles.pid[particles.m1]) == 6
-    #     )
-    # )
-    # print(f"all bquarks statuses = \n{particles.status[bquarks_condition]}")
-    # wbosons_condition = np.logical_and(
-    #     np.abs(particles.pid) == 24, np.logical_or(
-    #         np.abs(particles.pid[particles.m1]) == 24, np.abs(particles.pid[particles.m1]) == 6
-    #     )
-    # )
-    # print(f"all wbosons statuses = \n{particles.status[wbosons_condition]}")
-
-
-    # for i in range(3):
-    #     print(f"Jet/Jet.Particles.refs = {arrays['Jet/Jet.Particles'].refs}")
-    #     print(f"Jet/Jet.Particles[{i}] = {arrays['Jet/Jet.Particles'][i].refs}")
-    #     print(f"Jet/Jet.Particles[{i}][0] = {arrays['Jet/Jet.Particles'][i][0]}")
-    #     print(f"Jet/Jet.Particles[{i}][0].refs = {arrays['Jet/Jet.Particles'][i][0].refs}")
-    #     print(f"Particle/Particle.fUniqueID = {arrays['Particle/Particle.fUniqueID']}")
-    #     print(f"Particle/Particle.fUniqueID[{i}] = {arrays['Particle/Particle.fUniqueID'][i]}")
-    #     print(f"Particles[{i}] = {particles[0]}")
-    #     print(f"Particles[Jet/Jet.Particles[{i}][0]] = {particles[0][arrays['Jet/Jet.Particles'][i][0].refs[0]]}")
-    #     print(f"Particles.pid[Jet/Jet.Particles[{i}][0]] = {particles.pid[0][arrays['Jet/Jet.Particles'][i][0].refs[0]]}")
-    #     print(f"FatJet/FatJet.Particles[{i}] = {arrays['FatJet/FatJet.Particles'][i]}")
-    
-    # print(f"w.d1 pid: \n{wquarks_d1.pid}")
-    # print(f"w.d1 m1: \n{wquarks_d1.m1}")
-    # print(f"w.d2 pid: \n{wquarks_d2.pid}")
-    # print(f"w.d2 m1: \n{wquarks_d2.m1}")
-
-    # w1_quarks = 
-    # w1_mask = wquarks_temp.m1 < np.tile(ak.singletons(wbosons.idx[:, 1]), (1, 4))
-    # w2_mask = wquarks_temp.m1 >= np.tile(ak.singletons(wbosons.idx[:, 1]), (1, 4))
-    # w1quarks = ak.drop_none(ak.mask(wquarks_temp, w1_mask))
-    # w2quarks = ak.drop_none(ak.mask(wquarks_temp, w2_mask))
-    # wquarks_d1 = ak.to_regular(
-    #     ak.concatenate([ak.singletons(w1quarks[:, 0]), ak.singletons(w2quarks[:, 0])], axis=1), axis=1
-    # )
-    # wquarks_d2 = ak.to_regular(
-    #     ak.concatenate([ak.singletons(w1quarks[:, 1]), ak.singletons(w2quarks[:, 1])], axis=1), axis=1
-    # )
-
-    # print(f"wquarks_condition: \n{wquarks_condition}")
-    # print(f"wquarks: \n{particles[wquarks_condition]}")
-    # print(f"wquarks nums: \n{np.unique(ak.num(particles[wquarks_condition]))}")
-    # print(f"wquarks.m1: \n{wquarks_temp.m1}")
-    # print(f"wbosons.idx: \n{wbosons.idx}\n -> wbosons.idx[:,0]: {wbosons.idx[:, 0]}")
-    # print(np.tile(ak.singletons(wbosons.idx[:, 1]), (1, 4)))
-    # print(np.shape(np.tile(ak.singletons(wbosons.idx[:, 1]), (1, 4))))
-    # print(f"wquarks from w1: \n{wquarks_temp[wquarks_temp.m1 < np.tile(ak.singletons(wbosons.idx[:, 1]), (1, 4))]}")
-    # print(f"wquarks from w2: \n{wquarks_temp[wquarks_temp.m1 > np.tile(ak.singletons(wbosons.idx[:, 1]), (1, 4))]}")
-    # print(f"wquarks.m1: \n{wquarks_temp.m1}\n{'-'*60}")
-    # print(f"w2_idx: \n{np.tile(ak.singletons(wbosons.idx[:, 1]), (1, 4))}\n{'-'*60}")
-    # print(f"w1_mask -> wquarks.m1 < w2_idx: \n{w1_mask}\n{'-'*60}")
-    # print(f"w2_mask -> wquarks.m1 > w2_idx: \n{w2_mask}\n{'-'*60}")
-    # print(f"masks or = {ak.all(w1_mask | w2_mask)}")
-    # bad_idxs = ~(w1_mask | w2_mask)
-    # print(f"masks not or \n-> w1mask: \n{w1_mask[bad_idxs]}\n-> w2mask: \n{w2_mask[bad_idxs]}")
-    # print(f"wquarks.m1[bad_idxs]: \n{wquarks_temp.m1[bad_idxs]}")
-    # print(f"wbosons.idx[bad_idxs]: \n{np.tile(ak.singletons(wbosons.idx[:, 1]), (1, 4))[bad_idxs]}")
-    # print(f"wquarks.pid[bad_idxs]: \n{wquarks_temp.pid[bad_idxs]}")
-    # print(f"wbosons.pid[bad_idxs]: \n{np.tile(ak.singletons(wbosons.pid[:, 1]), (1, 4))[bad_idxs]}")
-    # print(f"masks and = {ak.all(~(w1_mask & w2_mask))}")
-    # print(f"masks both = {ak.all(w1_mask | w2_mask) & ak.all(~(w1_mask & w2_mask))}")
-    # print(f"w1quarks shape: ({ak.num(w1quarks, axis=0)}, {np.unique(ak.num(w1quarks))})")
-    # print(f"w2quarks shape: ({ak.num(w2quarks, axis=0)}, {np.unique(ak.num(w2quarks))})")
-    # print(f"w1quarks: \n{w1quarks}\n{'-'*60}")
-    # print(f"w2quarks: \n{w2quarks}\n{'-'*60}")
-    # print(f"w1quarks.d1: \n{w1quarks[:, 0]}")
-    # print(f"ak.singletons(w1quarks.d1): \n{ak.singletons(w1quarks[:, 0])}")
-    # print(f"concat lists: \n{ak.concatenate([ak.singletons(w1quarks[:, 0]), ak.singletons(w2quarks[:, 0])], axis=1)}")
-    # concat_temp = ak.concatenate([ak.singletons(w1quarks[:, 0]), ak.singletons(w2quarks[:, 0])], axis=1)
-    # print(f"concat lists shape = ({ak.num(concat_temp, axis=0)}, {np.unique(ak.num(concat_temp))})")
-    # wquarks = ak.to_regular(
-    #     ak.zip(
-    #         {
-    #             'd1': ak.concatenate([ak.singletons(w1quarks[:, 0]), ak.singletons(w2quarks[:, 0])], axis=1), 
-    #             'd2': ak.concatenate([ak.singletons(w1quarks[:, 1]), ak.singletons(w2quarks[:, 1])], axis=1)
-    #         }
-    #     )
-    # )
-    # print(f"topquarks: \n{topquarks}\n{'-'*60}")
-    # print(f"num topquarks: \n{ak.num(topquarks)}\n{'-'*60}")
-    # print(f"num topquarks = n_tops?: \n{ak.all(ak.num(topquarks) == n_tops)}\n{'-'*60 + '-'*60}")
-    # print(f"bquarks: \n{bquarks}\n{'-'*60}")
-    # print(f"num bquarks: \n{ak.num(bquarks)}\n{'-'*60}")
-    # print(f"num bquarks = n_tops?: \n{ak.all(ak.num(bquarks) == n_tops)}\n{'-'*60 + '-'*60}")
-    # print(f"wbosons: \n{wbosons}\n{'-'*60}")
-    # print(f"num wbosons: \n{ak.num(wbosons)}\n{'-'*60}")
-    # print(f"num wbosons = n_tops?: \n{ak.all(ak.num(wbosons) == n_tops)}\n{'-'*60 + '-'*60}")
-    # print(f"wquarks_d1: \n{wquarks_d1}\n{'-'*60}")
-    # print(f"wquarks_d2: \n{wquarks_d2}\n{'-'*60}")
-    # print(f"num wquarks: \n{ak.num(wquarks_d1) + ak.num(wquarks_d2)}\n{'-'*60}")
-    # print(f"num wquarks = 2 * n_tops?: \n{ak.all(ak.num(wquarks_d1) == n_tops) & ak.all(ak.num(wquarks_d2) == n_tops)}\n{'-'*60}")
-
     jets = ak.zip(
         {
             "pt": pt,
@@ -305,49 +178,6 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         },
         with_name="Momentum4D",
     )
-
-    # print(f"id of min deltaR \n{particles.pid[np.argmin(particles.deltaR(jets))]}")
-
-
-    # print(ak.type(arrays["Jet/Jet.Particles"].refs))
-    # print(ak.type(bquarks))
-    # bquark_jets = ak.argcartesian(
-    #     {'bquark_ID': bquarks.fUniqueID, 'jet': arrays["Jet/Jet.Particles"].refs}, axis=1
-    # )
-    # print(bquark_jets)
-    # print(ak.type(bquark_jets))
-
-    # temp = ak.any(
-    #     arrays["Jet/Jet.Particles"].refs == bquarks.fUniqueID, axis=-1
-    # )
-    # print(ak.type(temp))
-    # print(temp)
-
-    # top_b_idx = match_top_to_jet(
-    #     bquarks.fUniqueID, arrays["Jet/Jet.Particles"].refs, ak.ArrayBuilder()
-    # ).snapshot()
-    # top_q1_idx = match_top_to_jet(
-    #     wquarks_d1.fUniqueID, arrays["Jet/Jet.Particles"].refs, ak.ArrayBuilder()
-    # ).snapshot()
-    # top_q2_idx = match_top_to_jet(
-    #     wquarks_d2.fUniqueID, arrays["Jet/Jet.Particles"].refs, ak.ArrayBuilder()
-    # ).snapshot()
-    # top_q_idx = ak.where(top_q1_idx > 0, top_q1_idx, top_q2_idx)
-    # top_idx = ak.where(top_b_idx > 0, top_b_idx, top_q_idx)
-
-    # print(ak.type(top_b_idx))
-    # print(top_b_idx)
-    # print(ak.type(top_q1_idx))
-    # print(top_q1_idx)
-    # print(ak.type(top_q2_idx))
-    # print(top_q2_idx)
-    # print(ak.type(top_q_idx))
-    # print(top_q_idx)
-    # print(ak.type(top_idx))
-    # print(top_idx)
-
-    # bjets_idx = ak.where(
-    #     jets.particle_fUniqueID == bquarks.fUniqueID
     
     top_idx, top_b_idx, top_q_idx = match_top_to_jet(
         bquarks, wquarks_d1, wquarks_d2, jets, 
@@ -356,8 +186,6 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     top_idx, top_b_idx, top_q_idx = (
         top_idx.snapshot(), top_b_idx.snapshot(), top_q_idx.snapshot()
     )
-
-    matched_fj_idx = match_fjet_to_jet(fjets, jets, ak.ArrayBuilder()).snapshot()
     fj_top_idx, fj_top_bqq_idx, fj_top_bq_idx, fj_top_qq_idx = match_top_to_fjet(
         bquarks, wquarks_d1, wquarks_d2, fjets, 
         ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder()
@@ -365,6 +193,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     fj_top_idx, fj_top_bqq_idx, fj_top_bq_idx, fj_top_qq_idx = (
         fj_top_idx.snapshot(), fj_top_bqq_idx.snapshot(), fj_top_bq_idx.snapshot(), fj_top_qq_idx.snapshot()
     )
+    matched_fj_idx = match_fjet_to_jet(fjets, jets, ak.ArrayBuilder()).snapshot()
     # print(f"fjets: \n{fjets}\n{'='*60}")
     # print(f"empty at same places fjets-any: \n{ak.all(ak.num(fjets) == ak.num(fj_top_idx))}\n{'='*60}")
     # print(f"empty at same places fjets-bqq: \n{ak.all(ak.num(fjets) == ak.num(fj_top_bqq_idx))}\n{'='*60}")
@@ -394,6 +223,8 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     # print(f"top_b_idx where problems: \n{top_b_idx[problem_indices != -1]}")
     # print(f"top_q_idx where problems: \n{top_q_idx[problem_indices != -1]}")
     # print(f"fatjets where problems: \n{fj_top_idx[problem_indices != -1]}")
+
+
 
     print(f"total number of events = {ak.num(top_idx, axis=0)}")
 
@@ -516,64 +347,6 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         )
     )
     print(f"number of reco. 2 tops fully-boosted events = {ak.sum(two_fullyBoosted)}")
-
-    # # number matched bjets
-    # matched_bjet = (
-    #     (ak.sum(top_b_idx == 1, axis=1) == 1) & (ak.sum(top_b_idx == 2, axis=1) == 1)
-    # )
-    # print(f"number of reco. events w/ exactly 1 resolved-bjet matched to each top = {ak.sum(matched_bjet)}")
-    # matched_bjet_in_fjet = (
-    #     (
-    #         (ak.sum(fj_top_bq_idx == 1, axis=1) == 1) 
-    #         | (ak.sum(fj_top_bqq_idx == 1, axis=1) == 1)
-    #     ) & (
-    #         (ak.sum(fj_top_bq_idx == 2, axis=1) == 1) 
-    #         | (ak.sum(fj_top_bqq_idx == 2, axis=1) == 1)
-    #     )
-    # )
-    # print(f"number of reco. events w/ exactly 1 boosted-bjet matched to each top = {ak.sum(matched_bjet_in_fjet)}")
-    # matched_bjet_total = matched_bjet | matched_bjet_in_fjet | (
-    #     (
-    #         (
-    #             (ak.sum(fj_top_bq_idx == 1, axis=1) == 1) 
-    #             | (ak.sum(fj_top_bqq_idx == 1, axis=1) == 1)
-    #         ) & (ak.sum(top_b_idx == 2, axis=1) == 1)
-    #     ) | (
-    #         (
-    #             (ak.sum(fj_top_bq_idx == 2, axis=1) == 1) 
-    #             | (ak.sum(fj_top_bqq_idx == 2, axis=1) == 1)
-    #         ) & (ak.sum(top_b_idx == 1, axis=1) == 1)
-    #     )
-    # )
-    # print(f"total number of reco. events w/ a bjet matched to each top (boosted+resolved) = {ak.sum(matched_bjet_total)}")
-    # matched_qjet = (
-    #     (ak.sum(top_q_idx == 1, axis=1) == 2) & (ak.sum(top_q_idx == 2, axis=1) == 2)
-    # )
-    # print(f"number of reco. events w/ exactly 2 resolved-qjets matched to each top = {ak.sum(matched_qjet)}")
-
-    # print(ak.firsts(particles).deltaR(jets))
-    # print(wquarks_d1)
-    # print(wquarks_d2)
-    # print(ak.local_index(wquarks_d1))
-    # print(wquarks_d1[ak.local_index(wquarks_d1) == 0])
-    # print(bquarks)
-    # print(bquarks[ak.local_index(bquarks) == 0])
-    # print(ak.type(wquarks_d1))
-    # print(ak.type(bquarks))
-    # print(f"always 2 bquarks? = {ak.all(ak.num(bquarks) == 2)}")
-    # min_dR_bquark1 = ak.min(bquarks[ak.local_index(bquarks) == 0].deltaR(jets), axis=1)
-    # min_dR_bquark2 = ak.min(bquarks[ak.local_index(bquarks) == 1].deltaR(jets), axis=1)
-    # min_dR_w1quark1 = ak.min(wquarks_d1[ak.local_index(wquarks_d1) == 0].deltaR(jets), axis=1)
-    # min_dR_w1quark2 = ak.min(wquarks_d2[ak.local_index(wquarks_d2) == 0].deltaR(jets), axis=1)
-    # min_dR_w2quark1 = ak.min(wquarks_d1[ak.local_index(wquarks_d1) == 1].deltaR(jets), axis=1)
-    # min_dR_w2quark2 = ak.min(wquarks_d2[ak.local_index(wquarks_d2) == 1].deltaR(jets), axis=1)
-
-    # print(f"min DeltaR btwn bquark1 and jets = {min_dR_bquark1}")
-    # print(f"min DeltaR btwn bquark2 and jets = {min_dR_bquark2}")
-    # print(f"min DeltaR btwn w1quark1 and jets = {min_dR_w1quark1}")
-    # print(f"min DeltaR btwn w1quark2 and jets = {min_dR_w1quark2}")
-    # print(f"min DeltaR btwn w2quark1 and jets = {min_dR_w2quark1}")
-    # print(f"min DeltaR btwn w2quark2 and jets = {min_dR_w2quark2}")
 
     def fiducial_mask(quarks, min_pt=10):
         eta_barrel, eta_endcap, max_eta = 1.4442, 1.566, 2.3
@@ -763,16 +536,41 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         top_pt_dict[f"top{i+1}_bqq_pt"] = top_pt[:, i]
         top_pt_dict[f"top{i+1}_bq_pt"] = top_pt[:, i]
         top_pt_dict[f"top{i+1}_qq_pt"] = top_pt[:, i]
-    # h1_pt, bh1_pt = top_pt[:, 0], top_pt[:, 0]
-    # h2_pt, bh2_pt = top_pt[:, 1], top_pt[:, 1]
-    # if n_tops == 3:
-    #     h3_pt, bh3_pt = top_pt[:, 2], top_pt[:, 2]
 
     # mask to define zero-padded small-radius jets
     mask = pt > MIN_JET_PT
 
     # mask to define zero-padded large-radius jets
     fj_mask = fj_pt > MIN_FJET_PT
+
+    # fully-resolved top mask
+    top_fullyResolved_mask = {}
+    for i in range(n_tops):
+        top_fullyResolved_mask[f"top{i+1}"] = (
+            ak.sum(top_idx == i+1, axis=1) == 3
+        )
+    
+    # semi-resolved (qq fatjet) top mask
+    top_semiResolved_qq_mask = {}
+    for i in range(n_tops):
+        top_semiResolved_qq_mask[f"top{i+1}"] = (
+            (ak.sum(top_b_idx == i+1, axis=1) == 1) 
+            & (ak.sum(fj_top_qq_idx == i+1, axis=1) == 1)
+        )
+    # semi-resolved (bq fatjet) top mask
+    top_semiResolved_bq_mask = {}
+    for i in range(n_tops):
+        top_semiResolved_bq_mask[f"top{i+1}"] = (
+            (ak.sum(top_q_idx == i+1, axis=1) == 1) 
+            & (ak.sum(fj_top_bq_idx == i+1, axis=1) == 1)
+        )
+
+    # fully-boosted top mask
+    top_fullyBoosted_mask = {}
+    for i in range(n_tops):
+        top_fullyBoosted_mask[f"top{i+1}"] = (
+            ak.sum(fj_top_bqq_idx == i+1, axis=1) == 1
+        )
 
     # index of small-radius jet if top is reconstructed
     top_jet_idxs = {}
@@ -800,18 +598,6 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     # check/fix small-radius jet truth (ensure max 3 small-radius jets per top)
     check, check_b, check_q = [], [], []
     for i in range(n_tops):
-        # print('='*60 + '\n' + '='*60)
-        # print(top_jet_idxs[f"top{i+1}"])
-        # print(np.unique(ak.count(top_jet_idxs[f"top{i+1}"], axis=-1)))
-        # print(top_jet_idxs[f"top{i+1}"][ak.count(top_jet_idxs[f"top{i+1}"], axis=-1) == 4])
-        # print('-'*60)
-        # print(top_jet_idxs[f"top{i+1}_b"])
-        # print(np.unique(ak.count(top_jet_idxs[f"top{i+1}_b"], axis=-1)))
-        # print(top_jet_idxs[f"top{i+1}_b"][ak.count(top_jet_idxs[f"top{i+1}_b"], axis=-1) == 2])
-        # print('-'*60)
-        # print(top_jet_idxs[f"top{i+1}_q"])
-        # print(np.unique(ak.count(top_jet_idxs[f"top{i+1}_q"], axis=-1)))
-        # print(top_jet_idxs[f"top{i+1}_q"][ak.count(top_jet_idxs[f"top{i+1}_q"], axis=-1) == 3])
         check += np.unique(ak.count(top_jet_idxs[f"top{i+1}"], axis=-1)).to_list()
         check_b += np.unique(ak.count(top_jet_idxs[f"top{i+1}_b"], axis=-1)).to_list()
         check_q += np.unique(ak.count(top_jet_idxs[f"top{i+1}_q"], axis=-1)).to_list()
@@ -822,11 +608,6 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     if 3 in check_q:
         logging.warning(" Some tops match to having 3 W-daughter jets (i.e. 3 jets directly from Ws)! Check truth")
     print(f"All proper numbers of jets: {ak.all(np.array(check) <= 6) & ak.all(np.array(check_b) <= 2) & ak.all(np.array(check_q) <= 4)}")
-    # np.unique(ak.count(h1_bs, axis=-1)).to_list() + np.unique(ak.count(h2_bs, axis=-1)).to_list()
-    # if n_tops == 3:
-    #     check += np.unique(ak.count(h3_bs, axis=-1)).to_list()
-    # if 3 in check:
-    #     logging.warning("some Higgs bosons match to 3 small-radius jets! Check truth")
 
     # check/fix large-radius jet truth (ensure max 1 large-radius jet per top)
     fj_check, fj_check_bqq, fj_check_bq, fj_check_qq = [], [], [], []
@@ -844,11 +625,6 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     if 2 in fj_check_qq:
         logging.warning(" Some tops match to 2 large-radius jets in fj_check_qq! Check truth")
     print(f"All proper numbers of fjets: {ak.all(np.array(fj_check) <= 2) & ak.all(np.array(fj_check_bqq) <= 2) & ak.all(np.array(fj_check_bq) <= 2) & ak.all(np.array(fj_check_qq) <= 2)}")
-    # fj_check = np.unique(ak.count(h1_bb, axis=-1)).to_list() + np.unique(ak.count(h2_bb, axis=-1)).to_list()
-    # if n_tops == 3:
-    #     fj_check += np.unique(ak.count(h3_bb, axis=-1)).to_list()
-    # if 2 in fj_check:
-    #     logging.warning("some Higgs bosons match to 2 large-radius jets! Check truth")
 
     for i in range(n_tops):
         top_jet_idxs[f"top{i+1}"] = ak.fill_none(ak.pad_none(top_jet_idxs[f"top{i+1}"], 3, clip=True), -1)
@@ -877,26 +653,25 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     #     h3_b1, h3_b2 = h3_bs[:, 0], h3_bs[:, 1]
 
     # mask whether top can be reconstructed as 3 small-radius jet
-    top_fullyResolved_mask = {}
-    for i in range(n_tops):
-        top_fullyResolved_mask[f"top{i+1}"] = ak.all(top_jet_idxs[f"top{i+1}"] != -1, axis=-1)
+    # top_fullyResolved_mask = {}
+    # for i in range(n_tops):
+    #     top_fullyResolved_mask[f"top{i+1}"] = ak.all(top_jet_idxs[f"top{i+1}"] != -1, axis=-1)
 
-    top_semiResolved_mask = {}
-    for i in range(n_tops):
-        top_semiResolved_mask[f"top{i+1}"] = ak.all(
-            np.logical_or(
-                np.logical_and(
-                    top_jet_idxs[f"top{i+1}_b"] != -1, 
-                    top_fjet_idxs[f"top{i+1}_qq"] != -1
-                ),
-                np.logical_and(
-                    top_jet_idxs[f"top{i+1}_q"] != -1, 
-                    top_fjet_idxs[f"top{i+1}_bq"] != -1
-                )
-            ),
-            axis=-1
-        )
-
+    # top_semiResolved_mask = {}
+    # for i in range(n_tops):
+    #     top_semiResolved_mask[f"top{i+1}"] = ak.all(
+    #         np.logical_or(
+    #             np.logical_and(
+    #                 top_jet_idxs[f"top{i+1}_b"] != -1, 
+    #                 top_fjet_idxs[f"top{i+1}_qq"] != -1
+    #             ),
+    #             np.logical_and(
+    #                 top_jet_idxs[f"top{i+1}_q"] != -1, 
+    #                 top_fjet_idxs[f"top{i+1}_bq"] != -1
+    #             )
+    #         ),
+    #         axis=-1
+    #     )
 
 
     # h1_mask = ak.all(h1_bs != -1, axis=-1)
@@ -939,36 +714,62 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     datasets["INPUTS/BoostedJets/fj_nneutral"] = to_np_array(fj_nneutral, max_n=N_FJETS)
     datasets["INPUTS/BoostedJets/fj_ncharged"] = to_np_array(fj_ncharged, max_n=N_FJETS)
 
+    # fully-resolved tops
+    for i in range(n_tops):
+        datasets[f"TARGETS/frt{i+1}/mask"] = top_fullyResolved_mask[f"top{i+1}"]
+        datasets[f"TARGETS/frt{i+1}/b"] = top_jet_idxs[f"top{i+1}_b"]
+        datasets[f"TARGETS/frt{i+1}/q1"] = top_jet_idxs[f"top{i+1}_q"]
+        datasets[f"TARGETS/frt{i+1}/q2"] = top_jet_idxs[f"top{i+1}_q"]
+        datasets[f"TARGETS/frt{i+1}/pt"] = top_pt_dict[f"top{i+1}_pt"]
 
+    # semi-resolved (qq fatjet) tops
+    for i in range(n_tops):
+        datasets[f"TARGETS/srqqt{i+1}/mask"] = top_semiResolved_qq_mask[f"top{i+1}"]
+        datasets[f"TARGETS/srqqt{i+1}/b"] = top_jet_idxs[f"top{i+1}_b"]
+        datasets[f"TARGETS/srqqt{i+1}/qq"] = top_fjet_idxs[f"top{i+1}_qq"]
+        datasets[f"TARGETS/srqqt{i+1}/pt"] = top_pt_dict[f"top{i+1}_qq_pt"]
 
-    datasets["TARGETS/h1/mask"] = h1_mask.to_numpy()
-    datasets["TARGETS/h1/b1"] = h1_b1.to_numpy()
-    datasets["TARGETS/h1/b2"] = h1_b2.to_numpy()
-    datasets["TARGETS/h1/pt"] = h1_pt.to_numpy()
+    # semi-resolved (bq fatjet) tops
+    for i in range(n_tops):
+        datasets[f"TARGETS/srbqt{i+1}/mask"] = top_semiResolved_bq_mask[f"top{i+1}"]
+        datasets[f"TARGETS/srbqt{i+1}/q"] = top_jet_idxs[f"top{i+1}_q"]
+        datasets[f"TARGETS/srbqt{i+1}/bq"] = top_fjet_idxs[f"top{i+1}_bq"]
+        datasets[f"TARGETS/srbqt{i+1}/pt"] = top_pt_dict[f"top{i+1}_bq_pt"]
 
-    datasets["TARGETS/h2/mask"] = h2_mask.to_numpy()
-    datasets["TARGETS/h2/b1"] = h2_b1.to_numpy()
-    datasets["TARGETS/h2/b2"] = h2_b2.to_numpy()
-    datasets["TARGETS/h2/pt"] = h2_pt.to_numpy()
+    # fully-boosted tops
+    for i in range(n_tops):
+        datasets[f"TARGETS/fbt{i+1}/mask"] = top_semiResolved_bq_mask[f"top{i+1}"]
+        datasets[f"TARGETS/fbt{i+1}/bqq"] = top_fjet_idxs[f"top{i+1}_bqq"]
+        datasets[f"TARGETS/fbt{i+1}/pt"] = top_pt_dict[f"top{i+1}_bqq_pt"]
 
-    if n_tops == 3:
-        datasets["TARGETS/h3/mask"] = h3_mask.to_numpy()
-        datasets["TARGETS/h3/b1"] = h3_b1.to_numpy()
-        datasets["TARGETS/h3/b2"] = h3_b2.to_numpy()
-        datasets["TARGETS/h3/pt"] = h3_pt.to_numpy()
+    # datasets["TARGETS/h1/mask"] = h1_mask.to_numpy()
+    # datasets["TARGETS/h1/b1"] = h1_b1.to_numpy()
+    # datasets["TARGETS/h1/b2"] = h1_b2.to_numpy()
+    # datasets["TARGETS/h1/pt"] = h1_pt.to_numpy()
 
-    datasets["TARGETS/bh1/mask"] = h1_fj_mask.to_numpy()
-    datasets["TARGETS/bh1/bb"] = h1_bb.to_numpy().reshape(h1_fj_mask.to_numpy().shape)
-    datasets["TARGETS/bh1/pt"] = bh1_pt.to_numpy()
+    # datasets["TARGETS/h2/mask"] = h2_mask.to_numpy()
+    # datasets["TARGETS/h2/b1"] = h2_b1.to_numpy()
+    # datasets["TARGETS/h2/b2"] = h2_b2.to_numpy()
+    # datasets["TARGETS/h2/pt"] = h2_pt.to_numpy()
 
-    datasets["TARGETS/bh2/mask"] = h2_fj_mask.to_numpy()
-    datasets["TARGETS/bh2/bb"] = h2_bb.to_numpy().reshape(h2_fj_mask.to_numpy().shape)
-    datasets["TARGETS/bh2/pt"] = bh2_pt.to_numpy()
+    # if n_tops == 3:
+    #     datasets["TARGETS/h3/mask"] = h3_mask.to_numpy()
+    #     datasets["TARGETS/h3/b1"] = h3_b1.to_numpy()
+    #     datasets["TARGETS/h3/b2"] = h3_b2.to_numpy()
+    #     datasets["TARGETS/h3/pt"] = h3_pt.to_numpy()
 
-    if n_tops == 3:
-        datasets["TARGETS/bh3/mask"] = h3_fj_mask.to_numpy()
-        datasets["TARGETS/bh3/bb"] = h3_bb.to_numpy().reshape(h3_fj_mask.to_numpy().shape)
-        datasets["TARGETS/bh3/pt"] = bh3_pt.to_numpy()
+    # datasets["TARGETS/bh1/mask"] = h1_fj_mask.to_numpy()
+    # datasets["TARGETS/bh1/bb"] = h1_bb.to_numpy().reshape(h1_fj_mask.to_numpy().shape)
+    # datasets["TARGETS/bh1/pt"] = bh1_pt.to_numpy()
+
+    # datasets["TARGETS/bh2/mask"] = h2_fj_mask.to_numpy()
+    # datasets["TARGETS/bh2/bb"] = h2_bb.to_numpy().reshape(h2_fj_mask.to_numpy().shape)
+    # datasets["TARGETS/bh2/pt"] = bh2_pt.to_numpy()
+
+    # if n_tops == 3:
+    #     datasets["TARGETS/bh3/mask"] = h3_fj_mask.to_numpy()
+    #     datasets["TARGETS/bh3/bb"] = h3_bb.to_numpy().reshape(h3_fj_mask.to_numpy().shape)
+    #     datasets["TARGETS/bh3/pt"] = bh3_pt.to_numpy()
 
     return datasets
 

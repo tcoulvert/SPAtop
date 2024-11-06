@@ -114,12 +114,10 @@ def match_top_to_jet(
             alljet_match_idx, bjet_match_idx, wjet_match_idx = -1, -1, -1
 
             mindeltaR, mindeltaR_idxs = 999, (-1, -1)  # mindeltaR, (mindeltaR_topidx, mindeltaR_quarktype)
-            for j, (bquark, wquark1, wquark1_pid, wquark2, wquark2_pid) in enumerate(zip(
-                bquarks_event,
-                wquarks1_event, wquarks1_event.pid, 
-                wquarks2_event, wquarks2_event.pid
+            for j, (bquark, wquark1, wquark2) in enumerate(zip(
+                bquarks_event, wquarks1_event, wquarks2_event
             )):  # dont need to check b and w mother index b/c made them match by construction
-                bquark_deltaR = jet.deltaR(bquark) if jet.deltaR(bquark) < JET_DR and f'b_{j+1}' not in matched_set else 999
+                bquark_deltaR = jet.deltaR(bquark) if jet.deltaR(bquark) < JET_DR and np.abs(jet_flav) == 5 and f'b_{j+1}' not in matched_set else 999
                 wquark1_deltaR = jet.deltaR(wquark1) if jet.deltaR(wquark1) < JET_DR and f'w1_{j+1}' not in matched_set else 999
                 wquark2_deltaR = jet.deltaR(wquark2) if jet.deltaR(wquark2) < JET_DR and f'w2_{j+1}' not in matched_set else 999
 
