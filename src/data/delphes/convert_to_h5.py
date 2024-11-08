@@ -197,6 +197,9 @@ def get_datasets(arrays, n_tops):  # noqa: C901
 
     # print(f"total number of events = {ak.num(top_idx, axis=0)}")
 
+    # top_q_idx = np.where(top_q1_idx > 0, top_q1_idx, top_q2_idx)
+    # fj_top_bq_idx = np.where(fj_top_bq1_idx > 0, fj_top_bq1_idx, fj_top_bq2_idx)
+
     # # two fully resolved tops
     # two_fullyResolved = (
     #     (ak.sum(top_idx == 1, axis=1) == 3) & (ak.sum(top_idx == 2, axis=1) == 3)
@@ -207,12 +210,12 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     # one_fullyResolved_one_bqFjet = (
     #     (
     #         (ak.sum(top_idx == 2, axis=1) == 3) 
-    #         & (ak.sum(top_q1_idx == 1, axis=1) == 1) 
-    #         & (ak.sum(fj_top_bq2_idx == 1, axis=1) == 1)
+    #         & (ak.sum(top_q_idx == 1, axis=1) == 1) 
+    #         & (ak.sum(fj_top_bq_idx == 1, axis=1) == 1)
     #     ) | (
     #         (ak.sum(top_idx == 1, axis=1) == 3) 
-    #         & (ak.sum(top_q2_idx == 2, axis=1) == 1) 
-    #         & (ak.sum(fj_top_bq1_idx == 2, axis=1) == 1)
+    #         & (ak.sum(top_q_idx == 2, axis=1) == 1) 
+    #         & (ak.sum(fj_top_bq_idx == 2, axis=1) == 1)
     #     )
     # )
     # print(f"number of reco. 1 top fully-resolved, 1 top semi-resolved (bq) events = {ak.sum(one_fullyResolved_one_bqFjet)}")
@@ -341,10 +344,8 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     #     | two_semiResolved | one_semiResolved_one_fullyBoosted
     #     | two_fullyBoosted
     # ) & measureable_events
-    # print('-'*60)
-    # # print(f"number of good reco events = {ak.sum(proper_events)}")
-    # # print(f"num detectable events = {ak.sum(measureable_events)}")
 
+    # print('-'*60)
     # print(f"fiducial efficiency = {ak.sum(measureable_events) / ak.num(top_idx, axis=0)}")
     # print(f"reco. efficiency = {ak.sum(proper_events) / ak.sum(measureable_events)}")
     # print(f"total efficiency = {ak.sum(proper_events) / ak.num(top_idx, axis=0)}")
