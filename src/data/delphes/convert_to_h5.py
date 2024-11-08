@@ -531,162 +531,139 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     # add top pT info
     top_pt = topquarks[mask_minjets].pt
     top_pt = ak.fill_none(ak.pad_none(top_pt, target=3, axis=1, clip=True), -1)
-
     top_pt_dict = {}
     for i in range(n_tops):
         top_pt_dict[f"top{i+1}_pt"] = top_pt[:, i]
-        top_pt_dict[f"top{i+1}_bqq_pt"] = top_pt[:, i]
-        top_pt_dict[f"top{i+1}_bq_pt"] = top_pt[:, i]
-        top_pt_dict[f"top{i+1}_qq_pt"] = top_pt[:, i]
 
     # mask to define zero-padded small-radius jets
     mask = pt > MIN_JET_PT
-
     # mask to define zero-padded large-radius jets
     fj_mask = fj_pt > MIN_FJET_PT
 
-    # fully-resolved top mask
-    top_fullyResolved_mask = {}
+    # fully-resolved
+    top_fullyResolved = {}
     for i in range(n_tops):
-        top_fullyResolved_mask[f"top{i+1}"] = (
+        top_fullyResolved[f"top{i+1}_mask"] = (
             ak.sum(top_idx == i+1, axis=1) == 3
         )
+        top_fullyResolved[f"top{i+1}_b"] = ak.local_index(top_b_idx)[top_b_idx == i+1]
+        top_fullyResolved[f"top{i+1}_q1"] = ak.local_index(top_q1_idx)[top_q1_idx == i+1]
+        top_fullyResolved[f"top{i+1}_q2"] = ak.local_index(top_q2_idx)[top_q2_idx == i+1]
     
-    # semi-resolved (qq fatjet) top mask
-    top_semiResolved_qq_mask = {}
+    # semi-resolved (qq fatjet)
+    top_semiResolved_qq = {}
     for i in range(n_tops):
-        top_semiResolved_qq_mask[f"top{i+1}"] = (
+        top_semiResolved_qq[f"top{i+1}_mask"] = (
             (ak.sum(top_b_idx == i+1, axis=1) == 1) 
             & (ak.sum(fj_top_qq_idx == i+1, axis=1) == 1)
         )
-    # semi-resolved (bq fatjet) top mask
-    top_semiResolved_bq_mask = {}
+        top_semiResolved_qq[f"top{i+1}_b"] = ak.local_index(top_b_idx)[top_b_idx == i+1]
+        top_semiResolved_qq[f"top{i+1}_qq"] = ak.local_index(fj_top_qq_idx)[fj_top_qq_idx == i+1]
+    
+    # semi-resolved (bq fatjet)
+    top_semiResolved_bq = {}
     for i in range(n_tops):
-        top_semiResolved_bq_mask[f"top{i+1}"] = (
-            (ak.sum(top_q_idx == i+1, axis=1) == 1) 
-            & (ak.sum(fj_top_bq_idx == i+1, axis=1) == 1)
+        bq2_mask = (
+            (ak.sum(top_q1_idx == i+1, axis=1) == 1) 
+            & (ak.sum(fj_top_bq2_idx == i+1, axis=1) == 1)
+        )
+        bq1_mask = (
+            (ak.sum(top_q2_idx == i+1, axis=1) == 1) 
+            & (ak.sum(fj_top_bq1_idx == i+1, axis=1) == 1)
+        )
+        top_semiResolved_bq[f"top{i+1}_mask"] = (bq2_mask | bq1_mask)
+        top_semiResolved_bq[f"top{i+1}_q"] = ak.where(
+            bq2_mask, 
+            ak.local_index(top_q1_idx)[top_q1_idx == i+1], 
+            ak.where(
+                bq1_mask,
+                ak.local_index(top_q2_idx)[top_q2_idx == i+1], 
+                ak.local_index(top_q1_idx)[top_q1_idx == i+1]
+            )
+        )
+        top_semiResolved_bq[f"top{i+1}_bq"] = ak.where(
+            bq2_mask, 
+            ak.local_index(fj_top_bq2_idx)[fj_top_bq2_idx == i+1], 
+            ak.where(
+                bq1_mask,
+                ak.local_index(fj_top_bq1_idx)[fj_top_bq1_idx == i+1],
+                ak.local_index(fj_top_bq2_idx)[fj_top_bq2_idx == i+1]
+            )
         )
 
-    # fully-boosted top mask
-    top_fullyBoosted_mask = {}
+    # fully-boosted
+    top_fullyBoosted = {}
     for i in range(n_tops):
-        top_fullyBoosted_mask[f"top{i+1}"] = (
+        top_fullyBoosted[f"top{i+1}_mask"] = (
             ak.sum(fj_top_bqq_idx == i+1, axis=1) == 1
         )
+        top_fullyBoosted[f"top{i+1}_bqq"] = ak.local_index(fj_top_bqq_idx)[fj_top_bqq_idx == i+1]
 
-    # index of small-radius jet if top is reconstructed
-    top_jet_idxs = {}
+    ## Check data ##
+    # check fully-resolved tops
+    check_b, check_q1, check_q2 = [], [], []
     for i in range(n_tops):
-        top_jet_idxs[f"top{i+1}"] = ak.local_index(top_idx)[top_idx == i+1]
-        top_jet_idxs[f"top{i+1}_b"] = ak.local_index(top_b_idx)[top_b_idx == i+1]
-        top_jet_idxs[f"top{i+1}_q"] = ak.local_index(top_q_idx)[top_q_idx == i+1]
-    # h1_bs = ak.local_index(top_idx)[top_idx == 1]
-    # h2_bs = ak.local_index(top_idx)[top_idx == 2]
-    # if n_tops == 3:
-    #     h3_bs = ak.local_index(higgs_idx)[higgs_idx == 3]
+        check_b += np.unique(ak.count(top_fullyResolved[f"top{i+1}_b"], axis=-1)).to_list()
+        check_q1 += np.unique(ak.count(top_fullyResolved[f"top{i+1}_q1"], axis=-1)).to_list()
+        check_q2 += np.unique(ak.count(top_fullyResolved[f"top{i+1}_q2"], axis=-1)).to_list()
+    if 2 in check_b: 
+        logging.warning(" Some fully-resolved tops match to 2 bjets! Check truth")
+    if 2 in check_q1:
+        logging.warning(" Some fully-resolved tops match to 2 wjet1s! Check truth")
+    if 2 in check_q2:
+        logging.warning(" Some fully-resolved tops match to 2 wjet2s! Check truth")
+    print(f"All proper numbers of jets for fully-resolved: {ak.all(np.array(check_b) < 2) & ak.all(np.array(check_q1) < 2) & ak.all(np.array(check_q2) < 2)}")
 
-    # index of large-radius jet if Higgs is reconstructed
-    top_fjet_idxs = {}
+    # check semi-resolved (qq fatjet) tops
+    check_b, check_qq = [], []
     for i in range(n_tops):
-        top_fjet_idxs[f"top{i+1}"] = ak.local_index(fj_top_idx)[fj_top_idx == i+1]
-        top_fjet_idxs[f"top{i+1}_bqq"] = ak.local_index(fj_top_bqq_idx)[fj_top_bqq_idx == i+1]
-        top_fjet_idxs[f"top{i+1}_bq"] = ak.local_index(fj_top_bq_idx)[fj_top_bq_idx == i+1]
-        top_fjet_idxs[f"top{i+1}_qq"] = ak.local_index(fj_top_qq_idx)[fj_top_qq_idx == i+1]
-    # h1_bb = ak.local_index(fj_higgs_idx)[fj_higgs_idx == 1]
-    # h2_bb = ak.local_index(fj_higgs_idx)[fj_higgs_idx == 2]
-    # if n_tops == 3:
-    #     h3_bb = ak.local_index(fj_higgs_idx)[fj_higgs_idx == 3]
+        check_b += np.unique(ak.count(top_semiResolved_qq[f"top{i+1}_b"], axis=-1)).to_list()
+        check_qq += np.unique(ak.count(top_semiResolved_qq[f"top{i+1}_qq"], axis=-1)).to_list()
+    if 2 in check_b: 
+        logging.warning(" Some semi-resolved (qq) tops match to 2 bjets! Check truth")
+    if 2 in check_qq:
+        logging.warning(" Some semi-resolved (qq) tops match to 2 qq fatjets! Check truth")
+    print(f"All proper numbers of fatjets/jets for semi-resolved (qq fatjet): {ak.all(np.array(check_b) < 2) & ak.all(np.array(check_qq) < 2)}")
 
-    # check/fix small-radius jet truth (ensure max 3 small-radius jets per top)
-    check, check_b, check_q = [], [], []
+    # check semi-resolved (bq fatjet) tops
+    check_q, check_bq = [], []
     for i in range(n_tops):
-        check += np.unique(ak.count(top_jet_idxs[f"top{i+1}"], axis=-1)).to_list()
-        check_b += np.unique(ak.count(top_jet_idxs[f"top{i+1}_b"], axis=-1)).to_list()
-        check_q += np.unique(ak.count(top_jet_idxs[f"top{i+1}_q"], axis=-1)).to_list()
-    if 4 in check: 
-        logging.warning(" Some tops match to 4 small-radius jets! Check truth")
-    if 2 in check_b:
-        logging.warning(" Some tops match to having 2 daughter bjets (i.e. 2 bjets directly from tops)! Check truth")
-    if 3 in check_q:
-        logging.warning(" Some tops match to having 3 W-daughter jets (i.e. 3 jets directly from Ws)! Check truth")
-    print(f"All proper numbers of jets: {ak.all(np.array(check) <= 6) & ak.all(np.array(check_b) <= 2) & ak.all(np.array(check_q) <= 4)}")
+        check_q += np.unique(ak.count(top_semiResolved_bq[f"top{i+1}_q"], axis=-1)).to_list()
+        check_bq += np.unique(ak.count(top_semiResolved_bq[f"top{i+1}_bq"], axis=-1)).to_list()
+    if 2 in check_q: 
+        logging.warning(" Some semi-resolved (bq) tops match to 2 wjets! Check truth")
+    if 2 in check_bq:
+        logging.warning(" Some semi-resolved (bq) tops match to 2 bq fatjets! Check truth")
+    print(f"All proper numbers of fatjets/jets for semi-resolved (bq fatjet): {ak.all(np.array(check_q) < 2) & ak.all(np.array(check_bq) < 2)}")
 
     # check/fix large-radius jet truth (ensure max 1 large-radius jet per top)
-    fj_check, fj_check_bqq, fj_check_bq, fj_check_qq = [], [], [], []
+    fj_check_bqq = []
     for i in range(n_tops):
-        fj_check += np.unique(ak.count(top_fjet_idxs[f"top{i+1}"], axis=-1)).to_list()
-        fj_check_bqq += np.unique(ak.count(top_fjet_idxs[f"top{i+1}_bqq"], axis=-1)).to_list()
-        fj_check_bq += np.unique(ak.count(top_fjet_idxs[f"top{i+1}_bq"], axis=-1)).to_list()
-        fj_check_qq += np.unique(ak.count(top_fjet_idxs[f"top{i+1}_qq"], axis=-1)).to_list()
-    if 2 in fj_check:
-        logging.warning(" Some tops match to 2 large-radius jets in fj_check! Check truth")
+        fj_check_bqq += np.unique(ak.count(top_fullyBoosted[f"top{i+1}_bqq"], axis=-1)).to_list()
     if 2 in fj_check_bqq:
-        logging.warning(" Some tops match to 2 large-radius jets in fj_check_bqq! Check truth")
-    if 2 in fj_check_bq:
-        logging.warning(" Some tops match to 2 large-radius jets in fj_check_bq! Check truth")
-    if 2 in fj_check_qq:
-        logging.warning(" Some tops match to 2 large-radius jets in fj_check_qq! Check truth")
-    print(f"All proper numbers of fjets: {ak.all(np.array(fj_check) <= 2) & ak.all(np.array(fj_check_bqq) <= 2) & ak.all(np.array(fj_check_bq) <= 2) & ak.all(np.array(fj_check_qq) <= 2)}")
+        logging.warning(" Some fully-boosted tops match to 2 fatjets! Check truth")
+    print(f"All proper numbers of fatjets for fully-boosted: {ak.all(np.array(fj_check_bqq) < 2)}")
 
+    ## Clip data ##
     for i in range(n_tops):
-        top_jet_idxs[f"top{i+1}"] = ak.fill_none(ak.pad_none(top_jet_idxs[f"top{i+1}"], 3, clip=True), -1)
-        top_jet_idxs[f"top{i+1}_b"] = ak.fill_none(ak.pad_none(top_jet_idxs[f"top{i+1}_b"], 1, clip=True), -1)
-        top_jet_idxs[f"top{i+1}_q"] = ak.fill_none(ak.pad_none(top_jet_idxs[f"top{i+1}_q"], 2, clip=True), -1)
+        # fully-resolved
+        top_fullyResolved[f"top{i+1}_b"] = ak.fill_none(ak.firsts(top_fullyResolved[f"top{i+1}_b"]), -1)
+        top_fullyResolved[f"top{i+1}_q1"] = ak.fill_none(ak.firsts(top_fullyResolved[f"top{i+1}_q1"]), -1)
+        top_fullyResolved[f"top{i+1}_q2"] = ak.fill_none(ak.firsts(top_fullyResolved[f"top{i+1}_q2"]), -1)
 
-    # h1_bs = ak.fill_none(ak.pad_none(h1_bs, 2, clip=True), -1)
-    # h2_bs = ak.fill_none(ak.pad_none(h2_bs, 2, clip=True), -1)
-    # if n_tops == 3:
-    #     h3_bs = ak.fill_none(ak.pad_none(h3_bs, 2, clip=True), -1)
+        # semi-resolved (qq fatjet)
+        top_semiResolved_qq[f"top{i+1}_b"] = ak.fill_none(ak.firsts(top_semiResolved_qq[f"top{i+1}_b"]), -1)
+        top_semiResolved_qq[f"top{i+1}_qq"] = ak.fill_none(ak.firsts(top_semiResolved_qq[f"top{i+1}_qq"]), -1)
 
-    for i in range(n_tops):
-        top_fjet_idxs[f"top{i+1}"] = ak.fill_none(ak.pad_none(top_fjet_idxs[f"top{i+1}"], 1, clip=True), -1)
-        top_fjet_idxs[f"top{i+1}_bqq"] = ak.fill_none(ak.pad_none(top_fjet_idxs[f"top{i+1}_bqq"], 1, clip=True), -1)
-        top_fjet_idxs[f"top{i+1}_bq"] = ak.fill_none(ak.pad_none(top_fjet_idxs[f"top{i+1}_bq"], 1, clip=True), -1)
-        top_fjet_idxs[f"top{i+1}_qq"] = ak.fill_none(ak.pad_none(top_fjet_idxs[f"top{i+1}_qq"], 1, clip=True), -1)
+        # semi-resolved (bq fatjet)
+        top_semiResolved_bq[f"top{i+1}_q"] = ak.fill_none(ak.firsts(top_semiResolved_bq[f"top{i+1}_q"]), -1)
+        top_semiResolved_bq[f"top{i+1}_bq"] = ak.fill_none(ak.firsts(top_semiResolved_bq[f"top{i+1}_bq"]), -1)
 
-    # h1_bb = ak.fill_none(ak.pad_none(h1_bb, 1, clip=True), -1)
-    # h2_bb = ak.fill_none(ak.pad_none(h2_bb, 1, clip=True), -1)
-    # if n_tops == 3:
-    #     h3_bb = ak.fill_none(ak.pad_none(h3_bb, 1, clip=True), -1)
+        # fully-boosted
+        top_fullyBoosted[f"top{i+1}_bqq"] = ak.fill_none(ak.firsts(top_fullyBoosted[f"top{i+1}_bqq"]), -1)
 
-    # h1_b1, h1_b2 = h1_bs[:, 0], h1_bs[:, 1]
-    # h2_b1, h2_b2 = h2_bs[:, 0], h2_bs[:, 1]
-    # if n_tops == 3:
-    #     h3_b1, h3_b2 = h3_bs[:, 0], h3_bs[:, 1]
-
-    # mask whether top can be reconstructed as 3 small-radius jet
-    # top_fullyResolved_mask = {}
-    # for i in range(n_tops):
-    #     top_fullyResolved_mask[f"top{i+1}"] = ak.all(top_jet_idxs[f"top{i+1}"] != -1, axis=-1)
-
-    # top_semiResolved_mask = {}
-    # for i in range(n_tops):
-    #     top_semiResolved_mask[f"top{i+1}"] = ak.all(
-    #         np.logical_or(
-    #             np.logical_and(
-    #                 top_jet_idxs[f"top{i+1}_b"] != -1, 
-    #                 top_fjet_idxs[f"top{i+1}_qq"] != -1
-    #             ),
-    #             np.logical_and(
-    #                 top_jet_idxs[f"top{i+1}_q"] != -1, 
-    #                 top_fjet_idxs[f"top{i+1}_bq"] != -1
-    #             )
-    #         ),
-    #         axis=-1
-    #     )
-
-
-    # h1_mask = ak.all(h1_bs != -1, axis=-1)
-    # h2_mask = ak.all(h2_bs != -1, axis=-1)
-    # if n_tops == 3:
-    #     h3_mask = ak.all(h3_bs != -1, axis=-1)
-
-    # mask whether Higgs can be reconstructed as 1 large-radius jet
-    # h1_fj_mask = ak.all(h1_bb != -1, axis=-1)
-    # h2_fj_mask = ak.all(h2_bb != -1, axis=-1)
-    # if n_tops == 3:
-    #     h3_fj_mask = ak.all(h3_bb != -1, axis=-1)
-
+    ## Store processed data in dataset for training/testing ##
+    # Store the model inputs
     datasets = {}
     datasets["INPUTS/Jets/MASK"] = to_np_array(mask, max_n=N_JETS).astype("bool")
     datasets["INPUTS/Jets/pt"] = to_np_array(pt, max_n=N_JETS).astype("float32")
@@ -716,62 +693,31 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     datasets["INPUTS/BoostedJets/fj_nneutral"] = to_np_array(fj_nneutral, max_n=N_FJETS)
     datasets["INPUTS/BoostedJets/fj_ncharged"] = to_np_array(fj_ncharged, max_n=N_FJETS)
 
-    # fully-resolved tops
+    # Store the truth-level info
     for i in range(n_tops):
-        datasets[f"TARGETS/frt{i+1}/mask"] = top_fullyResolved_mask[f"top{i+1}"]
-        datasets[f"TARGETS/frt{i+1}/b"] = top_jet_idxs[f"top{i+1}_b"]
-        datasets[f"TARGETS/frt{i+1}/q1"] = top_jet_idxs[f"top{i+1}_q"]
-        datasets[f"TARGETS/frt{i+1}/q2"] = top_jet_idxs[f"top{i+1}_q"]
-        datasets[f"TARGETS/frt{i+1}/pt"] = top_pt_dict[f"top{i+1}_pt"]
+        # fully-resolved tops
+        datasets[f"TARGETS/FRt{i+1}/mask"] = top_fullyResolved[f"top{i+1}_mask"]
+        datasets[f"TARGETS/FRt{i+1}/b"] = top_fullyResolved[f"top{i+1}_b"]
+        datasets[f"TARGETS/FRt{i+1}/q1"] = top_fullyResolved[f"top{i+1}_q1"]
+        datasets[f"TARGETS/FRt{i+1}/q2"] = top_fullyResolved[f"top{i+1}_q2"]
+        datasets[f"TARGETS/FRt{i+1}/pt"] = top_pt_dict[f"top{i+1}_pt"]
 
-    # semi-resolved (qq fatjet) tops
-    for i in range(n_tops):
-        datasets[f"TARGETS/srqqt{i+1}/mask"] = top_semiResolved_qq_mask[f"top{i+1}"]
-        datasets[f"TARGETS/srqqt{i+1}/b"] = top_jet_idxs[f"top{i+1}_b"]
-        datasets[f"TARGETS/srqqt{i+1}/qq"] = top_fjet_idxs[f"top{i+1}_qq"]
-        datasets[f"TARGETS/srqqt{i+1}/pt"] = top_pt_dict[f"top{i+1}_qq_pt"]
+        # semi-resolved (qq fatjet) tops
+        datasets[f"TARGETS/SRqqt{i+1}/mask"] = top_semiResolved_qq[f"top{i+1}_mask"]
+        datasets[f"TARGETS/SRqqt{i+1}/b"] = top_semiResolved_qq[f"top{i+1}_b"]
+        datasets[f"TARGETS/SRqqt{i+1}/qq"] = top_semiResolved_qq[f"top{i+1}_qq"]
+        datasets[f"TARGETS/SRqqt{i+1}/pt"] = top_pt_dict[f"top{i+1}_pt"]
 
-    # semi-resolved (bq fatjet) tops
-    for i in range(n_tops):
-        datasets[f"TARGETS/srbqt{i+1}/mask"] = top_semiResolved_bq_mask[f"top{i+1}"]
-        datasets[f"TARGETS/srbqt{i+1}/q"] = top_jet_idxs[f"top{i+1}_q"]
-        datasets[f"TARGETS/srbqt{i+1}/bq"] = top_fjet_idxs[f"top{i+1}_bq"]
-        datasets[f"TARGETS/srbqt{i+1}/pt"] = top_pt_dict[f"top{i+1}_bq_pt"]
+        # semi-resolved (bq fatjet) tops
+        datasets[f"TARGETS/SRbqt{i+1}/mask"] = top_semiResolved_bq[f"top{i+1}_mask"]
+        datasets[f"TARGETS/SRbqt{i+1}/q"] = top_semiResolved_bq[f"top{i+1}_q"]
+        datasets[f"TARGETS/SRbqt{i+1}/bq"] = top_semiResolved_bq[f"top{i+1}_bq"]
+        datasets[f"TARGETS/SRbqt{i+1}/pt"] = top_pt_dict[f"top{i+1}_pt"]
 
-    # fully-boosted tops
-    for i in range(n_tops):
-        datasets[f"TARGETS/fbt{i+1}/mask"] = top_semiResolved_bq_mask[f"top{i+1}"]
-        datasets[f"TARGETS/fbt{i+1}/bqq"] = top_fjet_idxs[f"top{i+1}_bqq"]
-        datasets[f"TARGETS/fbt{i+1}/pt"] = top_pt_dict[f"top{i+1}_bqq_pt"]
-
-    # datasets["TARGETS/h1/mask"] = h1_mask.to_numpy()
-    # datasets["TARGETS/h1/b1"] = h1_b1.to_numpy()
-    # datasets["TARGETS/h1/b2"] = h1_b2.to_numpy()
-    # datasets["TARGETS/h1/pt"] = h1_pt.to_numpy()
-
-    # datasets["TARGETS/h2/mask"] = h2_mask.to_numpy()
-    # datasets["TARGETS/h2/b1"] = h2_b1.to_numpy()
-    # datasets["TARGETS/h2/b2"] = h2_b2.to_numpy()
-    # datasets["TARGETS/h2/pt"] = h2_pt.to_numpy()
-
-    # if n_tops == 3:
-    #     datasets["TARGETS/h3/mask"] = h3_mask.to_numpy()
-    #     datasets["TARGETS/h3/b1"] = h3_b1.to_numpy()
-    #     datasets["TARGETS/h3/b2"] = h3_b2.to_numpy()
-    #     datasets["TARGETS/h3/pt"] = h3_pt.to_numpy()
-
-    # datasets["TARGETS/bh1/mask"] = h1_fj_mask.to_numpy()
-    # datasets["TARGETS/bh1/bb"] = h1_bb.to_numpy().reshape(h1_fj_mask.to_numpy().shape)
-    # datasets["TARGETS/bh1/pt"] = bh1_pt.to_numpy()
-
-    # datasets["TARGETS/bh2/mask"] = h2_fj_mask.to_numpy()
-    # datasets["TARGETS/bh2/bb"] = h2_bb.to_numpy().reshape(h2_fj_mask.to_numpy().shape)
-    # datasets["TARGETS/bh2/pt"] = bh2_pt.to_numpy()
-
-    # if n_tops == 3:
-    #     datasets["TARGETS/bh3/mask"] = h3_fj_mask.to_numpy()
-    #     datasets["TARGETS/bh3/bb"] = h3_bb.to_numpy().reshape(h3_fj_mask.to_numpy().shape)
-    #     datasets["TARGETS/bh3/pt"] = bh3_pt.to_numpy()
+        # fully-boosted tops
+        datasets[f"TARGETS/FBt{i+1}/mask"] = top_fullyBoosted[f"top{i+1}_mask"]
+        datasets[f"TARGETS/FBt{i+1}/bqq"] = top_fullyBoosted[f"top{i+1}_bqq"]
+        datasets[f"TARGETS/FBt{i+1}/pt"] = top_pt_dict[f"top{i+1}_pt"]
 
     return datasets
 
