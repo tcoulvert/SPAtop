@@ -179,13 +179,14 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         with_name="Momentum4D",
     )
     
-    top_idx, top_b_idx, top_q_idx = match_top_to_jet(
+    top_idx, top_b_idx, top_q1_idx, top_q2_idx = match_top_to_jet(
         bquarks, wquarks_d1, wquarks_d2, jets, 
-        ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder()
+        ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder()
     )
-    top_idx, top_b_idx, top_q_idx = (
-        top_idx.snapshot(), top_b_idx.snapshot(), top_q_idx.snapshot()
+    top_idx, top_b_idx, top_q1_idx, top_q2_idx = (
+        top_idx.snapshot(), top_b_idx.snapshot(), top_q1_idx.snapshot(), top_q2_idx.snapshot()
     )
+    top_q_idx = ak.where(top_q1_idx > 0, top_q1_idx, top_q2_idx)
     fj_top_idx, fj_top_bqq_idx, fj_top_bq_idx, fj_top_qq_idx = match_top_to_fjet(
         bquarks, wquarks_d1, wquarks_d2, fjets, 
         ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder()
