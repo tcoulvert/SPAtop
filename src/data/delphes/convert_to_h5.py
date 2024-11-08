@@ -186,286 +186,175 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     top_idx, top_b_idx, top_q1_idx, top_q2_idx = (
         top_idx.snapshot(), top_b_idx.snapshot(), top_q1_idx.snapshot(), top_q2_idx.snapshot()
     )
-    top_q_idx = ak.where(top_q1_idx > 0, top_q1_idx, top_q2_idx)
     fj_top_idx, fj_top_bqq_idx, fj_top_bq1_idx, fj_top_bq2_idx, fj_top_qq_idx = match_top_to_fjet(
         bquarks, wquarks_d1, wquarks_d2, fjets, 
         ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder()
     )
-    fj_top_idx, fj_top_bqq_idx, fj_top_bq1_idx, fj_top_bq1_idx, fj_top_qq_idx = (
+    fj_top_idx, fj_top_bqq_idx, fj_top_bq1_idx, fj_top_bq2_idx, fj_top_qq_idx = (
         fj_top_idx.snapshot(), fj_top_bqq_idx.snapshot(), fj_top_bq1_idx.snapshot(), fj_top_bq2_idx.snapshot(), fj_top_qq_idx.snapshot()
     )
-    fj_top_bq_idx = ak.where(fj_top_bq1_idx > 0, fj_top_bq1_idx, fj_top_bq2_idx)
     matched_fj_idx = match_fjet_to_jet(fjets, jets, ak.ArrayBuilder()).snapshot()
-    # print(f"fjets: \n{fjets}\n{'='*60}")
-    # print(f"empty at same places fjets-any: \n{ak.all(ak.num(fjets) == ak.num(fj_top_idx))}\n{'='*60}")
-    # print(f"empty at same places fjets-bqq: \n{ak.all(ak.num(fjets) == ak.num(fj_top_bqq_idx))}\n{'='*60}")
-    # print(f"empty at same places fjets-bq: \n{ak.all(ak.num(fjets) == ak.num(fj_top_bq_idx))}\n{'='*60}")
-    # print(f"empty at same places fjets-qq: \n{ak.all(ak.num(fjets) == ak.num(fj_top_qq_idx))}\n{'='*60}")
-    print(f"fjet any boosted: \n{fj_top_idx}\n{'='*60}")
-    print(f"fjet all boosted: \n{fj_top_bqq_idx}\n{'='*60}")
-    print(f"fjet bq boosted: \n{fj_top_bq_idx}\n{'='*60}")
-    print(f"fjet qq boosted: \n{fj_top_qq_idx}\n{'='*60}")
-    # total_arr = np.where(fj_top_idx > 0, 1, -1) + np.where(fj_top_bqq_idx > 0, 1, -1) + np.where(fj_top_bq_idx > 0, 1, -1) + np.where(fj_top_qq_idx > 0, 1, -1)
-    # print(f"only 2 arrays have fatjets: \n{ak.all((total_arr == 0) | (total_arr == -4))}\n{'='*60}")
-    # less_total_arr = np.where(fj_top_bqq_idx > 0, 1, -1) + np.where(fj_top_bq_idx > 0, 1, -1) + np.where(fj_top_qq_idx > 0, 1, -1)
-    # print(f"only 1 array has fatjets: \n{ak.all((less_total_arr == -1) | (less_total_arr == -3))}\n{'='*60}")
-    print(f"jet any: \n{top_idx}\n{'='*60}")
-    print(f"jet t->b: \n{top_b_idx}\n{'='*60}")
-    print(f"jet w->q: \n{top_q_idx}\n{'='*60}")
-    # total_arr = np.where(top_idx > 0, 1, -1) + np.where(top_b_idx > 0, 1, -1) + np.where(top_q_idx > 0, 1, -1)
-    # print(f"only 2 arrays have jets: \n{ak.all((total_arr == 1) | (total_arr == -3))}\n{'='*60}")
-    # less_total_arr = np.where(top_b_idx > 0, 1, -1) + np.where(top_q_idx > 0, 1, -1)
-    # print(f"only 1 array has jets: \n{ak.all((less_total_arr == 0) | (less_total_arr == -2))}\n{'='*60}")
-    # print(f"total arr where problems: \n{ak.drop_none(ak.firsts(total_arr[(total_arr != 1) & (total_arr != -3)]))}")
-    # print(f"less total arr where problems: \n{ak.drop_none(ak.firsts(less_total_arr[(less_total_arr != 0) & (less_total_arr != -2)]))}")
-    # problem_indices = ak.where(
-    #     ak.is_none(ak.firsts(total_arr[(total_arr != 1) & (total_arr != -3)])), -1, range(len(ak.firsts(total_arr[(total_arr != 1) & (total_arr != -3)])))
+
+    # print(f"total number of events = {ak.num(top_idx, axis=0)}")
+
+    # # two fully resolved tops
+    # two_fullyResolved = (
+    #     (ak.sum(top_idx == 1, axis=1) == 3) & (ak.sum(top_idx == 2, axis=1) == 3)
     # )
-    # print(f"top_idx where problems: \n{top_idx[problem_indices != -1]}")
-    # print(f"top_b_idx where problems: \n{top_b_idx[problem_indices != -1]}")
-    # print(f"top_q_idx where problems: \n{top_q_idx[problem_indices != -1]}")
-    # print(f"fatjets where problems: \n{fj_top_idx[problem_indices != -1]}")
-
-
-
-    print(f"total number of events = {ak.num(top_idx, axis=0)}")
-
-    # two fully resolved tops
-    two_fullyResolved = (
-        (ak.sum(top_idx == 1, axis=1) == 3) & (ak.sum(top_idx == 2, axis=1) == 3)
-    )
-    print(f"number of reco. 2 tops fully-resolved events = {ak.sum(two_fullyResolved)}")
+    # print(f"number of reco. 2 tops fully-resolved events = {ak.sum(two_fullyResolved)}")
     
-    # one fully resolved top, one semi-resolved top
-    one_fullyResolved_one_bqFjet = (
-        (
-            (ak.sum(top_idx == 2, axis=1) == 3) 
-            & (ak.sum(top_q_idx == 1, axis=1) == 1) 
-            & (ak.sum(fj_top_bq_idx == 1, axis=1) == 1)
-        ) | (
-            (ak.sum(top_idx == 1, axis=1) == 3) 
-            & (ak.sum(top_q_idx == 2, axis=1) == 1) 
-            & (ak.sum(fj_top_bq_idx == 2, axis=1) == 1)
-        )
-    )
-    print(f"number of reco. 1 top fully-resolved, 1 top semi-resolved (bq) events = {ak.sum(one_fullyResolved_one_bqFjet)}")
-    one_fullyResolved_one_qqFjet = (
-        (
-            (ak.sum(top_idx == 2, axis=1) == 3) 
-            & (ak.sum(top_b_idx == 1, axis=1) == 1) 
-            & (ak.sum(fj_top_qq_idx == 1, axis=1) == 1)
-        ) | (
-            (ak.sum(top_idx == 1, axis=1) == 3) 
-            & (ak.sum(top_b_idx == 2, axis=1) == 1) 
-            & (ak.sum(fj_top_qq_idx == 2, axis=1) == 1)
-        )
-    )
-    print(f"number of reco. 1 top fully-resolved, 1 top semi-resolved (qq) events = {ak.sum(one_fullyResolved_one_qqFjet)}")
-    one_fullyResolved_one_semiResolved = one_fullyResolved_one_bqFjet | one_fullyResolved_one_qqFjet
-    print(f"number of reco. 1 top fully-resolved, 1 top semi-resolved (bq or qq) events = {ak.sum(one_fullyResolved_one_semiResolved)}")
-    
-    # two semi-resolved tops
-    two_bqFjet = (
-        (ak.sum(top_q_idx == 2, axis=1) == 1) 
-        & (ak.sum(fj_top_bq_idx == 2, axis=1) == 1)
-        & (ak.sum(top_q_idx == 1, axis=1) == 1) 
-        & (ak.sum(fj_top_bq_idx == 1, axis=1) == 1)
-    )
-    print(f"number of reco. 2 tops semi-resolved (bq) events = {ak.sum(two_bqFjet)}")
-    one_bqFjet_one_qqFjet = (
-        (
-            (ak.sum(top_b_idx == 2, axis=1) == 1) 
-            & (ak.sum(fj_top_qq_idx == 2, axis=1) == 1)
-            & (ak.sum(top_q_idx == 1, axis=1) == 1) 
-            & (ak.sum(fj_top_bq_idx == 1, axis=1) == 1)
-        ) | (
-            (ak.sum(top_b_idx == 1, axis=1) == 1) 
-            & (ak.sum(fj_top_qq_idx == 1, axis=1) == 1)
-            & (ak.sum(top_q_idx == 2, axis=1) == 1) 
-            & (ak.sum(fj_top_bq_idx == 2, axis=1) == 1)
-        )
-    )
-    print(f"number of reco. 1 top semi-resolved (bq), 1 top semi-resolved (qq) events = {ak.sum(one_bqFjet_one_qqFjet)}")
-    two_qqFjet = (
-        (ak.sum(top_b_idx == 2, axis=1) == 1) 
-        & (ak.sum(fj_top_qq_idx == 2, axis=1) == 1)
-        & (ak.sum(top_b_idx == 1, axis=1) == 1) 
-        & (ak.sum(fj_top_qq_idx == 1, axis=1) == 1)
-    )
-    print(f"number of reco. 2 tops semi-resolved (qq) events = {ak.sum(two_qqFjet)}")
-    two_semiResolved = two_bqFjet | one_bqFjet_one_qqFjet | two_qqFjet
-    print(f"number of reco. 2 tops semi-resolved (bq or qq) events = {ak.sum(two_semiResolved)}")
-
-    # one fully resolved top, one fully-boosted top
-    one_fullyResolved_one_fullyBoosted = (
-        (
-            (ak.sum(top_idx == 2, axis=1) == 3)
-            & (ak.sum(fj_top_bqq_idx == 1, axis=1) == 1)
-        ) | (
-            (ak.sum(top_idx == 1, axis=1) == 3)
-            & (ak.sum(fj_top_bqq_idx == 2, axis=1) == 1)
-        )
-    )
-    print(f"number of reco. 1 top fully-resolved, 1 top fully-boosted events = {ak.sum(one_fullyResolved_one_fullyBoosted)}")
-    
-    # one semi-resolved top, one fully-boosted top
-    one_bqFjet_one_bqqFjet = (
-        (
-            (ak.sum(top_q_idx == 2, axis=1) == 1) 
-            & (ak.sum(fj_top_bq_idx == 2, axis=1) == 1)
-            & (ak.sum(fj_top_bqq_idx == 1, axis=1) == 1)
-        ) | (
-            (ak.sum(top_q_idx == 1, axis=1) == 1) 
-            & (ak.sum(fj_top_bq_idx == 1, axis=1) == 1)
-            & (ak.sum(fj_top_bqq_idx == 2, axis=1) == 1)
-        )
-    )
-    print(f"number of reco. 1 top semi-resolved (bq), 1 top fully-boosted events = {ak.sum(one_bqFjet_one_bqqFjet)}")
-    one_qqFjet_one_bqqFjet = (
-        (
-            (ak.sum(top_b_idx == 2, axis=1) == 1) 
-            & (ak.sum(fj_top_qq_idx == 2, axis=1) == 1)
-            & (ak.sum(fj_top_bqq_idx == 1, axis=1) == 1)
-        ) | (
-            (ak.sum(top_b_idx == 1, axis=1) == 1) 
-            & (ak.sum(fj_top_qq_idx == 1, axis=1) == 1)
-            & (ak.sum(fj_top_bqq_idx == 2, axis=1) == 1)
-        )
-    )
-    print(f"number of reco. 1 top semi-resolved (qq), 1 top fully-boosted events = {ak.sum(one_qqFjet_one_bqqFjet)}")
-    one_semiResolved_one_fullyBoosted = one_bqFjet_one_bqqFjet | one_qqFjet_one_bqqFjet
-    print(f"number of reco. 1 top semi-resolved (bq or qq), 1 top fully-boosted events = {ak.sum(one_semiResolved_one_fullyBoosted)}")
-    
-    # two fully-boosted tops
-    two_fullyBoosted = (
-        (
-            (ak.sum(top_q_idx == 2, axis=1) == 1) 
-            & (ak.sum(fj_top_bq_idx == 2, axis=1) == 1)
-            & (ak.sum(fj_top_bqq_idx == 1, axis=1) == 1)
-        ) | (
-            (ak.sum(top_q_idx == 1, axis=1) == 1) 
-            & (ak.sum(fj_top_bq_idx == 1, axis=1) == 1)
-            & (ak.sum(fj_top_bqq_idx == 2, axis=1) == 1)
-        )
-    )
-    print(f"number of reco. 2 tops fully-boosted events = {ak.sum(two_fullyBoosted)}")
-
-    def fiducial_mask(quarks, min_pt=10):
-        eta_barrel, eta_endcap, max_eta = 1.4442, 1.566, 2.3
-
-        return np.logical_and(
-            np.logical_and(
-                np.logical_or(
-                    np.abs(quarks.eta) < eta_barrel, np.abs(quarks.eta) > eta_endcap
-                ), np.abs(quarks.eta) < max_eta
-            ), quarks.pt > min_pt
-        )
-    
-    bquark1_fiducial_mask = fiducial_mask(bquarks[ak.local_index(bquarks) == 0])
-    bquark2_fiducial_mask = fiducial_mask(bquarks[ak.local_index(bquarks) == 1])
-    w1quark1_fiducial_mask = fiducial_mask(wquarks_d1[ak.local_index(wquarks_d1) == 0])
-    w1quark2_fiducial_mask = fiducial_mask(wquarks_d2[ak.local_index(wquarks_d2) == 0])
-    w2quark1_fiducial_mask = fiducial_mask(wquarks_d1[ak.local_index(wquarks_d1) == 1])
-    w2quark2_fiducial_mask = fiducial_mask(wquarks_d2[ak.local_index(wquarks_d2) == 1])
-    measureable_events = bquark1_fiducial_mask & bquark2_fiducial_mask & w1quark1_fiducial_mask & w1quark2_fiducial_mask & w2quark1_fiducial_mask & w2quark2_fiducial_mask
-
-    proper_events = (
-        two_fullyResolved | one_fullyResolved_one_semiResolved | one_fullyResolved_one_fullyBoosted
-        | two_semiResolved | one_semiResolved_one_fullyBoosted
-        | two_fullyBoosted
-    ) & measureable_events
-    print('-'*60)
-    # print(f"number of good reco events = {ak.sum(proper_events)}")
-    # print(f"num detectable events = {ak.sum(measureable_events)}")
-
-    print(f"fiducial efficiency = {ak.sum(measureable_events) / ak.num(top_idx, axis=0)}")
-    print(f"reco. efficiency = {ak.sum(proper_events) / ak.sum(measureable_events)}")
-    print(f"total efficiency = {ak.sum(proper_events) / ak.num(top_idx, axis=0)}")
-    
-    # def weights_pt_hist(data, pt, n_bins: int=35, min_pt: float=0., max_pt: float=350.):
-    #     bin_edges = np.array([(i * (max_pt-min_pt) / n_bins) + min_pt for i in range(n_bins+1)])
-
-    #     weights = np.array([1. for _ in range(np.shape(data)[0])])
-    #     for i in range(n_bins):
-    #         mask_arr = np.logical_and(pt >= bin_edges[i], pt < bin_edges[i+1])
-    #         weights[mask_arr] = weights[mask_arr] * (np.sum(data[mask_arr]) / np.sum(mask_arr)) / np.sum(mask_arr)
-        
-    #     return weights
-    
-    # fig, ax = plt.subplots()
-    # hep.cms.text("Work in Progress", ax=ax)
-    # n_bins, min_pt, max_pt = 35, 0., 350.
-    # hist_axis = hist.axis.Regular(n_bins, min_pt, max_pt, name='var', label=r'$p_T$', growth=False, underflow=False, overflow=False)
-    # bquark1_hist = hist.Hist(hist_axis, storage='weight').fill(var=bquarks.pt[ak.local_index(bquarks) == 0][bquark1_fiducial_mask], weight=weights_pt_hist(min_dR_bquark1[bquark1_fiducial_mask], bquarks.pt[ak.local_index(bquarks) == 0][bquark1_fiducial_mask], n_bins, min_pt, max_pt))
-    # bquark2_hist = hist.Hist(hist_axis, storage='weight').fill(var=bquarks.pt[ak.local_index(bquarks) == 1][bquark2_fiducial_mask], weight=weights_pt_hist(min_dR_bquark2[bquark2_fiducial_mask], bquarks.pt[ak.local_index(bquarks) == 1][bquark2_fiducial_mask], n_bins, min_pt, max_pt))
-    # w1quark1_hist = hist.Hist(hist_axis, storage='weight').fill(var=wquarks_d1.pt[ak.local_index(wquarks_d1) == 0][w1quark1_fiducial_mask], weight=weights_pt_hist(min_dR_w1quark1[w1quark1_fiducial_mask], wquarks_d1.pt[ak.local_index(wquarks_d1) == 0][w1quark1_fiducial_mask], n_bins, min_pt, max_pt))
-    # w1quark2_hist = hist.Hist(hist_axis, storage='weight').fill(var=wquarks_d2.pt[ak.local_index(wquarks_d2) == 0][w1quark2_fiducial_mask], weight=weights_pt_hist(min_dR_w1quark2[w1quark2_fiducial_mask], wquarks_d2.pt[ak.local_index(wquarks_d2) == 0][w1quark2_fiducial_mask], n_bins, min_pt, max_pt))
-    # w2quark1_hist = hist.Hist(hist_axis, storage='weight').fill(var=wquarks_d1.pt[ak.local_index(wquarks_d1) == 1][w2quark1_fiducial_mask], weight=weights_pt_hist(min_dR_w2quark1[w2quark1_fiducial_mask], wquarks_d1.pt[ak.local_index(wquarks_d1) == 1][w2quark1_fiducial_mask], n_bins, min_pt, max_pt))
-    # w2quark2_hist = hist.Hist(hist_axis, storage='weight').fill(var=wquarks_d2.pt[ak.local_index(wquarks_d2) == 1][w2quark2_fiducial_mask], weight=weights_pt_hist(min_dR_w2quark2[w2quark2_fiducial_mask], wquarks_d2.pt[ak.local_index(wquarks_d2) == 1][w2quark2_fiducial_mask], n_bins, min_pt, max_pt))
-    # hep.histplot(
-    #     [bquark1_hist, bquark2_hist, w1quark1_hist, w1quark2_hist, w2quark1_hist, w2quark2_hist], 
-    #     yerr=True, alpha=0.5, histtype='step', label=['bquark1', 'bquark2', 'w1quark1', 'w1quark2', 'w2quark1', 'w2quark2']
-    # )
-    # ax.legend()
-    # ax.set_ylabel('Average min($\Delta R$)')
-    # plt.savefig('avg_min_deltaR_against_pt.png')
-    # plt.close()
-
-    # n_pt_bins, min_pt, max_pt = 35, 0., 350.
-    # n_dR_bins, min_dR, max_dR = 15, 0., 1.5
-    # for plot, pt_data, dR_data, fid_mask in [
-    #     ('bquark1', bquarks.pt[ak.local_index(bquarks) == 0], min_dR_bquark1, bquark1_fiducial_mask), ('bquark2', bquarks.pt[ak.local_index(bquarks) == 1], min_dR_bquark2, bquark2_fiducial_mask),
-    #     ('w1quark1', wquarks_d1.pt[ak.local_index(wquarks_d1) == 0], min_dR_w1quark1, w1quark1_fiducial_mask), ('w1quark2', wquarks_d2.pt[ak.local_index(wquarks_d2) == 0], min_dR_w1quark2, w1quark2_fiducial_mask),
-    #     ('w2quark1', wquarks_d1.pt[ak.local_index(wquarks_d1) == 1], min_dR_w2quark1, w2quark1_fiducial_mask), ('w2quark2', wquarks_d2.pt[ak.local_index(wquarks_d2) == 1], min_dR_w2quark2, w2quark2_fiducial_mask),
-    # ]:
-    #     fig, ax = plt.subplots()
-    #     hep.cms.text("Work in Progress", ax=ax)
-        
-    #     pt_axis = hist.axis.Regular(n_pt_bins, min_pt, max_pt, name='pt_var', label=r'$p_T$', growth=False, underflow=False, overflow=False)
-    #     deltaR_axis = hist.axis.Regular(n_dR_bins, min_dR, max_dR, name='dr_var', label=r'$\Delta R$', growth=False, underflow=False, overflow=False)
-    #     hist_data = hist.Hist(pt_axis, deltaR_axis).fill(pt_var=pt_data[fid_mask], dr_var=dR_data[fid_mask])
-    #     hep.hist2dplot(
-    #         hist_data, ax=ax,
+    # # one fully resolved top, one semi-resolved top
+    # one_fullyResolved_one_bqFjet = (
+    #     (
+    #         (ak.sum(top_idx == 2, axis=1) == 3) 
+    #         & (ak.sum(top_q1_idx == 1, axis=1) == 1) 
+    #         & (ak.sum(fj_top_bq2_idx == 1, axis=1) == 1)
+    #     ) | (
+    #         (ak.sum(top_idx == 1, axis=1) == 3) 
+    #         & (ak.sum(top_q2_idx == 2, axis=1) == 1) 
+    #         & (ak.sum(fj_top_bq1_idx == 2, axis=1) == 1)
     #     )
-    #     plt.savefig(f'{plot}_min_deltaR_against_pt.png')
-    #     plt.close()
+    # )
+    # print(f"number of reco. 1 top fully-resolved, 1 top semi-resolved (bq) events = {ak.sum(one_fullyResolved_one_bqFjet)}")
+    # one_fullyResolved_one_qqFjet = (
+    #     (
+    #         (ak.sum(top_idx == 2, axis=1) == 3) 
+    #         & (ak.sum(top_b_idx == 1, axis=1) == 1) 
+    #         & (ak.sum(fj_top_qq_idx == 1, axis=1) == 1)
+    #     ) | (
+    #         (ak.sum(top_idx == 1, axis=1) == 3) 
+    #         & (ak.sum(top_b_idx == 2, axis=1) == 1) 
+    #         & (ak.sum(fj_top_qq_idx == 2, axis=1) == 1)
+    #     )
+    # )
+    # print(f"number of reco. 1 top fully-resolved, 1 top semi-resolved (qq) events = {ak.sum(one_fullyResolved_one_qqFjet)}")
+    # one_fullyResolved_one_semiResolved = one_fullyResolved_one_bqFjet | one_fullyResolved_one_qqFjet
+    # print(f"number of reco. 1 top fully-resolved, 1 top semi-resolved (bq or qq) events = {ak.sum(one_fullyResolved_one_semiResolved)}")
+    
+    # # two semi-resolved tops
+    # two_bqFjet = (
+    #     (ak.sum(top_q_idx == 2, axis=1) == 1) 
+    #     & (ak.sum(fj_top_bq_idx == 2, axis=1) == 1)
+    #     & (ak.sum(top_q_idx == 1, axis=1) == 1) 
+    #     & (ak.sum(fj_top_bq_idx == 1, axis=1) == 1)
+    # )
+    # print(f"number of reco. 2 tops semi-resolved (bq) events = {ak.sum(two_bqFjet)}")
+    # one_bqFjet_one_qqFjet = (
+    #     (
+    #         (ak.sum(top_b_idx == 2, axis=1) == 1) 
+    #         & (ak.sum(fj_top_qq_idx == 2, axis=1) == 1)
+    #         & (ak.sum(top_q_idx == 1, axis=1) == 1) 
+    #         & (ak.sum(fj_top_bq_idx == 1, axis=1) == 1)
+    #     ) | (
+    #         (ak.sum(top_b_idx == 1, axis=1) == 1) 
+    #         & (ak.sum(fj_top_qq_idx == 1, axis=1) == 1)
+    #         & (ak.sum(top_q_idx == 2, axis=1) == 1) 
+    #         & (ak.sum(fj_top_bq_idx == 2, axis=1) == 1)
+    #     )
+    # )
+    # print(f"number of reco. 1 top semi-resolved (bq), 1 top semi-resolved (qq) events = {ak.sum(one_bqFjet_one_qqFjet)}")
+    # two_qqFjet = (
+    #     (ak.sum(top_b_idx == 2, axis=1) == 1) 
+    #     & (ak.sum(fj_top_qq_idx == 2, axis=1) == 1)
+    #     & (ak.sum(top_b_idx == 1, axis=1) == 1) 
+    #     & (ak.sum(fj_top_qq_idx == 1, axis=1) == 1)
+    # )
+    # print(f"number of reco. 2 tops semi-resolved (qq) events = {ak.sum(two_qqFjet)}")
+    # two_semiResolved = two_bqFjet | one_bqFjet_one_qqFjet | two_qqFjet
+    # print(f"number of reco. 2 tops semi-resolved (bq or qq) events = {ak.sum(two_semiResolved)}")
 
+    # # one fully resolved top, one fully-boosted top
+    # one_fullyResolved_one_fullyBoosted = (
+    #     (
+    #         (ak.sum(top_idx == 2, axis=1) == 3)
+    #         & (ak.sum(fj_top_bqq_idx == 1, axis=1) == 1)
+    #     ) | (
+    #         (ak.sum(top_idx == 1, axis=1) == 3)
+    #         & (ak.sum(fj_top_bqq_idx == 2, axis=1) == 1)
+    #     )
+    # )
+    # print(f"number of reco. 1 top fully-resolved, 1 top fully-boosted events = {ak.sum(one_fullyResolved_one_fullyBoosted)}")
+    
+    # # one semi-resolved top, one fully-boosted top
+    # one_bqFjet_one_bqqFjet = (
+    #     (
+    #         (ak.sum(top_q_idx == 2, axis=1) == 1) 
+    #         & (ak.sum(fj_top_bq_idx == 2, axis=1) == 1)
+    #         & (ak.sum(fj_top_bqq_idx == 1, axis=1) == 1)
+    #     ) | (
+    #         (ak.sum(top_q_idx == 1, axis=1) == 1) 
+    #         & (ak.sum(fj_top_bq_idx == 1, axis=1) == 1)
+    #         & (ak.sum(fj_top_bqq_idx == 2, axis=1) == 1)
+    #     )
+    # )
+    # print(f"number of reco. 1 top semi-resolved (bq), 1 top fully-boosted events = {ak.sum(one_bqFjet_one_bqqFjet)}")
+    # one_qqFjet_one_bqqFjet = (
+    #     (
+    #         (ak.sum(top_b_idx == 2, axis=1) == 1) 
+    #         & (ak.sum(fj_top_qq_idx == 2, axis=1) == 1)
+    #         & (ak.sum(fj_top_bqq_idx == 1, axis=1) == 1)
+    #     ) | (
+    #         (ak.sum(top_b_idx == 1, axis=1) == 1) 
+    #         & (ak.sum(fj_top_qq_idx == 1, axis=1) == 1)
+    #         & (ak.sum(fj_top_bqq_idx == 2, axis=1) == 1)
+    #     )
+    # )
+    # print(f"number of reco. 1 top semi-resolved (qq), 1 top fully-boosted events = {ak.sum(one_qqFjet_one_bqqFjet)}")
+    # one_semiResolved_one_fullyBoosted = one_bqFjet_one_bqqFjet | one_qqFjet_one_bqqFjet
+    # print(f"number of reco. 1 top semi-resolved (bq or qq), 1 top fully-boosted events = {ak.sum(one_semiResolved_one_fullyBoosted)}")
+    
+    # # two fully-boosted tops
+    # two_fullyBoosted = (
+    #     (
+    #         (ak.sum(top_q_idx == 2, axis=1) == 1) 
+    #         & (ak.sum(fj_top_bq_idx == 2, axis=1) == 1)
+    #         & (ak.sum(fj_top_bqq_idx == 1, axis=1) == 1)
+    #     ) | (
+    #         (ak.sum(top_q_idx == 1, axis=1) == 1) 
+    #         & (ak.sum(fj_top_bq_idx == 1, axis=1) == 1)
+    #         & (ak.sum(fj_top_bqq_idx == 2, axis=1) == 1)
+    #     )
+    # )
+    # print(f"number of reco. 2 tops fully-boosted events = {ak.sum(two_fullyBoosted)}")
+
+    # def fiducial_mask(quarks, min_pt=10):
+    #     eta_barrel, eta_endcap, max_eta = 1.4442, 1.566, 2.3
+
+    #     return np.logical_and(
+    #         np.logical_and(
+    #             np.logical_or(
+    #                 np.abs(quarks.eta) < eta_barrel, np.abs(quarks.eta) > eta_endcap
+    #             ), np.abs(quarks.eta) < max_eta
+    #         ), quarks.pt > min_pt
+    #     )
+    
+    # bquark1_fiducial_mask = fiducial_mask(bquarks[ak.local_index(bquarks) == 0])
+    # bquark2_fiducial_mask = fiducial_mask(bquarks[ak.local_index(bquarks) == 1])
+    # w1quark1_fiducial_mask = fiducial_mask(wquarks_d1[ak.local_index(wquarks_d1) == 0])
+    # w1quark2_fiducial_mask = fiducial_mask(wquarks_d2[ak.local_index(wquarks_d2) == 0])
+    # w2quark1_fiducial_mask = fiducial_mask(wquarks_d1[ak.local_index(wquarks_d1) == 1])
+    # w2quark2_fiducial_mask = fiducial_mask(wquarks_d2[ak.local_index(wquarks_d2) == 1])
+    # measureable_events = bquark1_fiducial_mask & bquark2_fiducial_mask & w1quark1_fiducial_mask & w1quark2_fiducial_mask & w2quark1_fiducial_mask & w2quark2_fiducial_mask
+
+    # proper_events = (
+    #     two_fullyResolved | one_fullyResolved_one_semiResolved | one_fullyResolved_one_fullyBoosted
+    #     | two_semiResolved | one_semiResolved_one_fullyBoosted
+    #     | two_fullyBoosted
+    # ) & measureable_events
+    # print('-'*60)
+    # # print(f"number of good reco events = {ak.sum(proper_events)}")
+    # # print(f"num detectable events = {ak.sum(measureable_events)}")
+
+    # print(f"fiducial efficiency = {ak.sum(measureable_events) / ak.num(top_idx, axis=0)}")
+    # print(f"reco. efficiency = {ak.sum(proper_events) / ak.sum(measureable_events)}")
+    # print(f"total efficiency = {ak.sum(proper_events) / ak.num(top_idx, axis=0)}")
     
 
-    # print('-'*60)
-    # deltaR_cut = 0.5
-    # frac_bquark1 = ak.sum(ak.min(bquarks[ak.local_index(bquarks) == 0].deltaR(jets), axis=1)[bquark1_fiducial_mask] < deltaR_cut) / ak.num(top_idx[bquark1_fiducial_mask], axis=0)
-    # print(f"frac bquark1 within {deltaR_cut} = {frac_bquark1}")
-    # frac_bquark2 = ak.sum(ak.min(bquarks[ak.local_index(bquarks) == 1].deltaR(jets), axis=1)[bquark2_fiducial_mask] < deltaR_cut) / ak.num(top_idx[bquark2_fiducial_mask], axis=0)
-    # print(f"frac bquark2 within {deltaR_cut} = {frac_bquark2}")
-    # frac_w1quark1 = ak.sum(ak.min(wquarks_d1[ak.local_index(wquarks_d1) == 0].deltaR(jets), axis=1)[w1quark1_fiducial_mask] < deltaR_cut) / ak.num(top_idx[w1quark1_fiducial_mask], axis=0)
-    # print(f"frac w1quark1 within {deltaR_cut} = {frac_w1quark1}")
-    # frac_w1quark2 = ak.sum(ak.min(wquarks_d2[ak.local_index(wquarks_d2) == 0].deltaR(jets), axis=1)[w1quark2_fiducial_mask] < deltaR_cut) / ak.num(top_idx[w1quark2_fiducial_mask], axis=0)
-    # print(f"frac w1quark2 within {deltaR_cut} = {frac_w1quark2}")
-    # frac_w2quark1 = ak.sum(ak.min(wquarks_d1[ak.local_index(wquarks_d1) == 1].deltaR(jets), axis=1)[w2quark1_fiducial_mask] < deltaR_cut) / ak.num(top_idx[w2quark1_fiducial_mask], axis=0)
-    # print(f"frac w2quark1 within {deltaR_cut} = {frac_w2quark1}")
-    # frac_w2quark2 = ak.sum(ak.min(wquarks_d2[ak.local_index(wquarks_d2) == 1].deltaR(jets), axis=1)[w2quark2_fiducial_mask] < deltaR_cut) / ak.num(top_idx[w2quark2_fiducial_mask], axis=0)
-    # print(f"frac w2quark2 within {deltaR_cut} = {frac_w2quark2}")
-    # expected_resolved_efficiency = frac_bquark1 * frac_bquark2 * frac_w1quark1 * frac_w1quark2 * frac_w2quark1 * frac_w2quark2
-    # print(f"expected fully-resolved efficiency at dR {deltaR_cut} = {expected_resolved_efficiency}")
-
-    # print('-'*60)
-    # print(f"w2quark1 deltaR with jets: {wquarks_d2[0, 1].deltaR(jets[0])}")
-    # print(f"w2quark1.m1 deltaR with jets: {particles[wquarks_d2.m1][0, 1].deltaR(jets[0])}")
-    # print(f"w2quark1.m1 status: {particles.status[wquarks_d2.m1][0, 1]}")
-    # print(f"w2quark1.m1.m1 deltaR with jets: {particles[particles.m1[wquarks_d2.m1]][0, 1].deltaR(jets[0])}")
-    # print(f"w2quark1.m1.m1 status: {particles.status[particles.m1[wquarks_d2.m1]][0, 1]}")
-
-    # print(f"min Delta pT btwn bquark1 and jets = {ak.min(ak.where(bquarks.pt[ak.local_index(bquarks) == 0] - jets.pt > 0, bquarks.pt[ak.local_index(bquarks) == 0] - jets.pt, -(bquarks.pt[ak.local_index(bquarks) == 0] - jets.pt)), axis=1)}")
-    # print(f"min Delta pT btwn bquark2 and jets = {ak.min(ak.where(bquarks.pt[ak.local_index(bquarks) == 1] - jets.pt > 0, bquarks.pt[ak.local_index(bquarks) == 1] - jets.pt, -(bquarks.pt[ak.local_index(bquarks) == 1] - jets.pt)), axis=1)}")
-    # print(f"min Delta pT btwn w1quark1 and jets = {ak.min(ak.where(wquarks_d1.pt[ak.local_index(wquarks_d1) == 0] - jets.pt > 0, wquarks_d1.pt[ak.local_index(wquarks_d1) == 0] - jets.pt, -(wquarks_d1.pt[ak.local_index(wquarks_d1) == 0] - jets.pt)), axis=1)}")
-    # print(f"min Delta pT btwn w1quark2 and jets = {ak.min(ak.where(wquarks_d2.pt[ak.local_index(wquarks_d2) == 0] - jets.pt > 0, wquarks_d2.pt[ak.local_index(wquarks_d2) == 0] - jets.pt, -(wquarks_d2.pt[ak.local_index(wquarks_d2) == 0] - jets.pt)), axis=1)}")
-    # print(f"min Delta pT btwn w2quark1 and jets = {ak.min(ak.where(wquarks_d1.pt[ak.local_index(wquarks_d1) == 1] - jets.pt > 0, wquarks_d1.pt[ak.local_index(wquarks_d1) == 1] - jets.pt, -(wquarks_d1.pt[ak.local_index(wquarks_d1) == 1] - jets.pt)), axis=1)}")
-    # print(f"min Delta pT btwn w2quark2 and jets = {ak.min(ak.where(wquarks_d2.pt[ak.local_index(wquarks_d2) == 1] - jets.pt > 0, wquarks_d2.pt[ak.local_index(wquarks_d2) == 1] - jets.pt, -(wquarks_d2.pt[ak.local_index(wquarks_d2) == 1] - jets.pt)), axis=1)}")
-
-    # keep events with >= min_jets small-radius jets
-    min_jets = 3 * n_tops
-    mask_minjets = ak.num(pt[pt > MIN_JET_PT]) >= min_jets
+    # keep events with >= min_jets
+    mask_minjets = (
+        ak.num(pt[pt > MIN_JET_PT]) / 3
+        + ak.num(fj_pt[fj_pt > MIN_FJET_PT])
+    ) >= n_tops
     # sort by pt
     sorted_by_pt = ak.argsort(pt, ascending=False, axis=-1)
     # sorted = ak.concatenate([sorted_by_pt[btag == 1], sorted_by_pt[btag == 0]], axis=-1)
@@ -476,6 +365,9 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     mass = mass[sorted_by_pt][mask_minjets]
     flavor = flavor[sorted_by_pt][mask_minjets]
     top_idx = top_idx[sorted_by_pt][mask_minjets]
+    top_b_idx = top_b_idx[sorted_by_pt][mask_minjets]
+    top_q1_idx = top_q1_idx[sorted_by_pt][mask_minjets]
+    top_q2_idx = top_q2_idx[sorted_by_pt][mask_minjets]
     matched_fj_idx = matched_fj_idx[sorted_by_pt][mask_minjets]
 
     # keep only top N_JETS
@@ -486,6 +378,9 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     mass = mass[:, :N_JETS]
     flavor = flavor[:, :N_JETS]
     top_idx = top_idx[:, :N_JETS]
+    top_b_idx = top_b_idx[:, :N_JETS]
+    top_q1_idx = top_q1_idx[:, :N_JETS]
+    top_q2_idx = top_q2_idx[:, :N_JETS]
     matched_fj_idx = matched_fj_idx[:, :N_JETS]
 
     # sort by pt
@@ -505,7 +400,8 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     fj_ncharged = fj_ncharged[sorted_by_fj_pt][mask_minjets]
     fj_top_idx = fj_top_idx[sorted_by_fj_pt][mask_minjets]
     fj_top_bqq_idx = fj_top_bqq_idx[sorted_by_fj_pt][mask_minjets]
-    fj_top_bq_idx = fj_top_bq_idx[sorted_by_fj_pt][mask_minjets]
+    fj_top_bq1_idx = fj_top_bq1_idx[sorted_by_fj_pt][mask_minjets]
+    fj_top_bq2_idx = fj_top_bq2_idx[sorted_by_fj_pt][mask_minjets]
     fj_top_qq_idx = fj_top_qq_idx[sorted_by_fj_pt][mask_minjets]
 
     # keep only top N_FJETS
@@ -525,7 +421,8 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     fj_ncharged = fj_ncharged[:, :N_FJETS]
     fj_top_idx = fj_top_idx[:, :N_FJETS]
     fj_top_bqq_idx = fj_top_bqq_idx[:, :N_FJETS]
-    fj_top_bq_idx = fj_top_bq_idx[:, :N_FJETS]
+    fj_top_bq1_idx = fj_top_bq1_idx[:, :N_FJETS]
+    fj_top_bq2_idx = fj_top_bq2_idx[:, :N_FJETS]
     fj_top_qq_idx = fj_top_qq_idx[:, :N_FJETS]
 
     # add top pT info
@@ -533,13 +430,13 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     top_pt = ak.fill_none(ak.pad_none(top_pt, target=3, axis=1, clip=True), -1)
     top_pt_dict = {}
     for i in range(n_tops):
-        top_pt_dict[f"top{i+1}_pt"] = top_pt[:, i]
+        top_pt_dict[f"top{i+1}_pt"] = top_pt[:, i].to_numpy()
 
     # mask to define zero-padded small-radius jets
     mask = pt > MIN_JET_PT
     # mask to define zero-padded large-radius jets
     fj_mask = fj_pt > MIN_FJET_PT
-
+    
     # fully-resolved
     top_fullyResolved = {}
     for i in range(n_tops):
@@ -647,20 +544,24 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     ## Clip data ##
     for i in range(n_tops):
         # fully-resolved
-        top_fullyResolved[f"top{i+1}_b"] = ak.fill_none(ak.firsts(top_fullyResolved[f"top{i+1}_b"]), -1)
-        top_fullyResolved[f"top{i+1}_q1"] = ak.fill_none(ak.firsts(top_fullyResolved[f"top{i+1}_q1"]), -1)
-        top_fullyResolved[f"top{i+1}_q2"] = ak.fill_none(ak.firsts(top_fullyResolved[f"top{i+1}_q2"]), -1)
+        top_fullyResolved[f"top{i+1}_mask"] = top_fullyResolved[f"top{i+1}_mask"].to_numpy()
+        top_fullyResolved[f"top{i+1}_b"] = ak.fill_none(ak.firsts(top_fullyResolved[f"top{i+1}_b"]), -1).to_numpy()
+        top_fullyResolved[f"top{i+1}_q1"] = ak.fill_none(ak.firsts(top_fullyResolved[f"top{i+1}_q1"]), -1).to_numpy()
+        top_fullyResolved[f"top{i+1}_q2"] = ak.fill_none(ak.firsts(top_fullyResolved[f"top{i+1}_q2"]), -1).to_numpy()
 
         # semi-resolved (qq fatjet)
-        top_semiResolved_qq[f"top{i+1}_b"] = ak.fill_none(ak.firsts(top_semiResolved_qq[f"top{i+1}_b"]), -1)
-        top_semiResolved_qq[f"top{i+1}_qq"] = ak.fill_none(ak.firsts(top_semiResolved_qq[f"top{i+1}_qq"]), -1)
+        top_semiResolved_qq[f"top{i+1}_mask"] = top_semiResolved_qq[f"top{i+1}_mask"].to_numpy()
+        top_semiResolved_qq[f"top{i+1}_b"] = ak.fill_none(ak.firsts(top_semiResolved_qq[f"top{i+1}_b"]), -1).to_numpy()
+        top_semiResolved_qq[f"top{i+1}_qq"] = ak.fill_none(ak.firsts(top_semiResolved_qq[f"top{i+1}_qq"]), -1).to_numpy()
 
         # semi-resolved (bq fatjet)
-        top_semiResolved_bq[f"top{i+1}_q"] = ak.fill_none(ak.firsts(top_semiResolved_bq[f"top{i+1}_q"]), -1)
-        top_semiResolved_bq[f"top{i+1}_bq"] = ak.fill_none(ak.firsts(top_semiResolved_bq[f"top{i+1}_bq"]), -1)
+        top_semiResolved_bq[f"top{i+1}_mask"] = top_semiResolved_bq[f"top{i+1}_mask"].to_numpy()
+        top_semiResolved_bq[f"top{i+1}_q"] = ak.fill_none(ak.firsts(top_semiResolved_bq[f"top{i+1}_q"]), -1).to_numpy()
+        top_semiResolved_bq[f"top{i+1}_bq"] = ak.fill_none(ak.firsts(top_semiResolved_bq[f"top{i+1}_bq"]), -1).to_numpy()
 
         # fully-boosted
-        top_fullyBoosted[f"top{i+1}_bqq"] = ak.fill_none(ak.firsts(top_fullyBoosted[f"top{i+1}_bqq"]), -1)
+        top_fullyBoosted[f"top{i+1}_mask"] = top_fullyBoosted[f"top{i+1}_mask"].to_numpy()
+        top_fullyBoosted[f"top{i+1}_bqq"] = ak.fill_none(ak.firsts(top_fullyBoosted[f"top{i+1}_bqq"]), -1).to_numpy()
 
     ## Store processed data in dataset for training/testing ##
     # Store the model inputs
@@ -750,20 +651,11 @@ def main(in_files, out_file, train_frac, n_tops):
                 entry_start = int(train_frac * num_entries)
                 entry_stop = None
 
-            # for key in events.keys():
-            #     print(f"{key}\n{'-'*60}")
-            # print('='*60)
-            # print('='*60)
-            # print('='*60)
-
             keys = (
                 [key for key in events.keys() if "Particle/Particle." in key and "fBits" not in key]
                 + [key for key in events.keys() if "Jet/Jet." in key]
                 + [key for key in events.keys() if "FatJet/FatJet." in key and "fBits" not in key]
             )
-
-            # for key in keys:
-            #     print(f"{key}\n{'-'*60}")
             
             arrays = events.arrays(keys, entry_start=entry_start, entry_stop=entry_stop)
             datasets = get_datasets(arrays, n_tops)

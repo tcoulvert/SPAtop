@@ -185,7 +185,7 @@ def match_top_to_jet(
             alljet_builder.append(alljet_match_idx)
             bjet_builder.append(bjet_match_idx)
             wjet1_builder.append(wjet1_match_idx)
-            wjet1_builder.append(wjet2_match_idx)
+            wjet2_builder.append(wjet2_match_idx)
 
         alljet_builder.end_list()
         bjet_builder.end_list()
