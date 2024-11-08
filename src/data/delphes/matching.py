@@ -16,18 +16,19 @@ FJET_DR = 0.8  # https://github.com/delphes/delphes/blob/master/cards/delphes_ca
 @nb.njit
 def match_top_to_fjet(
     bquarks, wquarks1, wquarks2, fjets, 
-    all_fjet_builder, bqq_fjet_builder, bq_fjet_builder, qq_fjet_builder
+    all_fjet_builder, bqq_fjet_builder, bq1_fjet_builder, bq2_fjet_builder, qq_fjet_builder
 ):
     for bquarks_event, wquarks1_event, wquarks2_event, fjets_event in zip(
         bquarks, wquarks1, wquarks2, fjets
     ):
         all_fjet_builder.begin_list()
         bqq_fjet_builder.begin_list()
-        bq_fjet_builder.begin_list()
+        bq1_fjet_builder.begin_list()
+        bq2_fjet_builder.begin_list()
         qq_fjet_builder.begin_list()
         matched_set = set()
         for i, fjet in enumerate(fjets_event):
-            all_match_idx, bqq_match_idx, bq_match_idx, qq_match_idx = -1, -1, -1, -1
+            all_match_idx, bqq_match_idx, bq1_match_idx, bq2_match_idx, qq_match_idx = -1, -1, -1, -1, -1
 
             mindeltaR, mindeltaR_idxs = 999, (-1, -1)  # mindeltaR, (mindeltaR_topidx, mindeltaR_quarktype)
             for j, (bquark, wquark1, wquark2) in enumerate(zip(
@@ -83,20 +84,23 @@ def match_top_to_fjet(
                     matched_set.add(f'w2_{j+1}')
                 all_match_idx = mindeltaR_idxs[0]
                 bqq_match_idx = mindeltaR_idxs[0] if mindeltaR_idxs[1] == 0 else bqq_match_idx
-                bq_match_idx = mindeltaR_idxs[0] if mindeltaR_idxs[1] == 1 or mindeltaR_idxs[1] == 2 else bq_match_idx
+                bq1_match_idx = mindeltaR_idxs[0] if mindeltaR_idxs[1] == 1 else bq1_match_idx
+                bq2_match_idx = mindeltaR_idxs[0] if mindeltaR_idxs[1] == 2 else bq2_match_idx
                 qq_match_idx = mindeltaR_idxs[0] if mindeltaR_idxs[1] == 3 else qq_match_idx
 
             all_fjet_builder.append(all_match_idx)
             bqq_fjet_builder.append(bqq_match_idx)
-            bq_fjet_builder.append(bq_match_idx)
+            bq1_fjet_builder.append(bq1_match_idx)
+            bq2_fjet_builder.append(bq2_match_idx)
             qq_fjet_builder.append(qq_match_idx)
 
         all_fjet_builder.end_list()
         bqq_fjet_builder.end_list()
-        bq_fjet_builder.end_list()
+        bq1_fjet_builder.end_list()
+        bq2_fjet_builder.end_list()
         qq_fjet_builder.end_list()
 
-    return all_fjet_builder, bqq_fjet_builder, bq_fjet_builder, qq_fjet_builder
+    return all_fjet_builder, bqq_fjet_builder, bq1_fjet_builder, bq2_fjet_builder, qq_fjet_builder
 
 # @nb.njit
 # def match_top_to_jet(

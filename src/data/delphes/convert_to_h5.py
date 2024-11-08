@@ -187,13 +187,14 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         top_idx.snapshot(), top_b_idx.snapshot(), top_q1_idx.snapshot(), top_q2_idx.snapshot()
     )
     top_q_idx = ak.where(top_q1_idx > 0, top_q1_idx, top_q2_idx)
-    fj_top_idx, fj_top_bqq_idx, fj_top_bq_idx, fj_top_qq_idx = match_top_to_fjet(
+    fj_top_idx, fj_top_bqq_idx, fj_top_bq1_idx, fj_top_bq2_idx, fj_top_qq_idx = match_top_to_fjet(
         bquarks, wquarks_d1, wquarks_d2, fjets, 
-        ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder()
+        ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder()
     )
-    fj_top_idx, fj_top_bqq_idx, fj_top_bq_idx, fj_top_qq_idx = (
-        fj_top_idx.snapshot(), fj_top_bqq_idx.snapshot(), fj_top_bq_idx.snapshot(), fj_top_qq_idx.snapshot()
+    fj_top_idx, fj_top_bqq_idx, fj_top_bq1_idx, fj_top_bq1_idx, fj_top_qq_idx = (
+        fj_top_idx.snapshot(), fj_top_bqq_idx.snapshot(), fj_top_bq1_idx.snapshot(), fj_top_bq2_idx.snapshot(), fj_top_qq_idx.snapshot()
     )
+    fj_top_bq_idx = ak.where(fj_top_bq1_idx > 0, fj_top_bq1_idx, fj_top_bq2_idx)
     matched_fj_idx = match_fjet_to_jet(fjets, jets, ak.ArrayBuilder()).snapshot()
     # print(f"fjets: \n{fjets}\n{'='*60}")
     # print(f"empty at same places fjets-any: \n{ak.all(ak.num(fjets) == ak.num(fj_top_idx))}\n{'='*60}")
