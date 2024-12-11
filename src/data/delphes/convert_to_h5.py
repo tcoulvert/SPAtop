@@ -63,6 +63,10 @@ def final_particle(particle_pdgid, mother_pdgid, particles, final_status=-1, int
 
 
 def get_datasets(arrays, n_tops):  # noqa: C901
+    print(f'num events = {len(arrays["Particle/Particle.PID"])}')
+    arrays = arrays[::5]
+    print(f'num events = {len(arrays["Particle/Particle.PID"])}')
+
     part_pid = arrays["Particle/Particle.PID"]  # PDG ID
     part_status = arrays["Particle/Particle.Status"]
     part_m1 = arrays["Particle/Particle.M1"]
@@ -156,6 +160,27 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         ), axis=1
     )
 
+    def fid_mask(particle, pt_threshold=10, max_eta=2.3, barrel_endcap_gap=(1.4, 1.6)):
+        pt_mask = ak.sum(particle['pt'] > pt_threshold, axis=1) == n_tops
+        eta_mask = ak.sum(
+            (
+                np.abs(particle['eta']) < barrel_endcap_gap[0]
+            ) | np.logical_and(
+                np.abs(particle['eta']) > barrel_endcap_gap[1],
+                np.abs(particle['eta']) < max_eta
+            ), axis=1
+        ) == n_tops
+
+        return pt_mask & eta_mask
+
+    # fiducial mask for the quarks
+    quark_fid_mask = (
+        fid_mask(bquarks)
+        & fid_mask(wquarks_d1)
+        & fid_mask(wquarks_d2)
+    )
+    print(f'num events with all quarks passing fiducial cuts = {ak.sum(quark_fid_mask)}')
+
     jets = ak.zip(
         {
             "pt": pt,
@@ -195,11 +220,13 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     )
     matched_fj_idx = match_fjet_to_jet(fjets, jets, ak.ArrayBuilder()).snapshot()
 
-    # keep events with >= min_jets
+    # keep events with >= min_jets and quarks passing fiducial mask
     mask_minjets = (
-        ak.num(pt[pt > MIN_JET_PT]) / 3
-        + ak.num(fj_pt[fj_pt > MIN_FJET_PT])
-    ) >= n_tops
+        (
+            ak.num(pt[pt > MIN_JET_PT]) / 3
+            + ak.num(fj_pt[fj_pt > MIN_FJET_PT])
+        ) >= n_tops
+    ) & quark_fid_mask
     # sort by pt
     sorted_by_pt = ak.argsort(pt, ascending=False, axis=-1)
     # sorted = ak.concatenate([sorted_by_pt[btag == 1], sorted_by_pt[btag == 0]], axis=-1)
@@ -291,6 +318,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         top_fullyResolved[f"top{i+1}_b"] = ak.local_index(top_b_idx)[top_b_idx == i+1]
         top_fullyResolved[f"top{i+1}_q1"] = ak.local_index(top_q1_idx)[top_q1_idx == i+1]
         top_fullyResolved[f"top{i+1}_q2"] = ak.local_index(top_q2_idx)[top_q2_idx == i+1]
+        print(f'top {i+1} - num fully-resolved tops = {ak.sum(top_fullyResolved[f"top{i+1}_mask"])}')
     
     # semi-resolved (qq fatjet)
     top_semiResolved_qq = {}
@@ -301,6 +329,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         )
         top_semiResolved_qq[f"top{i+1}_b"] = ak.local_index(top_b_idx)[top_b_idx == i+1]
         top_semiResolved_qq[f"top{i+1}_qq"] = ak.local_index(fj_top_qq_idx)[fj_top_qq_idx == i+1]
+        print(f'top {i+1} - num qq tops = {ak.sum(top_semiResolved_qq[f"top{i+1}_mask"])}')
     
     # semi-resolved (bq fatjet)
     top_semiResolved_bq = {}
@@ -332,6 +361,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
                 ak.local_index(fj_top_bq2_idx)[fj_top_bq2_idx == i+1]
             )
         )
+        print(f'top {i+1} - num bq tops = {ak.sum(top_semiResolved_bq[f"top{i+1}_mask"])}')
 
     # fully-boosted
     top_fullyBoosted = {}
@@ -340,6 +370,47 @@ def get_datasets(arrays, n_tops):  # noqa: C901
             ak.sum(fj_top_bqq_idx == i+1, axis=1) == 1
         )
         top_fullyBoosted[f"top{i+1}_bqq"] = ak.local_index(fj_top_bqq_idx)[fj_top_bqq_idx == i+1]
+        print(f'top {i+1} - num bqq tops = {ak.sum(top_fullyBoosted[f"top{i+1}_mask"])}')
+
+    print('-='*60)
+
+    # print output types #
+    # 2 resolved tops
+    both_tops_fully_resolved = top_fullyResolved[f"top1_mask"] & top_fullyResolved[f"top2_mask"]
+    print(f'num both tops fully-resolved = {ak.sum(both_tops_fully_resolved)}')
+    # 1 resolved top
+    one_top_resolved_one_top_bq = (top_fullyResolved[f"top1_mask"] & top_semiResolved_bq[f"top2_mask"]) | (top_fullyResolved[f"top2_mask"] & top_semiResolved_bq[f"top1_mask"])
+    print(f'num one top fully-resolved, one top semi-resolved bq = {ak.sum(one_top_resolved_one_top_bq)}')
+    one_top_resolved_one_top_qq = (top_fullyResolved[f"top1_mask"] & top_semiResolved_qq[f"top2_mask"]) | (top_fullyResolved[f"top2_mask"] & top_semiResolved_qq[f"top1_mask"])
+    print(f'num one top fully-resolved, one top semi-resolved qq = {ak.sum(one_top_resolved_one_top_qq)}')
+    one_top_resolved_one_top_semi_resolved = one_top_resolved_one_top_bq | one_top_resolved_one_top_qq
+    print(f'num one top fully-resolved, one top semi-resolved bq | qq = {ak.sum(one_top_resolved_one_top_semi_resolved)}')
+    
+    one_top_resolved_one_top_semi_resolved_and = one_top_resolved_one_top_bq & one_top_resolved_one_top_qq
+    print(f'num one top fully-resolved, one top semi-resolved bq & qq = {ak.sum(one_top_resolved_one_top_semi_resolved_and)}')
+    semi_resolved_ok_bool = ak.all(~(one_top_resolved_one_top_semi_resolved_and ^ ak.sum(matched_fj_idx != -1, axis=1)))
+    print(f'semi-resolved ok? {semi_resolved_ok_bool}')
+
+    one_top_resolved_one_top_boosted = (top_fullyResolved[f"top1_mask"] & top_fullyBoosted[f"top2_mask"]) | (top_fullyResolved[f"top2_mask"] & top_fullyBoosted[f"top1_mask"])
+    print(f'num one top fully-resolved, one top fully-boosted = {ak.sum(one_top_resolved_one_top_boosted)}')
+    # 2 tops semi-resolved
+    both_tops_bq = top_semiResolved_bq[f"top1_mask"] & top_semiResolved_bq[f"top2_mask"]
+    print(f'num both tops semi-resolved bq = {ak.sum(both_tops_bq)}')
+    one_top_bq_one_top_qq = (top_semiResolved_bq[f"top1_mask"] & top_semiResolved_qq[f"top2_mask"]) | (top_semiResolved_bq[f"top2_mask"] & top_semiResolved_qq[f"top1_mask"])
+    print(f'num one top fully-resolved, one top semi-resolved qq = {ak.sum(one_top_bq_one_top_qq)}')
+    both_tops_qq = top_semiResolved_qq[f"top1_mask"] & top_semiResolved_qq[f"top2_mask"]
+    print(f'num both tops semi-resolved qq = {ak.sum(both_tops_qq)}')
+    # 1 semi-resolved top
+    one_top_bq_one_top_boosted = (top_semiResolved_bq[f"top1_mask"] & top_fullyBoosted[f"top2_mask"]) | (top_semiResolved_bq[f"top2_mask"] & top_fullyBoosted[f"top1_mask"])
+    print(f'num one top semi-resolved bq, one top fully-boosted = {ak.sum(one_top_bq_one_top_boosted)}')
+    one_top_qq_one_top_boosted = (top_semiResolved_qq[f"top1_mask"] & top_fullyBoosted[f"top2_mask"]) | (top_semiResolved_qq[f"top2_mask"] & top_fullyBoosted[f"top1_mask"])
+    print(f'num one top semi-resolved qq, one top fully-boosted = {ak.sum(one_top_qq_one_top_boosted)}')
+    one_top_semi_resolved_one_top_boosted = one_top_bq_one_top_boosted | one_top_qq_one_top_boosted
+    print(f'num one top semi-resolved bq | qq, one top fully-boosted = {ak.sum(one_top_semi_resolved_one_top_boosted)}')
+    # 2 boosted tops
+    both_tops_boosted = top_fullyBoosted[f"top1_mask"] & top_fullyBoosted[f"top2_mask"]
+    print(f'num both tops semi-resolved bq = {ak.sum(both_tops_boosted)}')
+    
 
     ## Check data ##
     # check fully-resolved tops
@@ -512,8 +583,8 @@ def main(in_files, out_file, train_frac, n_tops):
     with h5py.File(out_file, "w") as output:
         for dataset_name, all_data in all_datasets.items():
             concat_data = np.concatenate(all_data, axis=0)
-            logging.info(f"Dataset name: {dataset_name}")
-            logging.info(f"Dataset shape: {concat_data.shape}")
+            # logging.info(f"Dataset name: {dataset_name}")
+            # logging.info(f"Dataset shape: {concat_data.shape}")
             output.create_dataset(dataset_name, data=concat_data)
 
 
