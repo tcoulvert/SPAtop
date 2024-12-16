@@ -160,7 +160,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         ), axis=1
     )
 
-    def fid_mask(particle, pt_threshold=10, max_eta=2.3, barrel_endcap_gap=(1.4, 1.6)):
+    def fid_mask(particle, pt_threshold=8, max_eta=2.3, barrel_endcap_gap=(1.4, 1.6)):
         pt_mask = ak.sum(particle['pt'] > pt_threshold, axis=1) == n_tops
         eta_mask = ak.sum(
             (
