@@ -219,14 +219,14 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     )
     matched_fj_idx = match_fjet_to_jet(fjets, jets, ak.ArrayBuilder()).snapshot()
 
-    # keep events with >= min_jets and quarks passing fiducial mask
-    # mask_minjets = (
-    #     (
-    #         ak.num(pt[pt > MIN_JET_PT])
-    #         + 3*ak.num(fj_pt[fj_pt > MIN_FJET_PT])
-    #     ) >= 3*n_tops
-    # ) & quark_fid_mask
-    mask_minjets = ak.num(pt[pt > MIN_JET_PT]) >= 3*n_tops
+    # keep events with >= min_jets
+    mask_minjets = (
+        (
+            ak.num(pt[pt > MIN_JET_PT])
+            + 3*ak.num(fj_pt[fj_pt > MIN_FJET_PT])
+        ) >= 3*n_tops
+    )
+    # mask_minjets = ak.num(pt[pt > MIN_JET_PT]) >= 3*n_tops
     print(f"Num proper events = {ak.sum(mask_minjets, axis=0)}")
     # sort by pt
     sorted_by_pt = ak.argsort(pt, ascending=False, axis=-1)
