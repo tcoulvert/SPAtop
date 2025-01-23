@@ -11,6 +11,7 @@ ak.numba.register_and_check()
 
 JET_DR = 0.5  # https://github.com/delphes/delphes/blob/master/cards/delphes_card_CMS.tcl#L642
 FJET_DR = 0.8  # https://github.com/delphes/delphes/blob/master/cards/delphes_card_CMS.tcl#L658
+VFJET_DR = 1.5
 
 # https://registry.hub.docker.com/r/jmduarte/mapyde - docker image for madgraph, pythia8, and delphes
 

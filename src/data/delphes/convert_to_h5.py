@@ -29,7 +29,6 @@ ak.numba.register_and_check()
 
 logging.basicConfig(level=logging.INFO)
 
-N_JETS = 16
 MIN_JET_PT = 10
 MIN_FJET_PT = 200
 PROJECT_DIR = Path(__file__).resolve().parents[3]
@@ -221,15 +220,16 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     matched_fj_idx = match_fjet_to_jet(fjets, jets, ak.ArrayBuilder()).snapshot()
 
     # keep events with >= min_jets and quarks passing fiducial mask
-    mask_minjets = (
-        (
-            ak.num(pt[pt > MIN_JET_PT]) / 3
-            + ak.num(fj_pt[fj_pt > MIN_FJET_PT])
-        ) >= n_tops
-    ) & quark_fid_mask
+    # mask_minjets = (
+    #     (
+    #         ak.num(pt[pt > MIN_JET_PT])
+    #         + 3*ak.num(fj_pt[fj_pt > MIN_FJET_PT])
+    #     ) >= 3*n_tops
+    # ) & quark_fid_mask
+    mask_minjets = ak.num(pt[pt > MIN_JET_PT]) >= 3*n_tops
+    print(f"Num proper events = {ak.sum(mask_minjets, axis=0)}")
     # sort by pt
     sorted_by_pt = ak.argsort(pt, ascending=False, axis=-1)
-    # sorted = ak.concatenate([sorted_by_pt[btag == 1], sorted_by_pt[btag == 0]], axis=-1)
     btag = btag[sorted_by_pt][mask_minjets]
     pt = pt[sorted_by_pt][mask_minjets]
     eta = eta[sorted_by_pt][mask_minjets]
@@ -243,6 +243,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     matched_fj_idx = matched_fj_idx[sorted_by_pt][mask_minjets]
 
     # keep only top N_JETS
+    N_JETS = 3*n_tops
     btag = btag[:, :N_JETS]
     pt = pt[:, :N_JETS]
     eta = eta[:, :N_JETS]
@@ -299,7 +300,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
 
     # add top pT info
     top_pt = topquarks[mask_minjets].pt
-    top_pt = ak.fill_none(ak.pad_none(top_pt, target=3, axis=1, clip=True), -1)
+    top_pt = ak.fill_none(ak.pad_none(top_pt, target=n_tops, axis=1, clip=True), -1)
     top_pt_dict = {}
     for i in range(n_tops):
         top_pt_dict[f"top{i+1}_pt"] = top_pt[:, i].to_numpy()
@@ -397,7 +398,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     both_tops_bq = top_semiResolved_bq[f"top1_mask"] & top_semiResolved_bq[f"top2_mask"]
     print(f'num both tops semi-resolved bq = {ak.sum(both_tops_bq)}')
     one_top_bq_one_top_qq = (top_semiResolved_bq[f"top1_mask"] & top_semiResolved_qq[f"top2_mask"]) | (top_semiResolved_bq[f"top2_mask"] & top_semiResolved_qq[f"top1_mask"])
-    print(f'num one top fully-resolved, one top semi-resolved qq = {ak.sum(one_top_bq_one_top_qq)}')
+    print(f'num one top semi-resolved bq, one top semi-resolved qq = {ak.sum(one_top_bq_one_top_qq)}')
     both_tops_qq = top_semiResolved_qq[f"top1_mask"] & top_semiResolved_qq[f"top2_mask"]
     print(f'num both tops semi-resolved qq = {ak.sum(both_tops_qq)}')
     # 1 semi-resolved top
@@ -583,8 +584,8 @@ def main(in_files, out_file, train_frac, n_tops):
     with h5py.File(out_file, "w") as output:
         for dataset_name, all_data in all_datasets.items():
             concat_data = np.concatenate(all_data, axis=0)
-            # logging.info(f"Dataset name: {dataset_name}")
-            # logging.info(f"Dataset shape: {concat_data.shape}")
+            logging.info(f"Dataset name: {dataset_name}")
+            logging.info(f"Dataset shape: {concat_data.shape}")
             output.create_dataset(dataset_name, data=concat_data)
 
 
