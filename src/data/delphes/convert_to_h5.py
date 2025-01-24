@@ -19,7 +19,10 @@ plt.rcParams.update({"axes.prop_cycle": cycler("color", cmap_petroff10)})
 
 from src.data.delphes.matching import (
     match_fjet_to_jet,
+    match_vfjet_to_jet,
+    match_vfjet_to_fjet,
     match_top_to_fjet,
+    match_top_to_vfjet,
     match_top_to_jet,
 )
 
@@ -150,7 +153,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     tops_condition = np.logical_and(
         np.abs(particles.pid) == 6, np.logical_and(
             np.abs(particles.pid[particles.d1]) == 5, np.abs(particles.pid[particles.d2]) == 24
-        )   # do we know the bquarks are going to be daughter 1? yes, confirmed.
+        )   # bquarks are going to be daughter 1
     )
     topquarks = ak.to_regular(particles[tops_condition], axis=1)
     topquark_idx_sort = ak.argsort(topquarks.idx, axis=-1)
@@ -227,17 +230,18 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         with_name="Momentum4D",
     )
 
-    fjets = ak.zip(
+    vfjets = ak.zip(
         {
-            "pt": fj_pt,
-            "eta": fj_eta,
-            "phi": fj_phi,
-            "mass": fj_mass,
-            "idx": ak.local_index(fj_pt),
+            "pt": vfj_pt,
+            "eta": vfj_eta,
+            "phi": vfj_phi,
+            "mass": vfj_mass,
+            "idx": ak.local_index(vfj_pt),
         },
         with_name="Momentum4D",
     )
     
+    # fully-resolved tops
     top_idx, top_b_idx, top_q1_idx, top_q2_idx = match_top_to_jet(
         bquarks, wquarks_d1, wquarks_d2, jets, 
         ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder()
@@ -245,14 +249,30 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     top_idx, top_b_idx, top_q1_idx, top_q2_idx = (
         top_idx.snapshot(), top_b_idx.snapshot(), top_q1_idx.snapshot(), top_q2_idx.snapshot()
     )
-    fj_top_idx, fj_top_bqq_idx, fj_top_bq1_idx, fj_top_bq2_idx, fj_top_qq_idx = match_top_to_fjet(
+    # fj_top_idx, fj_top_bqq_idx, fj_top_bq1_idx, fj_top_bq2_idx, fj_top_qq_idx = match_top_to_fjet(
+    #     bquarks, wquarks_d1, wquarks_d2, fjets, 
+    #     ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder()
+    # )
+    # fj_top_idx, fj_top_bqq_idx, fj_top_bq1_idx, fj_top_bq2_idx, fj_top_qq_idx = (
+    #     fj_top_idx.snapshot(), fj_top_bqq_idx.snapshot(), fj_top_bq1_idx.snapshot(), fj_top_bq2_idx.snapshot(), fj_top_qq_idx.snapshot()
+    # )
+    # semi-resolved tops
+    fj_top_idx, fj_top_bq1_idx, fj_top_bq2_idx, fj_top_qq_idx = match_top_to_fjet(
         bquarks, wquarks_d1, wquarks_d2, fjets, 
-        ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder()
+        ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder()
     )
-    fj_top_idx, fj_top_bqq_idx, fj_top_bq1_idx, fj_top_bq2_idx, fj_top_qq_idx = (
-        fj_top_idx.snapshot(), fj_top_bqq_idx.snapshot(), fj_top_bq1_idx.snapshot(), fj_top_bq2_idx.snapshot(), fj_top_qq_idx.snapshot()
+    fj_top_idx, fj_top_bq1_idx, fj_top_bq2_idx, fj_top_qq_idx = (
+        fj_top_idx.snapshot(), fj_top_bq1_idx.snapshot(), fj_top_bq2_idx.snapshot(), fj_top_qq_idx.snapshot()
     )
-    matched_fj_idx = match_fjet_to_jet(fjets, jets, ak.ArrayBuilder()).snapshot()
+    # fully-boosted tops
+    vfj_top_idx, vfj_top_bqq_idx = match_top_to_vfjet(
+        bquarks, wquarks_d1, wquarks_d2, vfjets, 
+        ak.ArrayBuilder(), ak.ArrayBuilder(),
+    )
+    vfj_top_idx, vfj_top_bqq_idx = vfj_top_idx.snapshot(), vfj_top_bqq_idx.snapshot()
+    matched_fj_j_idx = match_fjet_to_jet(fjets, jets, ak.ArrayBuilder()).snapshot()
+    matched_vfj_j_idx = match_vfjet_to_jet(vfjets, jets, ak.ArrayBuilder()).snapshot()
+    matched_vfj_fj_idx = match_vfjet_to_fjet(vfjets, fjets, ak.ArrayBuilder()).snapshot()
 
     # keep events with >= min_jets
     mask_minjets = (
@@ -263,6 +283,8 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     )
     # mask_minjets = ak.num(pt[pt > MIN_JET_PT]) >= 3*n_tops
     print(f"Num proper events = {ak.sum(mask_minjets, axis=0)}")
+
+    ## Jets ##
     # sort by pt
     sorted_by_pt = ak.argsort(pt, ascending=False, axis=-1)
     btag = btag[sorted_by_pt][mask_minjets]
@@ -275,10 +297,11 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     top_b_idx = top_b_idx[sorted_by_pt][mask_minjets]
     top_q1_idx = top_q1_idx[sorted_by_pt][mask_minjets]
     top_q2_idx = top_q2_idx[sorted_by_pt][mask_minjets]
-    matched_fj_idx = matched_fj_idx[sorted_by_pt][mask_minjets]
+    matched_fj_j_idx = matched_fj_j_idx[sorted_by_pt][mask_minjets]
+    matched_vfj_j_idx = matched_vfj_j_idx[sorted_by_pt][mask_minjets]
 
     # keep only top N_JETS
-    N_JETS = 3*n_tops
+    N_JETS = 3*n_tops + 4
     btag = btag[:, :N_JETS]
     pt = pt[:, :N_JETS]
     eta = eta[:, :N_JETS]
@@ -289,8 +312,10 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     top_b_idx = top_b_idx[:, :N_JETS]
     top_q1_idx = top_q1_idx[:, :N_JETS]
     top_q2_idx = top_q2_idx[:, :N_JETS]
-    matched_fj_idx = matched_fj_idx[:, :N_JETS]
+    matched_fj_j_idx = matched_fj_j_idx[:, :N_JETS]
+    matched_vfj_j_idx = matched_vfj_j_idx[:, :N_JETS]
 
+    ## FatJets ##
     # sort by pt
     sorted_by_fj_pt = ak.argsort(fj_pt, ascending=False, axis=-1)
     fj_pt = fj_pt[sorted_by_fj_pt][mask_minjets]
@@ -307,10 +332,10 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     fj_nneutral = fj_nneutral[sorted_by_fj_pt][mask_minjets]
     fj_ncharged = fj_ncharged[sorted_by_fj_pt][mask_minjets]
     fj_top_idx = fj_top_idx[sorted_by_fj_pt][mask_minjets]
-    fj_top_bqq_idx = fj_top_bqq_idx[sorted_by_fj_pt][mask_minjets]
     fj_top_bq1_idx = fj_top_bq1_idx[sorted_by_fj_pt][mask_minjets]
     fj_top_bq2_idx = fj_top_bq2_idx[sorted_by_fj_pt][mask_minjets]
     fj_top_qq_idx = fj_top_qq_idx[sorted_by_fj_pt][mask_minjets]
+    matched_vfj_fj_idx = matched_vfj_fj_idx[sorted_by_fj_pt][mask_minjets]
 
     # keep only top N_FJETS
     N_FJETS = n_tops
@@ -328,10 +353,47 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     fj_nneutral = fj_nneutral[:, :N_FJETS]
     fj_ncharged = fj_ncharged[:, :N_FJETS]
     fj_top_idx = fj_top_idx[:, :N_FJETS]
-    fj_top_bqq_idx = fj_top_bqq_idx[:, :N_FJETS]
     fj_top_bq1_idx = fj_top_bq1_idx[:, :N_FJETS]
     fj_top_bq2_idx = fj_top_bq2_idx[:, :N_FJETS]
     fj_top_qq_idx = fj_top_qq_idx[:, :N_FJETS]
+    matched_vfj_fj_idx = matched_vfj_fj_idx[:, :N_FJETS]
+
+    ## VeryFatJets ##
+    # sort by pt
+    sorted_by_vfj_pt = ak.argsort(vfj_pt, ascending=False, axis=-1)
+    vfj_pt = vfj_pt[sorted_by_vfj_pt][mask_minjets]
+    vfj_eta = vfj_eta[sorted_by_vfj_pt][mask_minjets]
+    vfj_phi = vfj_phi[sorted_by_vfj_pt][mask_minjets]
+    vfj_mass = vfj_mass[sorted_by_vfj_pt][mask_minjets]
+    vfj_sdmass = vfj_sdmass[sorted_by_vfj_pt][mask_minjets]
+    vfj_tau21 = vfj_tau21[sorted_by_vfj_pt][mask_minjets]
+    vfj_tau32 = vfj_tau32[sorted_by_vfj_pt][mask_minjets]
+    vfj_charge = vfj_charge[sorted_by_vfj_pt][mask_minjets]
+    vfj_ehadovereem = vfj_ehadovereem[sorted_by_vfj_pt][mask_minjets]
+    vfj_neutralenergyfrac = vfj_neutralenergyfrac[sorted_by_vfj_pt][mask_minjets]
+    vfj_chargedenergyfrac = vfj_chargedenergyfrac[sorted_by_vfj_pt][mask_minjets]
+    vfj_nneutral = vfj_nneutral[sorted_by_vfj_pt][mask_minjets]
+    vfj_ncharged = vfj_ncharged[sorted_by_vfj_pt][mask_minjets]
+    vfj_top_idx = vfj_top_idx[sorted_by_vfj_pt][mask_minjets]
+    vfj_top_bqq_idx = vfj_top_bqq_idx[sorted_by_vfj_pt][mask_minjets]
+
+    # keep only top N_FJETS
+    N_VFJETS = n_tops
+    vfj_pt = vfj_pt[:, :N_VFJETS]
+    vfj_eta = vfj_eta[:, :N_VFJETS]
+    vfj_phi = vfj_phi[:, :N_VFJETS]
+    vfj_mass = vfj_mass[:, :N_VFJETS]
+    vfj_sdmass = vfj_sdmass[:, :N_VFJETS]
+    vfj_tau21 = vfj_tau21[:, :N_VFJETS]
+    vfj_tau32 = vfj_tau32[:, :N_VFJETS]
+    vfj_charge = vfj_charge[:, :N_VFJETS]
+    vfj_ehadovereem = vfj_ehadovereem[:, :N_VFJETS]
+    vfj_neutralenergyfrac = vfj_neutralenergyfrac[:, :N_VFJETS]
+    vfj_chargedenergyfrac = vfj_chargedenergyfrac[:, :N_VFJETS]
+    vfj_nneutral = vfj_nneutral[:, :N_VFJETS]
+    vfj_ncharged = vfj_ncharged[:, :N_VFJETS]
+    vfj_top_idx = vfj_top_idx[:, :N_VFJETS]
+    vfj_top_bqq_idx = vfj_top_bqq_idx[:, :N_VFJETS]
 
     # add top pT info
     top_pt = topquarks[mask_minjets].pt
@@ -344,6 +406,8 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     mask = pt > MIN_JET_PT
     # mask to define zero-padded large-radius jets
     fj_mask = fj_pt > MIN_FJET_PT
+    # mask to define zero-padded very-large-radius jets
+    vfj_mask = vfj_pt > MIN_VFJET_PT
     
     # fully-resolved
     top_fullyResolved = {}
@@ -424,7 +488,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     
     # one_top_resolved_one_top_semi_resolved_and = one_top_resolved_one_top_bq & one_top_resolved_one_top_qq
     # print(f'num one top fully-resolved, one top semi-resolved bq & qq = {ak.sum(one_top_resolved_one_top_semi_resolved_and)}')
-    # semi_resolved_ok_bool = ak.all(~(one_top_resolved_one_top_semi_resolved_and ^ ak.sum(matched_fj_idx != -1, axis=1)))
+    # semi_resolved_ok_bool = ak.all(~(one_top_resolved_one_top_semi_resolved_and ^ ak.sum(matched_fj_j_idx != -1, axis=1)))
     # print(f'semi-resolved ok? {semi_resolved_ok_bool}')
 
     # one_top_resolved_one_top_boosted = (top_fullyResolved[f"top1_mask"] & top_fullyBoosted[f"top2_mask"]) | (top_fullyResolved[f"top2_mask"] & top_fullyBoosted[f"top1_mask"])
@@ -527,7 +591,8 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     datasets["INPUTS/Jets/mass"] = to_np_array(mass, max_n=N_JETS).astype("float32")
     datasets["INPUTS/Jets/btag"] = to_np_array(btag, max_n=N_JETS).astype("float32")
     datasets["INPUTS/Jets/flavor"] = to_np_array(flavor, max_n=N_JETS).astype("float32")
-    datasets["INPUTS/Jets/matchedfj"] = to_np_array(matched_fj_idx, max_n=N_JETS).astype("int32")
+    datasets["INPUTS/Jets/matchedfj"] = to_np_array(matched_fj_j_idx, max_n=N_JETS).astype("int32")
+    datasets["INPUTS/Jets/matchedvfj"] = to_np_array(matched_vfj_j_idx, max_n=N_JETS).astype("int32")
 
     datasets["INPUTS/BoostedJets/MASK"] = to_np_array(fj_mask, max_n=N_FJETS).astype("bool")
     datasets["INPUTS/BoostedJets/fj_pt"] = to_np_array(fj_pt, max_n=N_FJETS).astype("float32")
