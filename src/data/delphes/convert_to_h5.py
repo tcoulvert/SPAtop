@@ -186,26 +186,26 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         ), axis=1
     )
 
-    # def fid_mask(particle, pt_threshold=8, max_eta=2.3, barrel_endcap_gap=(1.4, 1.6)):
-    #     pt_mask = ak.sum(particle['pt'] > pt_threshold, axis=1) == n_tops
-    #     eta_mask = ak.sum(
-    #         (
-    #             np.abs(particle['eta']) < barrel_endcap_gap[0]
-    #         ) | np.logical_and(
-    #             np.abs(particle['eta']) > barrel_endcap_gap[1],
-    #             np.abs(particle['eta']) < max_eta
-    #         ), axis=1
-    #     ) == n_tops
+    def fid_mask(particle, pt_threshold=8, max_eta=2.3, barrel_endcap_gap=(1.4, 1.6)):
+        pt_mask = ak.sum(particle['pt'] > pt_threshold, axis=1) == n_tops
+        eta_mask = ak.sum(
+            (
+                np.abs(particle['eta']) < barrel_endcap_gap[0]
+            ) | np.logical_and(
+                np.abs(particle['eta']) > barrel_endcap_gap[1],
+                np.abs(particle['eta']) < max_eta
+            ), axis=1
+        ) == n_tops
 
-    #     return pt_mask & eta_mask
+        return pt_mask & eta_mask
 
-    # # fiducial mask for the quarks
-    # quark_fid_mask = (
-    #     fid_mask(bquarks)
-    #     & fid_mask(wquarks_d1)
-    #     & fid_mask(wquarks_d2)
-    # )
-    # print(f'num events with all quarks passing fiducial cuts = {ak.sum(quark_fid_mask)}')
+    # fiducial mask for the quarks
+    quark_fid_mask = (
+        fid_mask(bquarks)
+        & fid_mask(wquarks_d1)
+        & fid_mask(wquarks_d2)
+    )
+    print(f'num events with all quarks passing fiducial cuts = {ak.sum(quark_fid_mask)}')
 
     jets = ak.zip(
         {
@@ -467,9 +467,9 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     top_fullyBoosted = {}
     for i in range(n_tops):
         top_fullyBoosted[f"top{i+1}_mask"] = (
-            ak.sum(fj_top_bqq_idx == i+1, axis=1) == 1
+            ak.sum(vfj_top_bqq_idx == i+1, axis=1) == 1
         )
-        top_fullyBoosted[f"top{i+1}_bqq"] = ak.local_index(fj_top_bqq_idx)[fj_top_bqq_idx == i+1]
+        top_fullyBoosted[f"top{i+1}_bqq"] = ak.local_index(vfj_top_bqq_idx)[vfj_top_bqq_idx == i+1]
         print(f'top {i+1} - num bqq tops = {ak.sum(top_fullyBoosted[f"top{i+1}_mask"])}')
 
     print('-='*60)
