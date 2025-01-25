@@ -78,7 +78,7 @@ def match_top_to_fjet(
         qq_fjet_builder.begin_list()
         matched_set = set()
         for i, fjet in enumerate(fjets_event):
-            all_match_idx, bq1_match_idx, bq2_match_idx, qq_match_idx = -1, -1, -1, -1, -1
+            all_match_idx, bq1_match_idx, bq2_match_idx, qq_match_idx = -1, -1, -1, -1
 
             mindeltaR, mindeltaR_idxs = 999, (-1, -1)  # mindeltaR, (mindeltaR_topidx, mindeltaR_quarktype)
             for j, (bquark, wquark1, wquark2) in enumerate(zip(

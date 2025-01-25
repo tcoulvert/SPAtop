@@ -50,14 +50,14 @@ def final_particle(particle_pdgid, mother_pdgid, particles, final_status=-1, int
         ak.any(
             np.logical_and(
                 np.abs(particles.pid[intermediate_particles.d1]) == particle_pdgid,
-                intermediate_particles.status != final_status
+                intermediate_particles.status < final_status
             ), axis=1
         ), axis=0
     ):
         intermediate_particles = ak.where(
             np.logical_and(
                 np.abs(particles.pid[intermediate_particles.d1]) == particle_pdgid,
-                intermediate_particles.status != final_status
+                intermediate_particles.status < final_status
             ),
             particles[intermediate_particles.d1],
             intermediate_particles
@@ -67,8 +67,8 @@ def final_particle(particle_pdgid, mother_pdgid, particles, final_status=-1, int
 
 def get_datasets(arrays, n_tops):  # noqa: C901
     print(f'num events = {len(arrays["Particle/Particle.PID"])}')
-    arrays = arrays[::5]
-    print(f'num events = {len(arrays["Particle/Particle.PID"])}')
+    # arrays = arrays[::5]
+    # print(f'num events = {len(arrays["Particle/Particle.PID"])}')
 
     part_pid = arrays["Particle/Particle.PID"]  # PDG ID
     part_status = arrays["Particle/Particle.Status"]
@@ -240,6 +240,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         },
         with_name="Momentum4D",
     )
+
     
     # fully-resolved tops
     top_idx, top_b_idx, top_q1_idx, top_q2_idx = match_top_to_jet(
@@ -249,13 +250,6 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     top_idx, top_b_idx, top_q1_idx, top_q2_idx = (
         top_idx.snapshot(), top_b_idx.snapshot(), top_q1_idx.snapshot(), top_q2_idx.snapshot()
     )
-    # fj_top_idx, fj_top_bqq_idx, fj_top_bq1_idx, fj_top_bq2_idx, fj_top_qq_idx = match_top_to_fjet(
-    #     bquarks, wquarks_d1, wquarks_d2, fjets, 
-    #     ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder()
-    # )
-    # fj_top_idx, fj_top_bqq_idx, fj_top_bq1_idx, fj_top_bq2_idx, fj_top_qq_idx = (
-    #     fj_top_idx.snapshot(), fj_top_bqq_idx.snapshot(), fj_top_bq1_idx.snapshot(), fj_top_bq2_idx.snapshot(), fj_top_qq_idx.snapshot()
-    # )
     # semi-resolved tops
     fj_top_idx, fj_top_bq1_idx, fj_top_bq2_idx, fj_top_qq_idx = match_top_to_fjet(
         bquarks, wquarks_d1, wquarks_d2, fjets, 
@@ -275,13 +269,14 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     matched_vfj_fj_idx = match_vfjet_to_fjet(vfjets, fjets, ak.ArrayBuilder()).snapshot()
 
     # keep events with >= min_jets
-    mask_minjets = (
-        (
-            ak.num(pt[pt > MIN_JET_PT])
-            + 3*ak.num(fj_pt[fj_pt > MIN_FJET_PT])
-        ) >= 3*n_tops
-    )
-    # mask_minjets = ak.num(pt[pt > MIN_JET_PT]) >= 3*n_tops
+    # mask_minjets = (
+    #     (
+    #         ak.num(pt[pt > MIN_JET_PT])
+    #         + 3*ak.num(fj_pt[fj_pt > MIN_FJET_PT])
+    #         + 3*ak.num(vfj_pt[vfj_pt > MIN_VFJET_PT])
+    #     ) >= 3*n_tops
+    # )
+    mask_minjets = ak.num(pt[pt > MIN_JET_PT]) >= 3*n_tops
     print(f"Num proper events = {ak.sum(mask_minjets, axis=0)}")
 
     ## Jets ##
@@ -684,10 +679,6 @@ def main(in_files, out_file, train_frac, n_tops):
             else:
                 entry_start = int(train_frac * num_entries)
                 entry_stop = None
-
-            for key in events.keys():
-                print(key)
-                print('-'*60)
 
             keys = (
                 [key for key in events.keys() if "Particle/Particle." in key and "fBits" not in key]
