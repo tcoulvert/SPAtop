@@ -268,7 +268,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     matched_vfj_j_idx = match_vfjet_to_jet(vfjets, jets, ak.ArrayBuilder()).snapshot()
     matched_vfj_fj_idx = match_vfjet_to_fjet(vfjets, fjets, ak.ArrayBuilder()).snapshot()
 
-    # keep events with >= min_jets
+    # keep events with >= min_jets, how should we do it?
     # mask_minjets = (
     #     (
     #         ak.num(pt[pt > MIN_JET_PT])
@@ -277,7 +277,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     #     ) >= 3*n_tops
     # )
     mask_minjets = ak.num(pt[pt > MIN_JET_PT]) >= 3*n_tops
-    print(f"Num proper events = {ak.sum(mask_minjets, axis=0)}")
+    print(f"Num events with >=3 jets per top = {ak.sum(mask_minjets, axis=0)}")
 
     ## Jets ##
     # sort by pt
@@ -408,34 +408,36 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     top_fullyResolved = {}
     for i in range(n_tops):
         top_fullyResolved[f"top{i+1}_mask"] = (
-            ak.sum(top_idx == i+1, axis=1) == 3
+            ak.sum(top_idx == i+1, axis=1) >= 3
         )
         top_fullyResolved[f"top{i+1}_b"] = ak.local_index(top_b_idx)[top_b_idx == i+1]
         top_fullyResolved[f"top{i+1}_q1"] = ak.local_index(top_q1_idx)[top_q1_idx == i+1]
         top_fullyResolved[f"top{i+1}_q2"] = ak.local_index(top_q2_idx)[top_q2_idx == i+1]
         print(f'top {i+1} - num fully-resolved tops = {ak.sum(top_fullyResolved[f"top{i+1}_mask"])}')
+    print(f'num fully-resolved tops = {sum([ak.sum(top_fullyResolved[f"top{i+1}_mask"]) for i in range(n_tops)])}')
     
     # semi-resolved (qq fatjet)
     top_semiResolved_qq = {}
     for i in range(n_tops):
         top_semiResolved_qq[f"top{i+1}_mask"] = (
-            (ak.sum(top_b_idx == i+1, axis=1) == 1) 
-            & (ak.sum(fj_top_qq_idx == i+1, axis=1) == 1)
+            (ak.sum(top_b_idx == i+1, axis=1) >= 1) 
+            & (ak.sum(fj_top_qq_idx == i+1, axis=1) >= 1)
         )
         top_semiResolved_qq[f"top{i+1}_b"] = ak.local_index(top_b_idx)[top_b_idx == i+1]
         top_semiResolved_qq[f"top{i+1}_qq"] = ak.local_index(fj_top_qq_idx)[fj_top_qq_idx == i+1]
         print(f'top {i+1} - num qq tops = {ak.sum(top_semiResolved_qq[f"top{i+1}_mask"])}')
+    print(f'num qq tops = {sum([ak.sum(top_semiResolved_qq[f"top{i+1}_mask"]) for i in range(n_tops)])}')
     
     # semi-resolved (bq fatjet)
     top_semiResolved_bq = {}
     for i in range(n_tops):
         bq2_mask = (
-            (ak.sum(top_q1_idx == i+1, axis=1) == 1) 
-            & (ak.sum(fj_top_bq2_idx == i+1, axis=1) == 1)
+            (ak.sum(top_q1_idx == i+1, axis=1) >= 1) 
+            & (ak.sum(fj_top_bq2_idx == i+1, axis=1) >= 1)
         )
         bq1_mask = (
-            (ak.sum(top_q2_idx == i+1, axis=1) == 1) 
-            & (ak.sum(fj_top_bq1_idx == i+1, axis=1) == 1)
+            (ak.sum(top_q2_idx == i+1, axis=1) >= 1) 
+            & (ak.sum(fj_top_bq1_idx == i+1, axis=1) >= 1)
         )
         top_semiResolved_bq[f"top{i+1}_mask"] = (bq2_mask | bq1_mask)
         top_semiResolved_bq[f"top{i+1}_q"] = ak.where(
@@ -457,17 +459,27 @@ def get_datasets(arrays, n_tops):  # noqa: C901
             )
         )
         print(f'top {i+1} - num bq tops = {ak.sum(top_semiResolved_bq[f"top{i+1}_mask"])}')
+    print(f'num bq tops = {sum([ak.sum(top_semiResolved_bq[f"top{i+1}_mask"]) for i in range(n_tops)])}')
 
     # fully-boosted
     top_fullyBoosted = {}
     for i in range(n_tops):
         top_fullyBoosted[f"top{i+1}_mask"] = (
-            ak.sum(vfj_top_bqq_idx == i+1, axis=1) == 1
+            ak.sum(vfj_top_bqq_idx == i+1, axis=1) >= 1
         )
         top_fullyBoosted[f"top{i+1}_bqq"] = ak.local_index(vfj_top_bqq_idx)[vfj_top_bqq_idx == i+1]
         print(f'top {i+1} - num bqq tops = {ak.sum(top_fullyBoosted[f"top{i+1}_mask"])}')
+    print(f'num bqq tops = {sum([ak.sum(top_fullyBoosted[f"top{i+1}_mask"]) for i in range(n_tops)])}')
 
     print('-='*60)
+
+    print(matched_fj_j_idx)
+    print(matched_vfj_j_idx)
+    print(matched_vfj_fj_idx)
+    for i in range(n_tops):
+        pass
+        # need to implement
+        
 
     # print output types #
     # # 2 resolved tops
@@ -606,22 +618,22 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     datasets["INPUTS/BoostedJets/fj_nneutral"] = to_np_array(fj_nneutral, max_n=N_FJETS)
     datasets["INPUTS/BoostedJets/fj_ncharged"] = to_np_array(fj_ncharged, max_n=N_FJETS)
 
-    datasets["INPUTS/VeryBoostedJets/MASK"] = to_np_array(vfj_mask, max_n=N_FJETS).astype("bool")
-    datasets["INPUTS/VeryBoostedJets/vfj_pt"] = to_np_array(vfj_pt, max_n=N_FJETS).astype("float32")
-    datasets["INPUTS/VeryBoostedJets/vfj_eta"] = to_np_array(vfj_eta, max_n=N_FJETS).astype("float32")
-    datasets["INPUTS/VeryBoostedJets/vfj_phi"] = to_np_array(vfj_phi, max_n=N_FJETS).astype("float32")
-    datasets["INPUTS/VeryBoostedJets/vfj_sinphi"] = to_np_array(np.sin(vfj_phi), max_n=N_FJETS).astype("float32")
-    datasets["INPUTS/VeryBoostedJets/vfj_cosphi"] = to_np_array(np.cos(vfj_phi), max_n=N_FJETS).astype("float32")
-    datasets["INPUTS/VeryBoostedJets/vfj_mass"] = to_np_array(vfj_mass, max_n=N_FJETS).astype("float32")
-    datasets["INPUTS/VeryBoostedJets/vfj_sdmass"] = to_np_array(vfj_sdmass, max_n=N_FJETS).astype("float32")
-    datasets["INPUTS/VeryBoostedJets/vfj_tau21"] = to_np_array(vfj_tau21, max_n=N_FJETS).astype("float32")
-    datasets["INPUTS/VeryBoostedJets/vfj_tau32"] = to_np_array(vfj_tau32, max_n=N_FJETS).astype("float32")
-    datasets["INPUTS/VeryBoostedJets/vfj_charge"] = to_np_array(vfj_charge, max_n=N_FJETS)
-    datasets["INPUTS/VeryBoostedJets/vfj_ehadovereem"] = to_np_array(vfj_ehadovereem, max_n=N_FJETS)
-    datasets["INPUTS/VeryBoostedJets/vfj_neutralenergyfrac"] = to_np_array(vfj_neutralenergyfrac, max_n=N_FJETS)
-    datasets["INPUTS/VeryBoostedJets/vfj_chargedenergyfrac"] = to_np_array(vfj_chargedenergyfrac, max_n=N_FJETS)
-    datasets["INPUTS/VeryBoostedJets/vfj_nneutral"] = to_np_array(vfj_nneutral, max_n=N_FJETS)
-    datasets["INPUTS/VeryBoostedJets/vfj_ncharged"] = to_np_array(vfj_ncharged, max_n=N_FJETS)
+    datasets["INPUTS/VeryBoostedJets/MASK"] = to_np_array(vfj_mask, max_n=N_VFJETS).astype("bool")
+    datasets["INPUTS/VeryBoostedJets/vfj_pt"] = to_np_array(vfj_pt, max_n=N_VFJETS).astype("float32")
+    datasets["INPUTS/VeryBoostedJets/vfj_eta"] = to_np_array(vfj_eta, max_n=N_VFJETS).astype("float32")
+    datasets["INPUTS/VeryBoostedJets/vfj_phi"] = to_np_array(vfj_phi, max_n=N_VFJETS).astype("float32")
+    datasets["INPUTS/VeryBoostedJets/vfj_sinphi"] = to_np_array(np.sin(vfj_phi), max_n=N_VFJETS).astype("float32")
+    datasets["INPUTS/VeryBoostedJets/vfj_cosphi"] = to_np_array(np.cos(vfj_phi), max_n=N_VFJETS).astype("float32")
+    datasets["INPUTS/VeryBoostedJets/vfj_mass"] = to_np_array(vfj_mass, max_n=N_VFJETS).astype("float32")
+    datasets["INPUTS/VeryBoostedJets/vfj_sdmass"] = to_np_array(vfj_sdmass, max_n=N_VFJETS).astype("float32")
+    datasets["INPUTS/VeryBoostedJets/vfj_tau21"] = to_np_array(vfj_tau21, max_n=N_VFJETS).astype("float32")
+    datasets["INPUTS/VeryBoostedJets/vfj_tau32"] = to_np_array(vfj_tau32, max_n=N_VFJETS).astype("float32")
+    datasets["INPUTS/VeryBoostedJets/vfj_charge"] = to_np_array(vfj_charge, max_n=N_VFJETS)
+    datasets["INPUTS/VeryBoostedJets/vfj_ehadovereem"] = to_np_array(vfj_ehadovereem, max_n=N_VFJETS)
+    datasets["INPUTS/VeryBoostedJets/vfj_neutralenergyfrac"] = to_np_array(vfj_neutralenergyfrac, max_n=N_VFJETS)
+    datasets["INPUTS/VeryBoostedJets/vfj_chargedenergyfrac"] = to_np_array(vfj_chargedenergyfrac, max_n=N_VFJETS)
+    datasets["INPUTS/VeryBoostedJets/vfj_nneutral"] = to_np_array(vfj_nneutral, max_n=N_VFJETS)
+    datasets["INPUTS/VeryBoostedJets/vfj_ncharged"] = to_np_array(vfj_ncharged, max_n=N_VFJETS)
 
     # Store the truth-level info
     for i in range(n_tops):
@@ -697,8 +709,8 @@ def main(in_files, out_file, train_frac, n_tops):
     with h5py.File(out_file, "w") as output:
         for dataset_name, all_data in all_datasets.items():
             concat_data = np.concatenate(all_data, axis=0)
-            logging.info(f"Dataset name: {dataset_name}")
-            logging.info(f"Dataset shape: {concat_data.shape}")
+            # logging.info(f"Dataset name: {dataset_name}")
+            # logging.info(f"Dataset shape: {concat_data.shape}")
             output.create_dataset(dataset_name, data=concat_data)
 
 
