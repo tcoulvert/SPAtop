@@ -278,6 +278,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     # )
     mask_minjets = ak.num(pt[pt > MIN_JET_PT]) >= 3*n_tops
     print(f"Num events with >=3 jets per top = {ak.sum(mask_minjets, axis=0)}")
+    print(f"Num events with >=3 jets per top & quark fiducial mask = {ak.sum(mask_minjets & quark_fid_mask, axis=0)}")
 
     ## Jets ##
     # sort by pt
@@ -470,14 +471,29 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         top_fullyBoosted[f"top{i+1}_bqq"] = ak.local_index(vfj_top_bqq_idx)[vfj_top_bqq_idx == i+1]
         print(f'top {i+1} - num bqq tops = {ak.sum(top_fullyBoosted[f"top{i+1}_mask"])}')
     print(f'num bqq tops = {sum([ak.sum(top_fullyBoosted[f"top{i+1}_mask"]) for i in range(n_tops)])}')
+    print(f'num reco tops = {sum([ak.sum(top_fullyResolved[f"top{i+1}_mask"]) for i in range(n_tops)]+[ak.sum(top_semiResolved_qq[f"top{i+1}_mask"]) for i in range(n_tops)]+[ak.sum(top_semiResolved_bq[f"top{i+1}_mask"]) for i in range(n_tops)]+[ak.sum(top_fullyBoosted[f"top{i+1}_mask"]) for i in range(n_tops)])}')
 
     print('-='*60)
 
-    print(matched_fj_j_idx)
-    print(matched_vfj_j_idx)
-    print(matched_vfj_fj_idx)
-    for i in range(n_tops):
-        pass
+    # print(matched_fj_j_idx)
+    # print(matched_vfj_j_idx)
+    # print(matched_vfj_fj_idx)
+
+    # def mask_arr(fj_tops, match_idxs):
+    #     mask = ak.is_none(fj_tops)
+    #     for i in range(n_tops):
+    #         for j, fj_event in enumerate(fj_tops):
+
+    #             if len(fj_event) == 0:
+    #                 continue
+
+    #             if ak.any(match_idxs[j] != -1):
+    #                 matched_idxs = match_idxs[j][match_idxs[j] != -1]
+    #                 fj_tops
+
+    #     fj_j_mask = ~ak.all(matched_fj_j_idx == -1, axis=1)
+    #     worst_fj_qq_mask = fj_top_qq_idx[fj_j_mask]
+
         # need to implement
         
 
