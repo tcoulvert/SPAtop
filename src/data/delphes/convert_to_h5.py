@@ -93,54 +93,96 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     mass = arrays["GenJet/GenJet.Mass"]
     btag = arrays["GenJet/GenJet.BTag"]
     flavor = arrays["GenJet/GenJet.Flavor"]
-    print(btag)
-    print(flavor)
 
     # large-radius jet info
-    fj_pt = arrays["FatJet/FatJet.PT"]
-    fj_eta = arrays["FatJet/FatJet.Eta"]
-    fj_phi = arrays["FatJet/FatJet.Phi"]
-    fj_mass = arrays["FatJet/FatJet.Mass"]
-    fj_sdp4 = arrays["FatJet/FatJet.SoftDroppedP4[5]"]
+    # fj_pt = arrays["FatJet/FatJet.PT"]
+    # fj_eta = arrays["FatJet/FatJet.Eta"]
+    # fj_phi = arrays["FatJet/FatJet.Phi"]
+    # fj_mass = arrays["FatJet/FatJet.Mass"]
+    # fj_sdp4 = arrays["FatJet/FatJet.SoftDroppedP4[5]"]
+    # # first entry (i = 0) is the total SoftDropped Jet 4-momenta
+    # # from i = 1 to 4 are the pruned subjets 4-momenta
+    # fj_sdmass2 = (
+    #     fj_sdp4.fE[..., 0] ** 2 - fj_sdp4.fP.fX[..., 0] ** 2 - fj_sdp4.fP.fY[..., 0] ** 2 - fj_sdp4.fP.fZ[..., 0] ** 2
+    # )
+    # fj_sdmass = np.sqrt(np.maximum(fj_sdmass2, 0))
+    # fj_taus = arrays["FatJet/FatJet.Tau[5]"]
+    # # just saving just tau21 and tau32, can save others if useful
+    # fj_tau21 = np.nan_to_num(fj_taus[..., 1] / fj_taus[..., 0], nan=-1)
+    # fj_tau32 = np.nan_to_num(fj_taus[..., 2] / fj_taus[..., 1], nan=-1)
+    # fj_charge = arrays["FatJet/FatJet.Charge"]
+    # fj_ehadovereem = arrays["FatJet/FatJet.EhadOverEem"]
+    # fj_neutralenergyfrac = arrays["FatJet/FatJet.NeutralEnergyFraction"]
+    # fj_chargedenergyfrac = arrays["FatJet/FatJet.ChargedEnergyFraction"]
+    # fj_nneutral = arrays["FatJet/FatJet.NNeutrals"]
+    # fj_ncharged = arrays["FatJet/FatJet.NCharged"]
+    # for key in arrays["GenFatJet"].keys():
+    #     print(key)
+    fj_pt = arrays["GenFatJet/GenFatJet.PT"]
+    fj_eta = arrays["GenFatJet/GenFatJet.Eta"]
+    fj_phi = arrays["GenFatJet/GenFatJet.Phi"]
+    fj_mass = arrays["GenFatJet/GenFatJet.Mass"]
+    fj_sdp4 = arrays["GenFatJet/GenFatJet.SoftDroppedP4[5]"]
     # first entry (i = 0) is the total SoftDropped Jet 4-momenta
     # from i = 1 to 4 are the pruned subjets 4-momenta
     fj_sdmass2 = (
         fj_sdp4.fE[..., 0] ** 2 - fj_sdp4.fP.fX[..., 0] ** 2 - fj_sdp4.fP.fY[..., 0] ** 2 - fj_sdp4.fP.fZ[..., 0] ** 2
     )
     fj_sdmass = np.sqrt(np.maximum(fj_sdmass2, 0))
-    fj_taus = arrays["FatJet/FatJet.Tau[5]"]
+    fj_taus = arrays["GenFatJet/GenFatJet.Tau[5]"]
     # just saving just tau21 and tau32, can save others if useful
     fj_tau21 = np.nan_to_num(fj_taus[..., 1] / fj_taus[..., 0], nan=-1)
     fj_tau32 = np.nan_to_num(fj_taus[..., 2] / fj_taus[..., 1], nan=-1)
-    fj_charge = arrays["FatJet/FatJet.Charge"]
-    fj_ehadovereem = arrays["FatJet/FatJet.EhadOverEem"]
-    fj_neutralenergyfrac = arrays["FatJet/FatJet.NeutralEnergyFraction"]
-    fj_chargedenergyfrac = arrays["FatJet/FatJet.ChargedEnergyFraction"]
-    fj_nneutral = arrays["FatJet/FatJet.NNeutrals"]
-    fj_ncharged = arrays["FatJet/FatJet.NCharged"]
+    fj_charge = arrays["GenFatJet/GenFatJet.Charge"]
+    fj_ehadovereem = arrays["GenFatJet/GenFatJet.EhadOverEem"]
+    fj_neutralenergyfrac = arrays["GenFatJet/GenFatJet.NeutralEnergyFraction"]
+    fj_chargedenergyfrac = arrays["GenFatJet/GenFatJet.ChargedEnergyFraction"]
+    fj_nneutral = arrays["GenFatJet/GenFatJet.NNeutrals"]
+    fj_ncharged = arrays["GenFatJet/GenFatJet.NCharged"]
 
     # very-large-radius jet info
-    vfj_pt = arrays["VeryFatJet/VeryFatJet.PT"]
-    vfj_eta = arrays["VeryFatJet/VeryFatJet.Eta"]
-    vfj_phi = arrays["VeryFatJet/VeryFatJet.Phi"]
-    vfj_mass = arrays["VeryFatJet/VeryFatJet.Mass"]
-    vfj_sdp4 = arrays["VeryFatJet/VeryFatJet.SoftDroppedP4[5]"]
+    # vfj_pt = arrays["VeryFatJet/VeryFatJet.PT"]
+    # vfj_eta = arrays["VeryFatJet/VeryFatJet.Eta"]
+    # vfj_phi = arrays["VeryFatJet/VeryFatJet.Phi"]
+    # vfj_mass = arrays["VeryFatJet/VeryFatJet.Mass"]
+    # vfj_sdp4 = arrays["VeryFatJet/VeryFatJet.SoftDroppedP4[5]"]
+    # # first entry (i = 0) is the total SoftDropped Jet 4-momenta
+    # # from i = 1 to 4 are the pruned subjets 4-momenta
+    # vfj_sdmass2 = (
+    #     vfj_sdp4.fE[..., 0] ** 2 - vfj_sdp4.fP.fX[..., 0] ** 2 - vfj_sdp4.fP.fY[..., 0] ** 2 - vfj_sdp4.fP.fZ[..., 0] ** 2
+    # )
+    # vfj_sdmass = np.sqrt(np.maximum(vfj_sdmass2, 0))
+    # vfj_taus = arrays["VeryFatJet/VeryFatJet.Tau[5]"]
+    # # just saving just tau21 and tau32, can save others if useful
+    # vfj_tau21 = np.nan_to_num(vfj_taus[..., 1] / vfj_taus[..., 0], nan=-1)
+    # vfj_tau32 = np.nan_to_num(vfj_taus[..., 2] / vfj_taus[..., 1], nan=-1)
+    # vfj_charge = arrays["VeryFatJet/VeryFatJet.Charge"]
+    # vfj_ehadovereem = arrays["VeryFatJet/VeryFatJet.EhadOverEem"]
+    # vfj_neutralenergyfrac = arrays["VeryFatJet/VeryFatJet.NeutralEnergyFraction"]
+    # vfj_chargedenergyfrac = arrays["VeryFatJet/VeryFatJet.ChargedEnergyFraction"]
+    # vfj_nneutral = arrays["VeryFatJet/VeryFatJet.NNeutrals"]
+    # vfj_ncharged = arrays["VeryFatJet/VeryFatJet.NCharged"]
+    vfj_pt = arrays["GenVeryFatJet/GenVeryFatJet.PT"]
+    vfj_eta = arrays["GenVeryFatJet/GenVeryFatJet.Eta"]
+    vfj_phi = arrays["GenVeryFatJet/GenVeryFatJet.Phi"]
+    vfj_mass = arrays["GenVeryFatJet/GenVeryFatJet.Mass"]
+    vfj_sdp4 = arrays["GenVeryFatJet/GenVeryFatJet.SoftDroppedP4[5]"]
     # first entry (i = 0) is the total SoftDropped Jet 4-momenta
     # from i = 1 to 4 are the pruned subjets 4-momenta
     vfj_sdmass2 = (
         vfj_sdp4.fE[..., 0] ** 2 - vfj_sdp4.fP.fX[..., 0] ** 2 - vfj_sdp4.fP.fY[..., 0] ** 2 - vfj_sdp4.fP.fZ[..., 0] ** 2
     )
     vfj_sdmass = np.sqrt(np.maximum(vfj_sdmass2, 0))
-    vfj_taus = arrays["VeryFatJet/VeryFatJet.Tau[5]"]
+    vfj_taus = arrays["GenVeryFatJet/GenVeryFatJet.Tau[5]"]
     # just saving just tau21 and tau32, can save others if useful
     vfj_tau21 = np.nan_to_num(vfj_taus[..., 1] / vfj_taus[..., 0], nan=-1)
     vfj_tau32 = np.nan_to_num(vfj_taus[..., 2] / vfj_taus[..., 1], nan=-1)
-    vfj_charge = arrays["VeryFatJet/VeryFatJet.Charge"]
-    vfj_ehadovereem = arrays["VeryFatJet/VeryFatJet.EhadOverEem"]
-    vfj_neutralenergyfrac = arrays["VeryFatJet/VeryFatJet.NeutralEnergyFraction"]
-    vfj_chargedenergyfrac = arrays["VeryFatJet/VeryFatJet.ChargedEnergyFraction"]
-    vfj_nneutral = arrays["VeryFatJet/VeryFatJet.NNeutrals"]
-    vfj_ncharged = arrays["VeryFatJet/VeryFatJet.NCharged"]
+    vfj_charge = arrays["GenVeryFatJet/GenVeryFatJet.Charge"]
+    vfj_ehadovereem = arrays["GenVeryFatJet/GenVeryFatJet.EhadOverEem"]
+    vfj_neutralenergyfrac = arrays["GenVeryFatJet/GenVeryFatJet.NeutralEnergyFraction"]
+    vfj_chargedenergyfrac = arrays["GenVeryFatJet/GenVeryFatJet.ChargedEnergyFraction"]
+    vfj_nneutral = arrays["GenVeryFatJet/GenVeryFatJet.NNeutrals"]
+    vfj_ncharged = arrays["GenVeryFatJet/GenVeryFatJet.NCharged"]
 
     particles = ak.zip(
         {
@@ -721,9 +763,9 @@ def main(in_files, out_file, train_frac, n_tops):
                 entry_start = int(train_frac * num_entries)
                 entry_stop = None
 
-            # for key in events.keys():
-            #     print(key)
-            #     print('-'*60)
+            for key in events.keys():
+                print(key)
+                print('-'*60)
 
             keys = (
                 [key for key in events.keys() if "Particle/Particle." in key and "fBits" not in key]
@@ -731,6 +773,8 @@ def main(in_files, out_file, train_frac, n_tops):
                 + [key for key in events.keys() if "FatJet/FatJet." in key and "fBits" not in key]
                 + [key for key in events.keys() if "VeryFatJet/VeryFatJet." in key and "fBits" not in key]
                 + [key for key in events.keys() if "GenJet/GenJet." in key and "fBits" not in key]
+                + [key for key in events.keys() if "GenFatJet/GenJet." in key and "fBits" not in key]
+                + [key for key in events.keys() if "GenVeryFatJet/GenJet." in key and "fBits" not in key]
             )
             
             arrays = events.arrays(keys, entry_start=entry_start, entry_stop=entry_stop)
