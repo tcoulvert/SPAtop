@@ -18,11 +18,11 @@ VFJET_DR = 1.5
 
 @nb.njit
 def match_top_to_vfjet(
-    bquarks, wquarks1, wquarks2, vfjets, 
+    topquarks, bquarks, wquarks1, wquarks2, vfjets, 
     all_vfjet_builder, bqq_vfjet_builder,
 ):
-    for bquarks_event, wquarks1_event, wquarks2_event, vfjets_event in zip(
-        bquarks, wquarks1, wquarks2, vfjets
+    for topquarks_event, bquarks_event, wquarks1_event, wquarks2_event, vfjets_event in zip(
+        topquarks, bquarks, wquarks1, wquarks2, vfjets
     ):
         all_vfjet_builder.begin_list()
         bqq_vfjet_builder.begin_list()
@@ -31,18 +31,19 @@ def match_top_to_vfjet(
             all_match_idx, bqq_match_idx = -1, -1
 
             mindeltaR, mindeltaR_idxs = 999, (-1, -1)  # mindeltaR, (mindeltaR_topidx, mindeltaR_quarktype)
-            for j, (bquark, wquark1, wquark2) in enumerate(zip(
-                bquarks_event,
+            for j, (topquark, bquark, wquark1, wquark2) in enumerate(zip(
+                topquarks_event, bquarks_event,
                 wquarks1_event, wquarks2_event
             )):  # dont need to check b and w mother index b/c made them match by construction
+                topquark_deltaR = vfjet.deltaR(topquark)
                 bquark_deltaR = vfjet.deltaR(bquark)
                 wquark1_deltaR = vfjet.deltaR(wquark1)
                 wquark2_deltaR = vfjet.deltaR(wquark2)
 
                 bqq_avg_deltaR = (
-                    bquark_deltaR + wquark1_deltaR + wquark2_deltaR
-                )/3 if (
-                    bquark_deltaR < VFJET_DR and 
+                    topquark_deltaR + bquark_deltaR + wquark1_deltaR + wquark2_deltaR
+                )/4 if (
+                    topquark_deltaR < VFJET_DR and bquark_deltaR < VFJET_DR and
                     wquark1_deltaR < VFJET_DR and wquark2_deltaR < VFJET_DR and len({f'b_{j+1}', f'w1_{j+1}', f'w2_{j+1}'} & matched_set) == 0
                 ) else 999
                 if bqq_avg_deltaR < mindeltaR:
@@ -201,7 +202,8 @@ def match_top_to_jet(
             for j, (bquark, wquark1, wquark2) in enumerate(zip(
                 bquarks_event, wquarks1_event, wquarks2_event
             )):  # dont need to check b and w mother index b/c made them match by construction
-                bquark_deltaR = jet.deltaR(bquark) if jet.deltaR(bquark) < JET_DR and np.abs(jet_flav) == 5 and f'b_{j+1}' not in matched_set else 999
+                # bquark_deltaR = jet.deltaR(bquark) if jet.deltaR(bquark) < JET_DR and np.abs(jet_flav) == 5 and f'b_{j+1}' not in matched_set else 999
+                bquark_deltaR = jet.deltaR(bquark) if jet.deltaR(bquark) < JET_DR and f'b_{j+1}' not in matched_set else 999
                 wquark1_deltaR = jet.deltaR(wquark1) if jet.deltaR(wquark1) < JET_DR and f'w1_{j+1}' not in matched_set else 999
                 wquark2_deltaR = jet.deltaR(wquark2) if jet.deltaR(wquark2) < JET_DR and f'w2_{j+1}' not in matched_set else 999
 

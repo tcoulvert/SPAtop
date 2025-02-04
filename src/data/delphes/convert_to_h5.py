@@ -81,12 +81,20 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     part_mass = arrays["Particle/Particle.Mass"]
 
     # small-radius jet info
-    pt = arrays["Jet/Jet.PT"]
-    eta = arrays["Jet/Jet.Eta"]
-    phi = arrays["Jet/Jet.Phi"]
-    mass = arrays["Jet/Jet.Mass"]
-    btag = arrays["Jet/Jet.BTag"]
-    flavor = arrays["Jet/Jet.Flavor"]
+    # pt = arrays["Jet/Jet.PT"]
+    # eta = arrays["Jet/Jet.Eta"]
+    # phi = arrays["Jet/Jet.Phi"]
+    # mass = arrays["Jet/Jet.Mass"]
+    # btag = arrays["Jet/Jet.BTag"]
+    # flavor = arrays["Jet/Jet.Flavor"]
+    pt = arrays["GenJet/GenJet.PT"]
+    eta = arrays["GenJet/GenJet.Eta"]
+    phi = arrays["GenJet/GenJet.Phi"]
+    mass = arrays["GenJet/GenJet.Mass"]
+    btag = arrays["GenJet/GenJet.BTag"]
+    flavor = arrays["GenJet/GenJet.Flavor"]
+    print(btag)
+    print(flavor)
 
     # large-radius jet info
     fj_pt = arrays["FatJet/FatJet.PT"]
@@ -219,6 +227,10 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         with_name="Momentum4D",
     )
 
+    # for jet_idx in range(len(jets[0])):
+    #     print(jets[0, jet_idx].deltaR(bquarks[0, 0]))
+    #     print(jets[0, jet_idx].deltaR(bquarks[0, 1]))
+
     fjets = ak.zip(
         {
             "pt": fj_pt,
@@ -250,6 +262,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     top_idx, top_b_idx, top_q1_idx, top_q2_idx = (
         top_idx.snapshot(), top_b_idx.snapshot(), top_q1_idx.snapshot(), top_q2_idx.snapshot()
     )
+    print(ak.all(ak.all(top_idx == -1, axis=1), axis=0))
     # semi-resolved tops
     fj_top_idx, fj_top_bq1_idx, fj_top_bq2_idx, fj_top_qq_idx = match_top_to_fjet(
         bquarks, wquarks_d1, wquarks_d2, fjets, 
@@ -260,7 +273,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     )
     # fully-boosted tops
     vfj_top_idx, vfj_top_bqq_idx = match_top_to_vfjet(
-        bquarks, wquarks_d1, wquarks_d2, vfjets, 
+        topquarks, bquarks, wquarks_d1, wquarks_d2, vfjets, 
         ak.ArrayBuilder(), ak.ArrayBuilder(),
     )
     vfj_top_idx, vfj_top_bqq_idx = vfj_top_idx.snapshot(), vfj_top_bqq_idx.snapshot()
@@ -708,11 +721,16 @@ def main(in_files, out_file, train_frac, n_tops):
                 entry_start = int(train_frac * num_entries)
                 entry_stop = None
 
+            # for key in events.keys():
+            #     print(key)
+            #     print('-'*60)
+
             keys = (
                 [key for key in events.keys() if "Particle/Particle." in key and "fBits" not in key]
                 + [key for key in events.keys() if "Jet/Jet." in key]
                 + [key for key in events.keys() if "FatJet/FatJet." in key and "fBits" not in key]
                 + [key for key in events.keys() if "VeryFatJet/VeryFatJet." in key and "fBits" not in key]
+                + [key for key in events.keys() if "GenJet/GenJet." in key and "fBits" not in key]
             )
             
             arrays = events.arrays(keys, entry_start=entry_start, entry_stop=entry_stop)

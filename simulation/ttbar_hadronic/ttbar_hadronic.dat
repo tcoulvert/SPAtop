@@ -1,0 +1,20 @@
+generate p p > t t~
+define l = e+ mu+ e- mu-
+define v = ve vm ve~ vm~
+output ttbar_hadronic_ak15
+launch
+madspin=ON
+shower=Pythia8
+detector=Delphes
+analysis=OFF
+
+delphes_card_CMS_vfj.dat
+set run_card ebeam1 7000
+set run_card ebeam2 7000
+set param_card mass 6 172.5
+set param_card mass 25 125.0
+set param_card yukawa 6 172.5
+
+decay t > w+ b, w+ > j j
+decay t~ > w- b~, w- > j j
+set nevents 100000
