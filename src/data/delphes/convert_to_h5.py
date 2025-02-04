@@ -754,6 +754,7 @@ def main(in_files, out_file, train_frac, n_tops):
     all_datasets = {}
     for file_name in in_files:
         with uproot.open(file_name) as in_file:
+            print(in_file.classnames())
             events = in_file["Delphes"]
             num_entries = events.num_entries
             if "training" in out_file:
@@ -773,8 +774,8 @@ def main(in_files, out_file, train_frac, n_tops):
                 + [key for key in events.keys() if "FatJet/FatJet." in key and "fBits" not in key]
                 + [key for key in events.keys() if "VeryFatJet/VeryFatJet." in key and "fBits" not in key]
                 + [key for key in events.keys() if "GenJet/GenJet." in key and "fBits" not in key]
-                + [key for key in events.keys() if "GenFatJet/GenJet." in key and "fBits" not in key]
-                + [key for key in events.keys() if "GenVeryFatJet/GenJet." in key and "fBits" not in key]
+                + [key for key in events.keys() if "GenFatJet/GenFatJet." in key and "fBits" not in key]
+                + [key for key in events.keys() if "GenVeryFatJet/GenVeryFatJet." in key and "fBits" not in key]
             )
             
             arrays = events.arrays(keys, entry_start=entry_start, entry_stop=entry_stop)

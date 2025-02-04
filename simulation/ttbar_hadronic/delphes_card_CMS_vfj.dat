@@ -38,6 +38,8 @@ set ExecutionPath {
 
   NeutrinoFilter
   GenJetFinder
+  GenFatJetFinder
+  GenVeryFatJetFinder
   GenMissingET
   
   FastJetFinder
