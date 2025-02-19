@@ -69,8 +69,6 @@ def final_particle(particle_pdgid, mother_pdgid, particles, final_status=-1, int
 
 def get_datasets(arrays, n_tops):  # noqa: C901
     print(f'num events = {len(arrays["Particle/Particle.PID"])}')
-    # arrays = arrays[::5]
-    # print(f'num events = {len(arrays["Particle/Particle.PID"])}')
 
     part_pid = arrays["Particle/Particle.PID"]  # PDG ID
     part_status = arrays["Particle/Particle.Status"]
@@ -142,66 +140,18 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     gen_eta = arrays["GenJet/GenJet.Eta"]
     gen_phi = arrays["GenJet/GenJet.Phi"]
     gen_mass = arrays["GenJet/GenJet.Mass"]
-    # pt = arrays["GenJet/GenJet.PT"]
-    # eta = arrays["GenJet/GenJet.Eta"]
-    # phi = arrays["GenJet/GenJet.Phi"]
-    # mass = arrays["GenJet/GenJet.Mass"]
-    # btag = arrays["GenJet/GenJet.BTag"]
-    # flavor = arrays["GenJet/GenJet.Flavor"]
 
     # gen large-radius jet 
     gen_fj_pt = arrays["GenFatJet/GenFatJet.PT"]
     gen_fj_eta = arrays["GenFatJet/GenFatJet.Eta"]
     gen_fj_phi = arrays["GenFatJet/GenFatJet.Phi"]
     gen_fj_mass = arrays["GenFatJet/GenFatJet.Mass"]
-    # fj_pt = arrays["GenFatJet/GenFatJet.PT"]
-    # fj_eta = arrays["GenFatJet/GenFatJet.Eta"]
-    # fj_phi = arrays["GenFatJet/GenFatJet.Phi"]
-    # fj_mass = arrays["GenFatJet/GenFatJet.Mass"]
-    # fj_sdp4 = arrays["GenFatJet/GenFatJet.SoftDroppedP4[5]"]
-    # # first entry (i = 0) is the total SoftDropped Jet 4-momenta
-    # # from i = 1 to 4 are the pruned subjets 4-momenta
-    # fj_sdmass2 = (
-    #     fj_sdp4.fE[..., 0] ** 2 - fj_sdp4.fP.fX[..., 0] ** 2 - fj_sdp4.fP.fY[..., 0] ** 2 - fj_sdp4.fP.fZ[..., 0] ** 2
-    # )
-    # fj_sdmass = np.sqrt(np.maximum(fj_sdmass2, 0))
-    # fj_taus = arrays["GenFatJet/GenFatJet.Tau[5]"]
-    # # just saving just tau21 and tau32, can save others if useful
-    # fj_tau21 = np.nan_to_num(fj_taus[..., 1] / fj_taus[..., 0], nan=-1)
-    # fj_tau32 = np.nan_to_num(fj_taus[..., 2] / fj_taus[..., 1], nan=-1)
-    # fj_charge = arrays["GenFatJet/GenFatJet.Charge"]
-    # fj_ehadovereem = arrays["GenFatJet/GenFatJet.EhadOverEem"]
-    # fj_neutralenergyfrac = arrays["GenFatJet/GenFatJet.NeutralEnergyFraction"]
-    # fj_chargedenergyfrac = arrays["GenFatJet/GenFatJet.ChargedEnergyFraction"]
-    # fj_nneutral = arrays["GenFatJet/GenFatJet.NNeutrals"]
-    # fj_ncharged = arrays["GenFatJet/GenFatJet.NCharged"]
 
     # gen very-large-radius jet info
     gen_vfj_pt = arrays["GenVeryFatJet/GenVeryFatJet.PT"]
     gen_vfj_eta = arrays["GenVeryFatJet/GenVeryFatJet.Eta"]
     gen_vfj_phi = arrays["GenVeryFatJet/GenVeryFatJet.Phi"]
     gen_vfj_mass = arrays["GenVeryFatJet/GenVeryFatJet.Mass"]
-    # vfj_pt = arrays["GenVeryFatJet/GenVeryFatJet.PT"]
-    # vfj_eta = arrays["GenVeryFatJet/GenVeryFatJet.Eta"]
-    # vfj_phi = arrays["GenVeryFatJet/GenVeryFatJet.Phi"]
-    # vfj_mass = arrays["GenVeryFatJet/GenVeryFatJet.Mass"]
-    # vfj_sdp4 = arrays["GenVeryFatJet/GenVeryFatJet.SoftDroppedP4[5]"]
-    # # first entry (i = 0) is the total SoftDropped Jet 4-momenta
-    # # from i = 1 to 4 are the pruned subjets 4-momenta
-    # vfj_sdmass2 = (
-    #     vfj_sdp4.fE[..., 0] ** 2 - vfj_sdp4.fP.fX[..., 0] ** 2 - vfj_sdp4.fP.fY[..., 0] ** 2 - vfj_sdp4.fP.fZ[..., 0] ** 2
-    # )
-    # vfj_sdmass = np.sqrt(np.maximum(vfj_sdmass2, 0))
-    # vfj_taus = arrays["GenVeryFatJet/GenVeryFatJet.Tau[5]"]
-    # # just saving just tau21 and tau32, can save others if useful
-    # vfj_tau21 = np.nan_to_num(vfj_taus[..., 1] / vfj_taus[..., 0], nan=-1)
-    # vfj_tau32 = np.nan_to_num(vfj_taus[..., 2] / vfj_taus[..., 1], nan=-1)
-    # vfj_charge = arrays["GenVeryFatJet/GenVeryFatJet.Charge"]
-    # vfj_ehadovereem = arrays["GenVeryFatJet/GenVeryFatJet.EhadOverEem"]
-    # vfj_neutralenergyfrac = arrays["GenVeryFatJet/GenVeryFatJet.NeutralEnergyFraction"]
-    # vfj_chargedenergyfrac = arrays["GenVeryFatJet/GenVeryFatJet.ChargedEnergyFraction"]
-    # vfj_nneutral = arrays["GenVeryFatJet/GenVeryFatJet.NNeutrals"]
-    # vfj_ncharged = arrays["GenVeryFatJet/GenVeryFatJet.NCharged"]
 
     particles = ak.zip(
         {
@@ -221,10 +171,11 @@ def get_datasets(arrays, n_tops):  # noqa: C901
 
     tops_condition = np.logical_and(
         np.abs(particles.pid) == 6, np.logical_and(
-            np.abs(particles.pid[particles.d1]) == 5, np.abs(particles.pid[particles.d2]) == 24
-        )   # bquarks are going to be daughter 1
+            np.abs(particles.pid[particles.d1]) == 24, np.abs(particles.pid[particles.d2]) == 5
+        )   # bquarks are going to be daughter 2 !!
     )
     topquarks = ak.to_regular(particles[tops_condition], axis=1)
+    print(f"2 tops in every event? = {ak.all(ak.num(topquarks) == 2)}")
     topquark_idx_sort = ak.argsort(topquarks.idx, axis=-1)
     topquarks = ak.to_regular(topquarks[topquark_idx_sort])
 
@@ -234,6 +185,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         ), axis=1
     )
     bquarks = ak.to_regular(bquarks[topquark_idx_sort])
+    print(f"2 bquarks in every event? = {ak.all(ak.num(bquarks) == 2)}")
 
     wbosons = ak.to_regular(
         final_particle(
@@ -241,6 +193,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         ), axis=1
     )
     wbosons = ak.to_regular(wbosons[topquark_idx_sort])
+    print(f"2 wbosons in every event? = {ak.all(ak.num(wbosons) == 2)}")
     
     wquarks_d1 = ak.to_regular(
         final_particle(
@@ -248,12 +201,14 @@ def get_datasets(arrays, n_tops):  # noqa: C901
             intermediate_particles=particles[wbosons.d1]
         ), axis=1
     )
+    print(f"2 wquarks_d1 in every event? = {ak.all(ak.num(wquarks_d1) == 2)}")
     wquarks_d2 = ak.to_regular(
         final_particle(
             np.abs(ak.to_regular(particles.pid[wbosons.d2], axis=1)), None, particles, 
             intermediate_particles=particles[wbosons.d2]
         ), axis=1
     )
+    print(f"2 wquarks_d2 in every event? = {ak.all(ak.num(wquarks_d2) == 2)}")
 
     def fid_mask(particle, pt_threshold=8, max_eta=2.3, barrel_endcap_gap=(1.4, 1.6)):
         pt_mask = ak.sum(particle['pt'] > pt_threshold, axis=1) == n_tops
@@ -274,6 +229,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         & fid_mask(wquarks_d1)
         & fid_mask(wquarks_d2)
     )
+    print('-'*60)
     print(f'num events with all quarks passing fiducial cuts = {ak.sum(quark_fid_mask)}')
 
     jets = ak.zip(
@@ -287,10 +243,6 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         },
         with_name="Momentum4D",
     )
-
-    # for jet_idx in range(len(jets[0])):
-    #     print(jets[0, jet_idx].deltaR(bquarks[0, 0]))
-    #     print(jets[0, jet_idx].deltaR(bquarks[0, 1]))
 
     fjets = ak.zip(
         {
@@ -314,7 +266,6 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         with_name="Momentum4D",
     )
 
-
     gen_jets = ak.zip(
         {
             "pt": gen_pt,
@@ -325,10 +276,6 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         },
         with_name="Momentum4D",
     )
-
-    # for jet_idx in range(len(jets[0])):
-    #     print(jets[0, jet_idx].deltaR(bquarks[0, 0]))
-    #     print(jets[0, jet_idx].deltaR(bquarks[0, 1]))
 
     gen_fjets = ak.zip(
         {
@@ -379,17 +326,11 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     matched_vfj_j_idx = match_vfjet_to_jet(vfjets, jets, ak.ArrayBuilder()).snapshot()
     matched_vfj_fj_idx = match_vfjet_to_fjet(vfjets, fjets, ak.ArrayBuilder()).snapshot()
 
-    # keep events with >= min_jets, how should we do it?
-    # mask_minjets = (
-    #     (
-    #         ak.num(pt[pt > MIN_JET_PT])
-    #         + 3*ak.num(fj_pt[fj_pt > MIN_FJET_PT])
-    #         + 3*ak.num(vfj_pt[vfj_pt > MIN_VFJET_PT])
-    #     ) >= 3*n_tops
-    # )
-    mask_minjets = ak.num(pt[pt > MIN_JET_PT]) >= 3*n_tops
+    # keep events with >= min_jets -> what cuts we apply depends on what phase-space (and benchmark) we're targeting
+    mask_minjets = ak.num(pt[pt > MIN_JET_PT]) >= 3*n_tops  # phase-space cuts for resolved-like training
     print(f"Num events with >=3 jets per top = {ak.sum(mask_minjets, axis=0)}")
-    print(f"Num events with >=3 jets per top & quark fiducial mask = {ak.sum(mask_minjets & quark_fid_mask, axis=0)}")
+    print(f"    -> Num events with >=3 jets per top & quark fiducial mask = {ak.sum(mask_minjets & quark_fid_mask, axis=0)}")
+    print('-'*60)
 
     ## Jets ##
     # sort by pt
