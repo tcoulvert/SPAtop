@@ -1,3 +1,4 @@
+import glob
 import logging
 import os
 from pathlib import Path
@@ -170,9 +171,14 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     )
 
     tops_condition = np.logical_and(
-        np.abs(particles.pid) == 6, np.logical_and(
-            np.abs(particles.pid[particles.d1]) == 24, np.abs(particles.pid[particles.d2]) == 5
-        )   # bquarks are going to be daughter 2 !!
+        np.abs(particles.pid) == 6, np.logical_or(
+            np.logical_and(
+                np.abs(particles.pid[particles.d1]) == 24, np.abs(particles.pid[particles.d2]) == 5
+            ),
+            np.logical_and(
+                np.abs(particles.pid[particles.d1]) == 5, np.abs(particles.pid[particles.d2]) == 24
+            )
+        )
     )
     topquarks = ak.to_regular(particles[tops_condition], axis=1)
     print(f"2 tops in every event? = {ak.all(ak.num(topquarks) == 2)}")
@@ -806,6 +812,14 @@ def main(in_files, out_file, train_frac, n_tops, plots):
         PLOTS = True
     
     all_datasets = {}
+    expanded_in_files = []
+    for file_name in in_files:
+        if os.path.isdir(file_name):
+            for root_file in glob.glob(os.path.join(file_name, '*.root')):
+                expanded_in_files.append(os.path.join(file_name, root_file))
+        else:
+            expanded_in_files.append(file_name)
+    in_files = expanded_in_files
     for file_name in in_files:
         with uproot.open(file_name) as in_file:
             events = in_file["Delphes"]
