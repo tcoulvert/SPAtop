@@ -1,35 +1,33 @@
-# hhh
+# SPANet for up to 4 tops
 
-## 1. Pull and start the Docker container
-```bash
-docker pull jmduarte/hhh
-docker run -it jmduarte/hhh bash
-```
-
-## 2. Check out the GitHub repository
+## 1. Check out the GitHub repository
 ```bash
 cd work
-git clone https://github.com/ucsd-hep-ex/hhh
+git clone https://github.com/tcoulvert/SPAtop/tree/topnet_dev
 ```
 
-## 3. Install the Python package(s)
+## 2. Install the Python venv (Ensure you have installed python 3.9 or greater)
 ```bash
-cd hhh
-pip install -e .
-cd ..
+python -m venv
+pip install -e ./SPAtop
+```
+If for some reason the code does not run properly, it could be because packages may have changed and broken things. If that is the case, you can install your environment as follows:
+```bash
+python -m venv
+pip install -r requirements.txt
 ```
 
-## 4. Copy and convert the dataset(s)
+## 3. Copy and convert the dataset(s)
 Copy the Delphes ROOT TTree datasets from:
-- CERN EOS: `/eos/user/m/mstamenk/CxAOD31run/hhh-6b/delphes-samples/GF_HHH_SM_c3_0_d4_0_14TeV/sample_*.root`, or
-- UCSD UAF: `/ceph/cms/store/user/woodson/GF_HHH_SM_c3_0_d4_0_14TeV/sample_*.root`
+- LPC EOS: `/eos/uscms/store/user/tsievert/ttbar_hadronic/ttbar_hadronic_*.root`, or
+- non-LPC EOS: `root://cmseos.fnal.gov//store/user/tsievert/ttbar_hadronic/ttbar_hadronic_*.root`
 
-to the `data/delphes/v2/GF_HHH_SM_c3_0_d4_0_14TeV` directory
+to the `data/delphes/v1/ttbar_hadronic` directory
 
 Convert to training and testing HDF5 files.
 ```bash
-python -m src.data.delphes.convert_to_h5 data/delphes/v2/GF_HHH_SM_c3_0_d4_0_14TeV/sample_*.root --out-file data/delphes/v2/hhh_training.h5
-python -m src.data.delphes.convert_to_h5 data/delphes/v2/GF_HHH_SM_c3_0_d4_0_14TeV/sample_*.root --out-file data/delphes/v2/hhh_testing.h5
+python -m src.data.delphes.convert_to_h5 data/delphes/v1/ttbar_hadronic/sample_*.root --out-file data/delphes/v1/ttbar_hadronic_training.h5
+python -m src.data.delphes.convert_to_h5 data/delphes/v1/ttbar_hadronic/sample_*.root --out-file data/delphes/v1/ttbar_hadronic_testing.h5
 ```
 
 ## 5. Run the SPANet training
