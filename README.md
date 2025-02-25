@@ -30,6 +30,8 @@ python -m src.data.delphes.convert_to_h5 data/delphes/v1/ttbar_hadronic/sample_*
 python -m src.data.delphes.convert_to_h5 data/delphes/v1/ttbar_hadronic/sample_*.root --out-file data/delphes/v1/ttbar_hadronic_testing.h5
 ```
 
+### !!! WARNING !!! : From this step on, this repo hasn't been updated, so don't expect things to work. When the repo is updated, this README will change to reflect that.
+
 ## 5. Run the SPANet training
 Override options file with `--gpus 0` if no GPUs are available.
 ```bash
