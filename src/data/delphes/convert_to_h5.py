@@ -813,13 +813,16 @@ def main(in_files, out_file, train_frac, n_tops, plots):
     
     all_datasets = {}
     expanded_in_files = []
+    print(f"starting in_files = {in_files}")
     for file_name in in_files:
         if os.path.isdir(file_name):
+            print(f"found directory: {file_name}")
             for root_file in glob.glob(os.path.join(file_name, '*.root')):
                 expanded_in_files.append(os.path.join(file_name, root_file))
         else:
             expanded_in_files.append(file_name)
     in_files = expanded_in_files
+    print(f"ending in_files = {in_files}")
     for file_name in in_files:
         with uproot.open(file_name) as in_file:
             events = in_file["Delphes"]
@@ -855,8 +858,8 @@ def main(in_files, out_file, train_frac, n_tops, plots):
     with h5py.File(out_file, "w") as output:
         for dataset_name, all_data in all_datasets.items():
             concat_data = np.concatenate(all_data, axis=0)
-            # logging.info(f"Dataset name: {dataset_name}")
-            # logging.info(f"Dataset shape: {concat_data.shape}")
+            logging.info(f"Dataset name: {dataset_name}")
+            logging.info(f"Dataset shape: {concat_data.shape}")
             output.create_dataset(dataset_name, data=concat_data)
 
 
