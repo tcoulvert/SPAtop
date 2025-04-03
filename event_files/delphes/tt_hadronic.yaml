@@ -1,0 +1,94 @@
+# ---------------------------------------------------
+# REQUIRED - INPUTS - List all inputs to SPANet here.
+# ---------------------------------------------------
+INPUTS:
+  # -----------------------------------------------------------------------------
+  # REQUIRED - SEQUENTIAL - inputs which can have an arbitrary number of vectors.
+  # -----------------------------------------------------------------------------
+  SEQUENTIAL:
+    Jets:
+      pt: log_normalize
+      eta: normalize
+      sinphi: none
+      cosphi: none
+      btag: none
+      mass: normalize
+    BoostedJets:
+      fj_pt: log_normalize
+      fj_eta: normalize
+      fj_sinphi: none
+      fj_cosphi: none
+      fj_mass: normalize
+      fj_sdmass: normalize
+      fj_nsub: normalize
+      fj_tau21: none
+      fj_tau32: none
+      fj_ncharged: normalize
+    VeryBoostedJets:
+      vfj_pt: log_normalize
+      vfj_eta: normalize
+      vfj_sinphi: none
+      vfj_cosphi: none
+      vfj_mass: normalize
+      vfj_sdmass: normalize
+      vfj_nsub: normalize
+      vfj_tau21: none
+      vfj_tau32: none
+      vfj_ncharged: normalize
+  # ---------------------------------------------------------------------
+  # REQUIRED - GLOBAL - inputs which will have a single vector per event.
+  # ---------------------------------------------------------------------
+  GLOBAL:
+
+
+# ----------------------------------------------------------------------
+# REQUIRED - EVENT - Complete list of resonance particles and daughters.
+# ----------------------------------------------------------------------
+EVENT:
+  FRt1:
+    - b: Jets
+    - q1: Jets
+    - q2: Jets
+  FRt2:
+    - b: Jets
+    - q1: Jets
+    - q2: Jets
+  SRqqt1:
+    - b: Jets
+    - qq: BoostedJets
+  SRqqt2:
+    - b: Jets
+    - qq: BoostedJets
+  SRbqt1:
+    - q: Jets
+    - bq: BoostedJets
+  SRbqt2:
+    - q: Jets
+    - bq: BoostedJets
+  FBt1:
+    - bqq: VeryBoostedJets
+  FBt2:
+    - bqq: VeryBoostedJets
+
+# ---------------------------------------------------------
+# REQUIRED KEY - PERMUTATIONS - List of valid permutations.
+# ---------------------------------------------------------
+PERMUTATIONS:
+    EVENT:
+      - [[FRt1, FRt2], [SRqqt1, SRqqt2], [SRbqt1, SRbqt2], [FBt1, FBt2]]
+    FRt1:
+      - [ q1, q2 ]
+    FRt2:
+      - [ q1, q2 ]
+
+
+# ------------------------------------------------------------------------------
+# REQUIRED - REGRESSIONS - List of desired features to regress from observables.
+# ------------------------------------------------------------------------------
+REGRESSIONS:
+
+
+# -----------------------------------------------------------------------------
+# REQUIRED - REGRESSIONS - List of desired classes to predict from observables.
+# -----------------------------------------------------------------------------
+CLASSIFICATIONS:
