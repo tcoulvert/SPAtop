@@ -37,6 +37,88 @@ Override options file with `--gpus 0` if no GPUs are available.
 ```bash
 python -m spanet.train -of options_files/delphes/hhh_v2.json [--gpus 0]
 ```
+# SPAtop Training via Kubernetes
+
+## Prerequisites
+
+Training via kubernetes on the cms-ml namespace requires the following:
+
+* `kubectl` configured to target the `cms-ml` namespace
+* PersistentVolumeClaim named `spatopvol` containing training data (already created)
+* Docker image `gitlab-registry.nrp-nautilus.io/jmduarte/hhh:latest` (to be updated)
+
+---
+
+## Data Organization
+
+Data should be placed under the PVC at:
+
+```
+spatopvol/data/delphes/v1/tt_training.h5
+```
+---
+
+## Configuration Files
+
+SPAtop training requires the following files, each located within the PVC:
+
+| File              | Description              | Location                                  |
+| ----------------- | ------------------------ | ----------------------------------------- |
+| `tt_hadronic.yml` | Physics process settings | `/spatopvol/event_files/tt_hadronic.yml`  |
+| `spatop_v1.json`  | SPANet model parameters  | `/spatopvol/options_files/spatop_v1.json` |
+
+Additionally, the Kubernetes job manifest is required:
+
+* **`spatop-job-train.yml`**: Defines the Job spec for launching the SPAtop training container. Place this file in your local working directory where you run `kubectl` commands.
+
+---
+
+## Launching Training
+
+To start the SPAtop training job, apply the Kubernetes manifest:
+
+```bash
+kubectl apply -f spatop-job-train.yml -n cms-ml
+```
+
+This command creates a Kubernetes Job that spawns one or more pods to perform the training.
+
+---
+
+## Monitoring Jobs
+
+1. **List Jobs and Pods**
+
+   ```bash
+   kubectl get jobs -n cms-ml
+   kubectl get pods -l job-name=spatop-job-train -n cms-ml
+   ```
+
+2. **Describe a Pod**
+
+   ```bash
+   kubectl describe pod <pod-name> -n cms-ml
+   ```
+
+3. **Stream Logs**
+
+   ```bash
+   kubectl logs -f <pod-name> -n cms-ml
+   ```
+
+Repeat these commands to track pod status, resource usage, and training progress.
+
+---
+
+## Cleanup
+
+Once training completes successfully,remove the job and its pods:
+
+```bash
+kubectl delete job spatop-job-train -n cms-ml
+```
+
+---
 
 ## 6. Evaluate the SPANet training
 Assuming the output log directory is `spanet_output/version_0`.
