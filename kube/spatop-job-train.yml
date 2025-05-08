@@ -1,0 +1,70 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: spatop-job-train-v1
+  labels:
+    jobgroup: spatop-job-train
+spec:
+  template:
+    spec:
+      securityContext:
+        runAsUser: 0
+        fsGroup: 0
+      containers:
+        - name: training
+          image: gitlab-registry.nrp-nautilus.io/jmduarte/hhh:latest
+          command:
+            - "python"
+          args:
+            - "-m"
+            - "spanet.train"
+            - -of
+            - "/spatopvol/options_files/spatop_v1.json"
+            - -l
+            - "/spatopvol/logs/"
+            - -n
+            - "v1_output"
+            - --epochs
+            - "2000"
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+            - mountPath: /spatopvol
+              name: spatopvol
+            - name: git-repo
+              mountPath: /opt/repo
+          resources:
+            limits:
+              memory: 64Gi
+              cpu: "16"
+              nvidia.com/gpu: "1"
+            requests:
+              memory: 32Gi
+              cpu: "8"
+              nvidia.com/gpu: "1"
+      initContainers:
+        - name: init-clone-repo
+          image: alpine/git
+          args:
+            - clone
+            - --single-branch
+            - https://github.com/tcoulvert/SPAtop
+            - -b
+            - topnet_dev
+            - --recurse-submodules
+            - /opt/repo/SPAtop
+          volumeMounts:
+            - name: git-repo
+              mountPath: /opt/repo
+      volumes:
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 8Gi
+        - name: git-repo
+          emptyDir: {}
+        - name: spatopvol
+          persistentVolumeClaim:
+            claimName: spatopvol
+      restartPolicy: Never
+  backoffLimit: 5
