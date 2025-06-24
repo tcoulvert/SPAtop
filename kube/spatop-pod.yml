@@ -7,8 +7,8 @@ spec:
     runAsUser: 0
     fsGroup: 0
   containers:
-  - name: gpu-container
-    image:  gitlab-registry.nrp-nautilus.io/jmduarte/hhh:latest
+  - name: spatop-container
+    image:  gitlab-registry.nrp-nautilus.io/mquinnan/top-spanet:spatop-container
     command: ["/bin/bash", "-c", "sleep infinity"]
     stdin: true
     tty: true
@@ -29,7 +29,3 @@ spec:
     - name: spatopvol
       persistentVolumeClaim:
         claimName: spatopvol
-  tolerations:
-    - key: "nautilus.io/axol1tl"
-      operator: "Exists"
-      effect: "NoSchedule"
