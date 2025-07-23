@@ -1,7 +1,7 @@
 #load packages
 import h5py
 import os
-import vector
+import vector as vec
 import awkward as ak
 
 #name filepath
@@ -25,7 +25,7 @@ with h5py.File(file_path, 'r') as f:
 print(f"found {len(bjet)} candidate events with 1 b-tagged jet")
 print(f"found {len(ljets)} candidate events with no b-tagged jets")
 
-#working version of the chi^2: first top only so far
+#working version of the chi^2:
 vec.register_awkward()
 
 with h5py.File(file_path, 'r') as f:
@@ -67,36 +67,79 @@ with h5py.File(file_path, 'r') as f:
 }] * len(jets))
 
 #finding ljets for top 1   
-for h in range(events):
-    jet_array = ak.Array([bjet, ljets])
-    ak.combinations(jet_array, 2, axis=0, fields=["jet1", "jet2"])
+ljet_pairs1 = ak.combinations(ljets, 2, axis=0, fields=["jet1", "jet2"])
     
-    ljets[i] = vector.awkward.from_awkward(jet_array.jet1)
-    ljets[j] = vector.awkward.from_awkward(jet_array.jet2)
-    
-    l1_index, j1 = ljets[i]
-    l2_index, j2 = ljets[j]
-    w = j1 +j2          
-    w_mass = w.mass                
-    chi2 = ((w_mass - 80.4)/10) **2 + ((mass_top - 172.5)/15) **2
-    
-    min_chi2_idx = ak.argmin(chi2, axis=1)
+l1_index, j1 = ljets[i]
+l2_index, j2 = ljets[j]
 
-best_pair = jet_array[min_chi2_idx]
-best_chi2 = chi2[min_chi2_idx]
+w = j1 +j2          
+w_mass = w.mass                
+chi2 = ((w_mass - 80.4)/10) **2 + ((mass_top - 172.5)/15) **2
+    
+min_chi2_idx1 = ak.argmin(chi2, axis=1)
+
+best_pairtop1 = ljet_pairs1[min_chi2_idx1]
+best_chi2top1 = chi2[min_chi2_idx1]
 
 #finding the corresponding bjets for top 1
 for k in range(events):
-    bjet_combos = ak.cartesian(jet_array, 2, axis=1)
-    vector_bjet  = vector.awkward.from_awkward(bjet_combos.bjet)
+    bjet_combos1 = ak.cartesian(ljet_pairs1, 2, axis=1)
+    vector_bjet1  = vector.awkward.from_awkward(bjet_combos1.bjet)
     
     top = w + b
     mass_top = top.mass          
-    chi2_top = ((w_mass - 80.4)/10) **2 + ((mass_top - 172.5)/15) **2
+    chi2_top1 = ((w_mass - 80.4)/10) **2 + ((mass_top - 172.5)/15) **2
     
-    best_bjet_idx = ak.argmin(chi2_top, axis=1)
+    best_bjet_idxtop1 = ak.argmin(chi2_top1, axis=1)
 
-best_combo = bjet_combos[best_bjet_idx]
-best_top_chi2 = chi2_top[best_bjet_idx]
+best_combotop1 = bjet_combos1[best_bjet_idxtop1]
+best_top1_chi2 = chi2_top1[best_bjet_idxtop1]
 
-#okay now time for top 2: must exclude all ljets/bjet used in the top 1 calculation (in progress)
+#okay now time for top 2: must exclude all ljets/bjet used in the top 1 calculation
+#excluding saved top1 candidate indices
+saved_ljetidx1 = ak.flatten([best_pairtop1.jet1.index, best_pairtop1.jet2.index])
+saved_bjetidx1 = best_combotop1.bjet.index
+total_saved = ak.flatten([saved_ljetidx1, saved_bjetidx1])
+
+unsaved_ljets = ljets[~ak.any(ljets.index[:, None] == saved_ljetidx1, axis=2)]
+unsaved_bjets = bjet[~ak.any(bjet.index[:, None] == saved_bjetidx1, axis=2)]
+
+unsaved_jets = jets[~ak.any(jets.index[:, None] == total_saved, axis=1)]
+
+#filtering through the unsaved ljets for top 2
+
+ljet_pairs2 = ak.combinations(ljets, 2, axis=0, fields=["jet1", "jet2"])
+    
+ljets[i] = vector.awkward.from_awkward(ljet_pairs2.jet1)
+ljets[j] = vector.awkward.from_awkward(ljet_pairs2.jet2)
+    
+l1_index, j1 = ljets[i]
+l2_index, j2 = ljets[j]
+w = j1 +j2          
+w_mass = w.mass                
+chi2 = ((w_mass - 80.4)/10) **2 + ((mass_top - 172.5)/15) **2
+    
+min_chi2_idx2 = ak.argmin(chi2, axis=1)
+
+best_pairtop2 = ljet_pairs2[min_chi2_idx2]
+best_chi2top2 = chi2[min_chi2_idx2]
+
+#finding the corresponding bjet for top 2
+for k in range(events):
+    bjet_combos2 = ak.cartesian(ljet_pairs2, 2, axis=1)
+    vector_bjet2  = vector.awkward.from_awkward(bjet_combos2.bjet)
+    
+    top = w + b
+    mass_top = top.mass          
+    chi2_top2 = ((w_mass - 80.4)/10) **2 + ((mass_top - 172.5)/15) **2
+    
+    best_bjet_idxtop2 = ak.argmin(chi2_top2, axis=1)
+
+best_combotop2 = bjet_combos2[best_bjet_idxtop2]
+best_top2_chi2 = chi2_top2[best_bjet_idxtop2]
+
+#print statements!!
+print("Best combination for top 1: ", best_combotop1)
+print("Chi^2 for the best combination for top 1: ", best_top1_chi2)
+print("Best combination for top 2: ", best_combotop2)
+print("Chi^2 for the best combination for top 2: ", best_top2_chi2)
