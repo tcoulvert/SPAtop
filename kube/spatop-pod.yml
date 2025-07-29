@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: spatop-pod
+spec:
+  securityContext:
+    runAsUser: 0
+    fsGroup: 0
+  containers:
+  - name: gpu-container
+    image:  gitlab-registry.nrp-nautilus.io/jmduarte/hhh:latest
+    command: ["/bin/bash", "-c", "sleep infinity"]
+    stdin: true
+    tty: true
+    resources:
+      limits:
+        nvidia.com/gpu: 1
+        memory: 30Gi
+        cpu: 4
+      requests:
+        nvidia.com/gpu: 1
+        memory: 30Gi
+        cpu: 3
+    volumeMounts:
+    - mountPath: /spatopvol
+      name: spatopvol
+  restartPolicy: Never
+  volumes:
+    - name: spatopvol
+      persistentVolumeClaim:
+        claimName: spatopvol
+  tolerations:
+    - key: "nautilus.io/axol1tl"
+      operator: "Exists"
+      effect: "NoSchedule"
