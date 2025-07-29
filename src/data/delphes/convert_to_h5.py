@@ -245,6 +245,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
             "phi": phi,
             "mass": mass,
             "flavor": flavor,
+            "btag": btag,
             "idx": ak.local_index(pt),
         },
         with_name="Momentum4D",
@@ -744,6 +745,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     datasets["INPUTS/BoostedJets/fj_chargedenergyfrac"] = to_np_array(fj_chargedenergyfrac, max_n=N_FJETS)
     datasets["INPUTS/BoostedJets/fj_nneutral"] = to_np_array(fj_nneutral, max_n=N_FJETS)
     datasets["INPUTS/BoostedJets/fj_ncharged"] = to_np_array(fj_ncharged, max_n=N_FJETS)
+    datasets["INPUTS/BoostedJets/matched_vfj_fj_idx"] = to_np_array(matched_vfj_fj_idx, max_n=N_FJETS)
 
     datasets["INPUTS/VeryBoostedJets/MASK"] = to_np_array(vfj_mask, max_n=N_VFJETS).astype("bool")
     datasets["INPUTS/VeryBoostedJets/vfj_pt"] = to_np_array(vfj_pt, max_n=N_VFJETS).astype("float32")

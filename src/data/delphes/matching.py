@@ -140,48 +140,6 @@ def match_top_to_fjet(
 
     return all_fjet_builder, bq1_fjet_builder, bq2_fjet_builder, qq_fjet_builder
 
-# @nb.njit
-# def match_top_to_jet(
-#     bquarks, wquarks1, wquarks2, jets, 
-#     alljet_builder, bjet_builder, wjet1_builder, wjet2_builder
-# ):
-#     for bquarks_event, wquarks1_event, wquarks2_event, jets_event in zip(
-#         bquarks, wquarks1, wquarks2, jets
-#     ):
-#         alljet_builder.begin_list()
-#         bjet_builder.begin_list()
-#         wjet1_builder.begin_list()
-#         wjet2_builder.begin_list()
-#         matched_dict = {}
-#         for i, (jet, jet_flav) in enumerate(zip(jets_event, jets_event.flavor)):
-#             alljet_match_idx, bjet_match_idx, wjet1_match_idx, wjet2_match_idx = -1, -1, -1, -1
-
-#             for j, (bquark, wquark1, wquark2) in enumerate(zip(
-#                 bquarks_event, wquarks1_event, wquarks2_event
-#             )):  # dont need to check b and w mother index b/c made them match by construction
-#                 if i == 0:
-#                     matched_dict[f"b_{j+1}"] = list()
-#                     matched_dict[f"w1_{j+1}"] = list()
-#                     matched_dict[f"w2_{j+1}"] = list()
-#                 matched_dict[f"b_{j+1}"].append(jet.deltaR(bquark) if jet.deltaR(bquark) < JET_DR and np.abs(jet_flav) == 5 else 999)
-#                 matched_dict[f"w1_{j+1}"].append(jet.deltaR(wquark1) if jet.deltaR(wquark1) < JET_DR else 999)
-#                 matched_dict[f"w2_{j+1}"].append(jet.deltaR(wquark2) if jet.deltaR(wquark2) < JET_DR else 999)
-
-
-#         for i, jet in enumerate(jets_event):
-
-#             alljet_builder.append(alljet_match_idx)
-#             bjet_builder.append(bjet_match_idx)
-#             wjet1_builder.append(wjet1_match_idx)
-#             wjet1_builder.append(wjet2_match_idx)
-
-#         alljet_builder.end_list()
-#         bjet_builder.end_list()
-#         wjet1_builder.end_list()
-#         wjet2_builder.end_list()
-
-#     return alljet_builder, bjet_builder, wjet1_builder, wjet2_builder
-
 @nb.njit
 def match_top_to_jet(
     bquarks, wquarks1, wquarks2, jets, 
@@ -195,15 +153,15 @@ def match_top_to_jet(
         wjet1_builder.begin_list()
         wjet2_builder.begin_list()
         matched_set = set()
-        for i, (jet, jet_flav) in enumerate(zip(jets_event, jets_event.flavor)):
+        for i, (jet, jet_btag) in enumerate(zip(jets_event, jets_event.btag)):
             alljet_match_idx, bjet_match_idx, wjet1_match_idx, wjet2_match_idx = -1, -1, -1, -1
 
             mindeltaR, mindeltaR_idxs = 999, (-1, -1)  # mindeltaR, (mindeltaR_topidx, mindeltaR_quarktype)
             for j, (bquark, wquark1, wquark2) in enumerate(zip(
                 bquarks_event, wquarks1_event, wquarks2_event
             )):  # dont need to check b and w mother index b/c made them match by construction
-                # bquark_deltaR = jet.deltaR(bquark) if jet.deltaR(bquark) < JET_DR and np.abs(jet_flav) == 5 and f'b_{j+1}' not in matched_set else 999
-                bquark_deltaR = jet.deltaR(bquark) if jet.deltaR(bquark) < JET_DR and f'b_{j+1}' not in matched_set else 999
+                bquark_deltaR = jet.deltaR(bquark) if jet.deltaR(bquark) < JET_DR and jet_btag and f'b_{j+1}' not in matched_set else 999
+                # bquark_deltaR = jet.deltaR(bquark) if jet.deltaR(bquark) < JET_DR and f'b_{j+1}' not in matched_set else 999
                 wquark1_deltaR = jet.deltaR(wquark1) if jet.deltaR(wquark1) < JET_DR and f'w1_{j+1}' not in matched_set else 999
                 wquark2_deltaR = jet.deltaR(wquark2) if jet.deltaR(wquark2) < JET_DR and f'w2_{j+1}' not in matched_set else 999
 
