@@ -5,7 +5,7 @@ import vector as vec
 import awkward as ak
 
 #name filepath
-file_path = "/Users/laurencadle/Downloads/tt_hadronic_training_ak15_gen1.h5"
+file_path = "/Users/laurencadle/Downloads/tt_hadronic_testing.h5"
 with h5py.File(file_path, "r") as f:
     print("keys in the file: ", list(f.keys()))
 
@@ -38,11 +38,11 @@ with h5py.File(file_path, 'r') as f:
     #define 4 vector + btag
     jets = ak.zip(
         {
-             "pt": pt, 
-             "eta": eta,
-             "phi": phi, 
-             "mass": mass,
-             "btag": btag,
+             "pt": pt[:1000], 
+             "eta": eta[:1000],
+             "phi": phi[:1000], 
+             "mass": mass[:1000],
+             "btag": btag[:1000],
          }, 
              with_name = 'Momentum4D'
              )
@@ -68,15 +68,15 @@ with h5py.File(file_path, 'r') as f:
 
 #finding ljets for top 1   
 ljet_pairs1 = ak.combinations(ljets, 2, axis=0, fields=["jet1", "jet2"])
-    
-l1_index, j1 = ljets[i]
-l2_index, j2 = ljets[j]
 
-w = j1 +j2          
-w_mass = w.mass                
+w = ljet_pairs1.jet1 + ljet_pairs1.jet2         
+w_mass = w.mass
+pair1 = ak.cartesian({'w': w, 'b': bjet}, axis=0)
+top = pair1['w'] + pair1['b']
+mass_top = top.mass                
 chi2 = ((w_mass - 80.4)/10) **2 + ((mass_top - 172.5)/15) **2
     
-min_chi2_idx1 = ak.argmin(chi2, axis=1)
+min_chi2_idx1 = ak.argmin(chi2, axis=0)
 
 best_pairtop1 = ljet_pairs1[min_chi2_idx1]
 best_chi2top1 = chi2[min_chi2_idx1]
@@ -86,7 +86,7 @@ for k in range(events):
     bjet_combos1 = ak.cartesian(ljet_pairs1, 2, axis=1)
     vector_bjet1  = vector.awkward.from_awkward(bjet_combos1.bjet)
     
-    top = w + b
+    top = pair1['w'] + pair1['b']
     mass_top = top.mass          
     chi2_top1 = ((w_mass - 80.4)/10) **2 + ((mass_top - 172.5)/15) **2
     
@@ -129,7 +129,8 @@ for k in range(events):
     bjet_combos2 = ak.cartesian(ljet_pairs2, 2, axis=1)
     vector_bjet2  = vector.awkward.from_awkward(bjet_combos2.bjet)
     
-    top = w + b
+    pair2 = ak.cartesian({'w': w, 'b': bjet}, axis=1)
+    top = pair2['w'] + pair2['b']
     mass_top = top.mass          
     chi2_top2 = ((w_mass - 80.4)/10) **2 + ((mass_top - 172.5)/15) **2
     
