@@ -12,11 +12,11 @@ def reset_collision_dp(dps, aps):
     return dps_reset
 
 
-def dp_to_HiggsNumProb(dps):
+def dp_to_TopNumProb(dps):
     # get maximum number of targets
     Nmax = dps.shape[-1]
 
-    # prepare a list for constructing [P_0H, P_1H, P_2H, ...]
+    # prepare a list for constructing [P_0t, P_1t, P_2t, ...]
     probs = []
 
     # loop through all possible number of existing targets
@@ -56,32 +56,32 @@ def dp_to_HiggsNumProb(dps):
 # if bins=None, put all data in a single bin
 def calc_eff(LUT_boosted_pred, LUT_resolved_pred, bins):
 
-    predHs = []
+    predTops = []
 
     if LUT_boosted_pred is not None:
         # boosted H don't need post processing
-        predHs_boosted = [predH for event in LUT_boosted_pred for predH in event]
-        predHs += predHs_boosted
+        predTops_boosted = [predTop for event in LUT_boosted_pred for predTop in event]
+        predTops += predTops_boosted
 
     if LUT_resolved_pred is not None:
         if LUT_boosted_pred is not None:
             # calculate merged efficiency
-            # Remove overlapped resolved H_reco
-            predHs_resolved = [predH[0:2] for event in LUT_resolved_pred for predH in event if predH[2] == 0]
-            predHs += predHs_resolved
+            # Remove overlapped resolved Top_reco
+            predTops_resolved = [predTop[0:2] for event in LUT_resolved_pred for predTop in event if predTop[2] == 0]
+            predTops += predTops_resolved
         else:
             # calculate resolved efficiency
-            predHs_resolved = [predH[0:2] for event in LUT_resolved_pred for predH in event]
-            predHs += predHs_resolved
+            predTops_resolved = [predTop[0:2] for event in LUT_resolved_pred for predTop in event]
+            predTops += predTops_resolved
 
     # then merge into the list with their pT
-    predHs = np.array(predHs)
+    predTops = np.array(predTops)
 
-    predHs_inds = np.digitize(predHs[:, 1], bins)
+    predTops_inds = np.digitize(predTops[:, 1], bins)
 
     correctTruth_per_bin = []
     for bin_i in range(1, len(bins) + 1):
-        correctTruth_per_bin.append(predHs[:, 0][predHs_inds == bin_i])
+        correctTruth_per_bin.append(predTops[:, 0][predTops_inds == bin_i])
     correctTruth_per_bin = ak.Array(correctTruth_per_bin)
 
     means = ak.mean(correctTruth_per_bin, axis=-1)
@@ -97,31 +97,31 @@ def calc_eff(LUT_boosted_pred, LUT_resolved_pred, bins):
 # calculate purity
 def calc_pur(LUT_boosted_target, LUT_resolved_target, bins):
 
-    targetHs = []
+    targetTops = []
 
     if LUT_boosted_target is not None:
-        # boosted H don't need post processing
-        targetHs_boosted = [targetH for event in LUT_boosted_target for targetH in event]
-        targetHs += targetHs_boosted
+        # boosted Top don't need post processing
+        targetTops_boosted = [targetTop for event in LUT_boosted_target for targetTop in event]
+        targetTops += targetTops_boosted
 
     if LUT_resolved_target is not None:
         if LUT_boosted_target is not None:
             # calculate merged purity
-            # only consider resolved target H that doesn't have a corresponding boosted H target
-            targetHs_resolved = [targetH[0:2] for event in LUT_resolved_target for targetH in event if targetH[2] == 0]
-            targetHs += targetHs_resolved
+            # only consider resolved target Top that doesn't have a corresponding boosted Top target
+            targetTops_resolved = [targetTop[0:2] for event in LUT_resolved_target for targetTop in event if targetTop[2] == 0]
+            targetTops += targetTops_resolved
         else:
             # calculate resolved only purity
-            targetHs_resolved = [targetH[0:2] for event in LUT_resolved_target for targetH in event]
-            targetHs += targetHs_resolved
+            targetTops_resolved = [targetTop[0:2] for event in LUT_resolved_target for targetTop in event]
+            targetTops += targetTops_resolved
 
-    targetHs = np.array(targetHs)
+    targetTops = np.array(targetTops)
 
-    targetHs_inds = np.digitize(targetHs[:, 1], bins)
+    targetTops_inds = np.digitize(targetTops[:, 1], bins)
 
     correctTruth_per_bin = []
     for bin_i in range(1, len(bins) + 1):
-        correctTruth_per_bin.append(targetHs[:, 0][targetHs_inds == bin_i])
+        correctTruth_per_bin.append(targetTops[:, 0][targetTops_inds == bin_i])
     correctTruth_per_bin = ak.Array(correctTruth_per_bin)
 
     means = ak.mean(correctTruth_per_bin, axis=-1)
