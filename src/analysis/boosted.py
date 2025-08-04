@@ -56,11 +56,11 @@ def gen_pred_FBt_LUT(bqq_ps_passed, bqq_ts_selected, fj_pts, builder):
 
         for i, bqq_p in enumerate(bqq_p_event):
 
-            correct = 0
+            correct = 0.
             predFBt_pt = fj_pt_event[bqq_p - (N_AK4_JETS + N_AK8_JETS)]
             for bqq_t in bqq_t_event:
                 if bqq_p == bqq_t + (N_AK4_JETS + N_AK8_JETS):
-                    correct = 1
+                    correct = 1.
 
             builder.begin_list()
             builder.append(correct)
@@ -86,11 +86,11 @@ def gen_target_FBt_LUT(bqq_ps_passed, bqq_ts_selected, targetFBt_pts, builder):
 
         for i, bqq_t in enumerate(bqq_t_event):
 
-            retrieved = 0
+            retrieved = 0.
             targetFBt_pt = targetH_pts_event[i]
             for bqq_p in bqq_p_event:
                 if bqq_p == bqq_t + (N_AK4_JETS + N_AK8_JETS):
-                    retrieved = 1
+                    retrieved = 1.
 
             builder.begin_list()
             builder.append(retrieved)
@@ -161,9 +161,7 @@ def parse_boosted_w_target(
     bqq_ps = np.concatenate((bqq_FBt1_p.reshape(-1, 1), bqq_FBt2_p.reshape(-1, 1)), axis=1)
     bqq_ps = ak.Array(bqq_ps)
     dps = np.concatenate((dp_FBt1.reshape(-1, 1), dp_FBt2.reshape(-1, 1)), axis=1)
-    dps = ak.Array(dps)
     aps = np.concatenate((ap_FBt1.reshape(-1, 1), ap_FBt2.reshape(-1, 1)), axis=1)
-    aps = ak.Array(aps)
 
 
     # collect veryfatjet kinematics

@@ -59,7 +59,7 @@ def calc_eff(LUT_boosted_pred, LUT_resolved_pred, bins):
     predTops = []
 
     if LUT_boosted_pred is not None:
-        # boosted H don't need post processing
+        # boosted Top don't need post processing
         predTops_boosted = [predTop for event in LUT_boosted_pred for predTop in event]
         predTops += predTops_boosted
 

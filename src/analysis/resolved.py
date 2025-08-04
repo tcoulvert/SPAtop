@@ -51,7 +51,7 @@ def sel_pred_FRt_by_dp_ap(dps, aps, b_ps, q1_ps, q2_ps):
 
     return b_ps_passed, q1_ps_passed, q2_ps_passed
 
-def sel_target_FRt_by_mask(b_ts, q1_ts, q2_ts, FRt_pts, bi_cat_FRt, FRt_masks):
+def sel_target_FRt_by_mask(b_ts, q1_ts, q2_ts, FRt_pts, FRt_overlap, FRt_masks):
     b_ts_selected = b_ts.mask[FRt_masks]
     b_ts_selected = ak.drop_none(b_ts_selected)
 
@@ -64,18 +64,18 @@ def sel_target_FRt_by_mask(b_ts, q1_ts, q2_ts, FRt_pts, bi_cat_FRt, FRt_masks):
     FRt_selected_pts = FRt_pts.mask[FRt_masks]
     FRt_selected_pts = ak.drop_none(FRt_selected_pts)
 
-    bi_cat_FRt_passed = bi_cat_FRt.mask[FRt_masks]
-    bi_cat_FRt_passed = ak.drop_none(bi_cat_FRt_passed)
+    FRt_overlap_passed = FRt_overlap.mask[FRt_masks]
+    FRt_overlap_passed = ak.drop_none(FRt_overlap_passed)
 
-    return b_ts_selected, q1_ts_selected, q2_ts_selected, FRt_selected_pts, bi_cat_FRt_passed
+    return b_ts_selected, q1_ts_selected, q2_ts_selected, FRt_selected_pts, FRt_overlap_passed
 
 
 # A pred look up table is in shape
 # [event,
-#    pred_top,
-#       [correct_or_not, pt, overlap_w_top_reco, has_boost_top_target, which_top_target]]
+#    pred_FRt,
+#       [correct_or_not, pt, overlap_w_FRt_reco, has_boost_FBt_target, which_FRt_target]]
 @nb.njit
-def gen_pred_h_LUT(
+def gen_pred_FRt_LUT(
     b_ps_passed, q1_ps_passed, q2_ps_passed, 
     b_ts_selected, q1_ts_selected, q2_ts_selected, 
     js, goodJetIdx, FBt_overlap_selected, 
@@ -87,7 +87,7 @@ def gen_pred_h_LUT(
         b_ts_selected, q1_ts_selected, q2_ts_selected, 
         js, goodJetIdx, FBt_overlap_selected
     ):
-        # for each predicted bb assignment, check if any target H have a same bb assignment
+        # for each predicted FRt assignment, check if any target t have a same FBt assignment
         builder.begin_list()
 
         for b_p, q1_p, q2_p in zip(b_ps_e, q1_ps_e, q2_ps_e):
@@ -127,10 +127,10 @@ def gen_pred_h_LUT(
 # A target look up table is in shape
 # [event,
 #    target_top,
-#        target_bb_assign,
-#           [retrieved, targettop_pt, can_boost_reco]]
+#        target_FBt_assign,
+#           [retrieved, targetFRt_pt, can_boost_reco]]
 @nb.njit
-def gen_target_h_LUT(
+def gen_target_FRt_LUT(
     b_ps_passed, q1_ps_passed, q2_ps_passed, 
     b_ts_selected, q1_ts_selected, q2_ts_selected, 
     FRt_pts, FBt_overlap_selected, 
@@ -208,8 +208,7 @@ def parse_resolved_w_target(
         FRt_overlap = FRt_masks & (SRqqt_masks | SRbqt_masks | FBt_masks)  # FR / all overlap
     else:
         raise Exception(f"Overlap criteria {overlap} not implemented, try \'Boosted\' or \'All\'.")
-    FRt_overlap = FRt_overlap.astype(float)
-    FRt_overlap = ak.Array(FRt_overlap)
+    FRt_overlap = ak.Array(ak.to_numpy(FRt_overlap).astype(float))  # necessary for downstream analysis, b/c NumPy requires uniform typing
 
 
     # target jets
@@ -264,12 +263,10 @@ def parse_resolved_w_target(
     dp_FRt1 = np.array(predfile[predfile_dict["TARGETS"]]["FRt1"]["detection_probability"])
     dp_FRt2 = np.array(predfile[predfile_dict["TARGETS"]]["FRt2"]["detection_probability"])
     dps = np.concatenate((dp_FRt1.reshape(-1, 1), dp_FRt2.reshape(-1, 1)), axis=1)
-    dps = ak.Array(dps)
     # jet assignment probability
     ap_FRt1 = np.array(predfile[predfile_dict["TARGETS"]]["FRt1"]["assignment_probability"])
     ap_FRt2 = np.array(predfile[predfile_dict["TARGETS"]]["FRt2"]["assignment_probability"])
     aps = np.concatenate((ap_FRt1.reshape(-1, 1), ap_FRt2.reshape(-1, 1)), axis=1)
-    aps = ak.Array(aps)
     # convert some numpy arrays to ak arrays
     dps = reset_collision_dp(dps, aps)
 
@@ -297,21 +294,21 @@ def parse_resolved_w_target(
     b_ps_selected, q1_ps_selected, q2_ps_selected = sel_pred_FRt_by_dp_ap(dps, aps, b_ps, q1_ps, q2_ps)
 
 
-    # find jets that are overlapped with reco boosted Higgs
+    # find jets that are overlapped with reco boosted top
     if fjs_reco is None:
         goodJetIdx = ak.local_index(js)
     else:
-        goodJetIdx = get_unoverlapped_jet_index(fjs_reco, js, dR_min=0.4)
+        goodJetIdx = get_unoverlapped_jet_index(fjs_reco, js, dR_min=0.8)
 
 
     # generate look up tables
-    LUT_pred = gen_pred_h_LUT(
+    LUT_pred = gen_pred_FRt_LUT(
         b_ps_selected, q1_ps_selected, q2_ps_selected, 
         b_ts_selected, q1_ts_selected, q2_ts_selected, 
         js, goodJetIdx, overlap_selected, 
         ak.ArrayBuilder()
     ).snapshot()
-    LUT_target = gen_target_h_LUT(
+    LUT_target = gen_target_FRt_LUT(
         b_ps_selected, q1_ps_selected, q2_ps_selected,
         b_ts_selected, q1_ts_selected, q2_ts_selected, 
         FRt_selected_pts, overlap_selected,
