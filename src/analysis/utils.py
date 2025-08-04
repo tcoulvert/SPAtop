@@ -2,7 +2,7 @@ import itertools
 
 import awkward as ak
 import numpy as np
-from coffea.hist.plot import clopper_pearson_interval
+from hist.intervals import clopper_pearson_interval
 
 
 def reset_collision_dp(dps, aps):
