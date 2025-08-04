@@ -21,7 +21,7 @@ W_MASS = 80.37  # GeV
 PLOT_CHI2_HISTS = False
 PLOT_ROCS = True
 
-file_path = "/storage/af/user/tsievert/topNet/SPAtop/data/delphes/v4/tt_hadronic_testing_SLIMMED.h5"
+file_path = os.path.join(DIRPATH, "../../data/delphes/v4/tt_hadronic_testing_SLIMMED.h5")
 # 1) Load arrays
 with h5py.File(file_path, "r") as f:
     pt   = f['INPUTS/Jets/pt'][:]
