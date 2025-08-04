@@ -1,0 +1,51 @@
+#import packages!
+import h5py
+import os
+import vector
+import awkward as ak
+import matplotlib.pyplot as plt 
+import numpy as np
+
+#make the file path
+file_path = "/Users/laurencadle/Downloads/tt_hadronic_testing.h5"
+with h5py.File(file_path, 'r') as f: 
+    very_fat_jets = f['INPUTS/VeryBoostedJets']
+
+#vfj_mass
+with h5py.File(file_path, 'r') as f:
+    pt = f['INPUTS/VeryBoostedJets/vfj_pt'][:]
+    eta = f['INPUTS/VeryBoostedJets/vfj_eta'][:]
+    phi = f['INPUTS/VeryBoostedJets/vfj_phi'][:]
+    mass = f['INPUTS/VeryBoostedJets/vfj_mass'][:]
+    
+    very_fat_jets = ak.zip({
+    "pt": pt,
+    "eta": eta,
+    "phi": phi,
+    "mass": mass 
+    }, with_name="Momentum4D")
+
+#chi2 calculations only rely on the mass of the fat jets vs the top
+vf_jets = ak.flatten(very_fat_jets)
+
+top_mass = 172.52
+mass_diff = abs(vf_jets.mass - top_mass)
+
+#save the indices and jets!
+best2_indices = ak.argsort(mass_diff)[:2]
+best2_jets = vf_jets[best2_indices]
+
+print("Best 2 jets closest to top mass:")
+print(ak.to_list(best2_jets))
+print("Indices of the best 2 jets: ", best2_indices)
+
+#time to make plots!
+vfj_mass = ak.to_numpy(vf_jets.mass)
+
+plt.hist(vfj_mass, bins = 100, label = 'VFJ masses', color = 'turquoise', alpha = 0.5)
+plt.axvline(top_mass, color = 'pink', linestyle = 'solid', linewidth =  2, label = 'Mass of top (172.52 GeV)')
+plt.title("Very Fat Jet Mass Distributions")
+plt.xlabel('Mass (GeV)')
+plt.ylabel('Number of Jets')
+plt.legend()
+plt.show()

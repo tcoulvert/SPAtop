@@ -1,0 +1,146 @@
+#load packages
+import h5py
+import os
+import vector as vec
+import awkward as ak
+
+#name filepath
+file_path = "/Users/laurencadle/Downloads/tt_hadronic_testing.h5"
+with h5py.File(file_path, "r") as f:
+    print("keys in the file: ", list(f.keys()))
+
+#find number of bjets and number of ljets
+bjet = []
+ljets = []
+
+with h5py.File(file_path, 'r') as f:
+    btag = f['INPUTS/Jets/btag'][:]
+    events = btag.shape[0]
+    for event_index in range(btag.shape[0]):
+        if np.any(btag[event_index] ==1):
+            bjet.append(event_index)
+        else: 
+            ljets.append(event_index)
+            
+print(f"found {len(bjet)} candidate events with 1 b-tagged jet")
+print(f"found {len(ljets)} candidate events with no b-tagged jets")
+
+#working version of the chi^2:
+vec.register_awkward()
+
+with h5py.File(file_path, 'r') as f:
+    pt = f['INPUTS/Jets/pt'][:]
+    eta = f['INPUTS/Jets/eta'][:]
+    phi = f['INPUTS/Jets/phi'][:]
+    mass = f['INPUTS/Jets/mass'][:]
+    btag = f['INPUTS/Jets/btag'][:]
+    
+    #define 4 vector + btag
+    jets = ak.zip(
+        {
+             "pt": pt[:1000], 
+             "eta": eta[:1000],
+             "phi": phi[:1000], 
+             "mass": mass[:1000],
+             "btag": btag[:1000],
+         }, 
+             with_name = 'Momentum4D'
+             )
+    #keep track of indices so i can later exclude the indices of the jets of the best top
+    jets = ak.with_field(jets, ak.local_index(jets), "index") 
+    
+    #set bjet and ljet requirements
+    bjet = jets[jets.btag ==1]
+    ljets = jets[jets.btag ==0]
+    
+    #i need to make pretend (dummy) jets to make sure i only include combos that are 2 light jets
+    pretend_jet = ak.zip({
+            "pt": 0.0,
+            "eta": 0.0,
+            "phi": 0.0,
+            "mass": 0.0,
+            "btag": 0.0,
+        })
+    pretend_jetpair = ak.Array([{
+    "jet1": pretend_jet,
+    "jet2": pretend_jet
+}] * len(jets))
+
+#finding ljets for top 1   
+ljet_pairs1 = ak.combinations(ljets, 2, axis=0, fields=["jet1", "jet2"])
+
+w = ljet_pairs1.jet1 + ljet_pairs1.jet2         
+w_mass = w.mass
+pair1 = ak.cartesian({'w': w, 'b': bjet}, axis=0)
+top = pair1['w'] + pair1['b']
+mass_top = top.mass                
+chi2 = ((w_mass - 80.4)/10) **2 + ((mass_top - 172.5)/15) **2
+    
+min_chi2_idx1 = ak.argmin(chi2, axis=0)
+
+best_pairtop1 = ljet_pairs1[min_chi2_idx1]
+best_chi2top1 = chi2[min_chi2_idx1]
+
+#finding the corresponding bjets for top 1
+for k in range(events):
+    bjet_combos1 = ak.cartesian(ljet_pairs1, 2, axis=1)
+    vector_bjet1  = vector.awkward.from_awkward(bjet_combos1.bjet)
+    
+    top = pair1['w'] + pair1['b']
+    mass_top = top.mass          
+    chi2_top1 = ((w_mass - 80.4)/10) **2 + ((mass_top - 172.5)/15) **2
+    
+    best_bjet_idxtop1 = ak.argmin(chi2_top1, axis=1)
+
+best_combotop1 = bjet_combos1[best_bjet_idxtop1]
+best_top1_chi2 = chi2_top1[best_bjet_idxtop1]
+
+#okay now time for top 2: must exclude all ljets/bjet used in the top 1 calculation
+#excluding saved top1 candidate indices
+saved_ljetidx1 = ak.flatten([best_pairtop1.jet1.index, best_pairtop1.jet2.index])
+saved_bjetidx1 = best_combotop1.bjet.index
+total_saved = ak.flatten([saved_ljetidx1, saved_bjetidx1])
+
+unsaved_ljets = ljets[~ak.any(ljets.index[:, None] == saved_ljetidx1, axis=2)]
+unsaved_bjets = bjet[~ak.any(bjet.index[:, None] == saved_bjetidx1, axis=2)]
+
+unsaved_jets = jets[~ak.any(jets.index[:, None] == total_saved, axis=1)]
+
+#filtering through the unsaved ljets for top 2
+
+ljet_pairs2 = ak.combinations(ljets, 2, axis=0, fields=["jet1", "jet2"])
+    
+ljets[i] = vector.awkward.from_awkward(ljet_pairs2.jet1)
+ljets[j] = vector.awkward.from_awkward(ljet_pairs2.jet2)
+    
+l1_index, j1 = ljets[i]
+l2_index, j2 = ljets[j]
+w = j1 +j2          
+w_mass = w.mass                
+chi2 = ((w_mass - 80.4)/10) **2 + ((mass_top - 172.5)/15) **2
+    
+min_chi2_idx2 = ak.argmin(chi2, axis=1)
+
+best_pairtop2 = ljet_pairs2[min_chi2_idx2]
+best_chi2top2 = chi2[min_chi2_idx2]
+
+#finding the corresponding bjet for top 2
+for k in range(events):
+    bjet_combos2 = ak.cartesian(ljet_pairs2, 2, axis=1)
+    vector_bjet2  = vector.awkward.from_awkward(bjet_combos2.bjet)
+    
+    pair2 = ak.cartesian({'w': w, 'b': bjet}, axis=1)
+    top = pair2['w'] + pair2['b']
+    mass_top = top.mass          
+    chi2_top2 = ((w_mass - 80.4)/10) **2 + ((mass_top - 172.5)/15) **2
+    
+    best_bjet_idxtop2 = ak.argmin(chi2_top2, axis=1)
+
+best_combotop2 = bjet_combos2[best_bjet_idxtop2]
+best_top2_chi2 = chi2_top2[best_bjet_idxtop2]
+
+#print statements!!
+print("Best combination for top 1: ", best_combotop1)
+print("Chi^2 for the best combination for top 1: ", best_top1_chi2)
+print("Best combination for top 2: ", best_combotop2)
+print("Chi^2 for the best combination for top 2: ", best_top2_chi2)
