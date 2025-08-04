@@ -1,10 +1,7 @@
 import awkward as ak
-import click
-import h5py as h5
 import numba as nb
 import numpy as np
 import vector
-
 vector.register_awkward()
 
 from src.analysis.utils import dp_to_TopNumProb, reset_collision_dp
@@ -50,6 +47,7 @@ def sel_target_FBt_by_mask(bqq_ts, FBt_pts, FBt_masks):
 # [event,
 #    pred_FBt,
 #       [correct, pred_FBt_pt]]
+@nb.njit
 def gen_pred_FBt_LUT(bqq_ps_passed, bqq_ts_selected, fj_pts, builder):
     # for each event
     for bqq_t_event, bqq_p_event, fj_pt_event in zip(bqq_ts_selected, bqq_ps_passed, fj_pts):
@@ -79,6 +77,7 @@ def gen_pred_FBt_LUT(bqq_ps_passed, bqq_ts_selected, fj_pts, builder):
 #    target_FBt,
 #        target_bqq_assign,
 #           [retrieved, targetFBt_pt]]
+@nb.njit
 def gen_target_FBt_LUT(bqq_ps_passed, bqq_ts_selected, targetFBt_pts, builder):
     # for each event
     for bqq_t_event, bqq_p_event, targetH_pts_event in zip(bqq_ts_selected, bqq_ps_passed, targetFBt_pts):

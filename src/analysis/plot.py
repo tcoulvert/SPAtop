@@ -65,8 +65,8 @@ def calc_pur_eff(target_path, pred_path, bins):
     return results
 
 
-# I started to use "efficiency" for describing how many gen Higgs were reconstructed
-# and "purity" for desrcribing how many reco Higgs are actually gen Higgs
+# I started to use "efficiency" for describing how many gen tops were reconstructed
+# and "purity" for desrcribing how many reco tops are actually gen tops
 def plot_pur_eff_w_dict(plot_dict, target_path, save_path=None, proj_name=None, bins=None):
     if bins == None:
         bins = np.arange(0, 1050, 50)
@@ -85,44 +85,44 @@ def plot_pur_eff_w_dict(plot_dict, target_path, save_path=None, proj_name=None, 
 
     # preset figure labels, titles, limits, etc.
     ax_m[0].set(
-        xlabel=r"Merged Reco H pT (GeV)",
+        xlabel=r"Merged Reco top pT (GeV)",
         ylabel=r"Reconstruction Purity",
-        title=f"Reconstruction Purity vs. Merged Reco H pT",
+        title=f"Reconstruction Purity vs. Merged Reco top pT",
     )
     ax_m[1].set(
-        xlabel=r"Merged Gen H pT (GeV)",
+        xlabel=r"Merged Gen top pT (GeV)",
         ylabel=r"Reconstruction Efficiency",
-        title=f"Reconstruction Efficiency vs. Merged Gen H pT",
+        title=f"Reconstruction Efficiency vs. Merged Gen top pT",
     )
     ax_b[0].set(
-        xlabel=r"Reco Boosted H pT (GeV)",
+        xlabel=r"Reco Boosted top pT (GeV)",
         ylabel=r"Reconstruction Purity",
-        title=f"Reconstruction Purity vs. Reco Boosted H pT",
+        title=f"Reconstruction Purity vs. Reco Boosted top pT",
     )
     ax_b[1].set(
-        xlabel=r"Gen Boosted H pT (GeV)",
+        xlabel=r"Gen Boosted top pT (GeV)",
         ylabel=r"Reconstruction Efficiency",
-        title=f"Reconstruction Efficiency vs. Gen Boosted H pT",
+        title=f"Reconstruction Efficiency vs. Gen Boosted top pT",
     )
     ax_r[0].set(
-        xlabel=r"Reco Resolved H pT (GeV)",
+        xlabel=r"Reco Resolved top pT (GeV)",
         ylabel=r"Reconstruction Purity",
-        title=f"Reconstruction Purity vs. Reco Resolved H pT",
+        title=f"Reconstruction Purity vs. Reco Resolved top pT",
     )
     ax_r[1].set(
-        xlabel=r"Gen Resolved H pT (GeV)",
+        xlabel=r"Gen Resolved top pT (GeV)",
         ylabel=r"Reconstruction Efficiency",
-        title=f"Reconstruction Efficiency vs. Gen Resolved H pT",
+        title=f"Reconstruction Efficiency vs. Gen Resolved top pT",
     )
     ax_r_or[0].set(
-        xlabel=r"Reco Resolved H pT (GeV)",
+        xlabel=r"Reco Resolved top pT (GeV)",
         ylabel=r"Reconstruction Purity",
-        title=f"Resolved Purity After OR  vs. Reco Resolved H pT",
+        title=f"Resolved Purity After OR  vs. Reco Resolved top pT",
     )
     ax_r_or[1].set(
-        xlabel=r"Gen Resolved H pT (GeV)",
+        xlabel=r"Gen Resolved top pT (GeV)",
         ylabel=r"Reconstruction Efficiency",
-        title=f"Resolved Efficiency After OR vs. Gen Resolved H pT",
+        title=f"Resolved Efficiency After OR vs. Gen Resolved top pT",
     )
 
     # plot purities and efficiencies

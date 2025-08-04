@@ -1,10 +1,7 @@
 import awkward as ak
-import click
-import h5py as h5
 import numba as nb
 import numpy as np
 import vector
-
 vector.register_awkward()
 
 from src.analysis.utils import dp_to_TopNumProb, reset_collision_dp
@@ -12,7 +9,7 @@ from src.analysis.utils import dp_to_TopNumProb, reset_collision_dp
 N_AK4_JETS = 10
 N_AK8_JETS = 2
 N_AK15_JETS = 2
-
+N_TOPS = 2
 
 def get_unoverlapped_jet_index(fjs, js, dR_min=0.5):
     overlapped = ak.sum(js[:, np.newaxis].deltaR(fjs) < dR_min, axis=-2) > 0
