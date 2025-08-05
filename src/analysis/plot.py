@@ -177,7 +177,7 @@ def plot_pur_eff_w_dict(plot_dict, target_path, save_path=None, proj_name=None, 
     plt.show()
 
     if save_path is not None:
-        fig_m.savefig(os.path.join(save_path, 'proj_name_merged.pdf'))
+        fig_m.savefig(os.path.join(save_path, proj_name+'_merged.pdf'))
         fig_b.savefig(os.path.join(save_path, proj_name+'_boosted.pdf'))
         fig_r.savefig(os.path.join(save_path, proj_name+'_resolved.pdf'))
         fig_r_or.savefig(os.path.join(save_path, proj_name+'_resolved_wOR.pdf'))
