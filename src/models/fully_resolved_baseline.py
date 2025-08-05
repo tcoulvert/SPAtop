@@ -79,7 +79,7 @@ for i in range(N_TOPS):
     top_dict[f'FRt{i+1}_b'] = best_t.b.index
     top_dict[f'FRt{i+1}_q1'] = best_t.w.j1.index
     top_dict[f'FRt{i+1}_q2'] = best_t.w.j2.index
-    top_dict[f'FRt{i+1}_pt'] = best_t.pt
+    top_dict[f'FRt{i+1}_pt'] = best_t.top_pt
     top_dict[f'FRt{i+1}_chi2'] = ak.firsts(chi2_all1[ak.local_index(chi2_all1) == idx1])
 
     # 7) Build ak arrays of unused jets
@@ -94,15 +94,18 @@ if SAVE_H5:
     out_filepath = os.path.join(DIRPATH, "../../data/delphes/v4/tt_hadronic_baseline.h5")
     with h5py.File(out_filepath, 'a') as f:
         with h5py.File(file_path, 'r') as test_f:
-            f['INPUTS'] = test_f['INPUTS']
+            for jet_class in test_f['INPUTS'].keys():
+                for variable in test_f['INPUTS'][jet_class].keys():
+                    if f'INPUTS/{jet_class}/{variable}' not in f:
+                        f[f'INPUTS/{jet_class}/{variable}'] = test_f[f'INPUTS/{jet_class}/{variable}'][:]
 
         for i in range(N_TOPS):
-            f[f'TARGETS/FRt{i+1}/mask'] = ak.to_numpy(top_dict[f't{i+1}_mask'])
-            f[f'TARGETS/FRt{i+1}/b'] = ak.to_numpy(top_dict[f't{i+1}_b'])
-            f[f'TARGETS/FRt{i+1}/q1'] = ak.to_numpy(top_dict[f't{i+1}_q1'])
-            f[f'TARGETS/FRt{i+1}/q2'] = ak.to_numpy(top_dict[f't{i+1}_q2'])
-            f[f'TARGETS/FRt{i+1}/pt'] = ak.to_numpy(top_dict[f't{i+1}_pt'])
-            f[f'TARGETS/FRt{i+1}/chi2'] = ak.to_numpy(top_dict[f't{i+1}_chi2'])
+            f[f'TARGETS/FRt{i+1}/mask'] = ak.to_numpy(top_dict[f'FRt{i+1}_mask'])
+            f[f'TARGETS/FRt{i+1}/b'] = ak.to_numpy(top_dict[f'FRt{i+1}_b'])
+            f[f'TARGETS/FRt{i+1}/q1'] = ak.to_numpy(top_dict[f'FRt{i+1}_q1'])
+            f[f'TARGETS/FRt{i+1}/q2'] = ak.to_numpy(top_dict[f'FRt{i+1}_q2'])
+            f[f'TARGETS/FRt{i+1}/pt'] = ak.to_numpy(top_dict[f'FRt{i+1}_pt'])
+            f[f'TARGETS/FRt{i+1}/chi2'] = ak.to_numpy(top_dict[f'FRt{i+1}_chi2'])
 
 
 ## Outputs ##

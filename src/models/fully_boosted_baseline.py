@@ -56,9 +56,9 @@ mass_diff = ak.where(
 # Tops
 top_dict = {}
 for i in range(N_TOPS):
-    top_dict[f't{i+1}_chi2'] = mass_diff[ak.local_index(mass_diff) == i]
-    top_dict[f't{i+1}_bqq'] = vf_jets.index[ak.local_index(vf_jets.index) == i]
-    top_dict[f't{i+1}_pt'] = vf_jets.pt[ak.local_index(vf_jets.pt) == i]
+    top_dict[f'FBt{i+1}_chi2'] = mass_diff[ak.local_index(mass_diff) == i]
+    top_dict[f'FBt{i+1}_bqq'] = vf_jets.index[ak.local_index(vf_jets.index) == i]
+    top_dict[f'FBt{i+1}_pt'] = vf_jets.pt[ak.local_index(vf_jets.pt) == i]
 
 
 # Save out new h5 file
@@ -66,13 +66,16 @@ if SAVE_H5:
     out_filepath = os.path.join(DIRPATH, "../../data/delphes/v4/tt_hadronic_baseline.h5")
     with h5py.File(out_filepath, 'a') as f:
         with h5py.File(file_path, 'r') as test_f:
-            f['INPUTS'] = test_f['INPUTS']
+            for jet_class in test_f['INPUTS'].keys():
+                for variable in test_f['INPUTS'][jet_class].keys():
+                    if f'INPUTS/{jet_class}/{variable}' not in f:
+                        f[f'INPUTS/{jet_class}/{variable}'] = test_f[f'INPUTS/{jet_class}/{variable}'][:]
 
         for i in range(N_TOPS):
             f[f'TARGETS/FBt{i+1}/mask'] = ak.to_numpy(ak.num(mass_diff, axis=1) >= i+1)
-            f[f'TARGETS/FBt{i+1}/bqq'] = ak.to_numpy(top_dict[f't{i+1}_bqq'])
-            f[f'TARGETS/FBt{i+1}/pt'] = ak.to_numpy(top_dict[f't{i+1}_pt'])
-            f[f'TARGETS/FBt{i+1}/chi2'] = ak.to_numpy(top_dict[f't{i+1}_chi2'])
+            f[f'TARGETS/FBt{i+1}/bqq'] = ak.to_numpy(top_dict[f'FBt{i+1}_bqq'])
+            f[f'TARGETS/FBt{i+1}/pt'] = ak.to_numpy(top_dict[f'FBt{i+1}_pt'])
+            f[f'TARGETS/FBt{i+1}/chi2'] = ak.to_numpy(top_dict[f'FBt{i+1}_chi2'])
 
 
 # Plot the "χ²" histograms

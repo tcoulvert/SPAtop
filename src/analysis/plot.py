@@ -1,4 +1,4 @@
-import re
+import os
 
 import h5py as h5
 import matplotlib.pyplot as plt
@@ -78,6 +78,7 @@ def plot_pur_eff_w_dict(plot_dict, target_path, save_path=None, proj_name=None, 
     xerr = (plot_bins[1] - plot_bins[0]) / 2 * np.ones(plot_bins.shape[0] - 1)
 
     plot_types = set([key.split('_')[-1] for key in plot_dict.keys() if 'err' not in key])
+    print(plot_types)
 
     # m: merged (b+r w OR)
     # b: boosted
@@ -196,12 +197,12 @@ def plot_pur_eff_w_dict(plot_dict, target_path, save_path=None, proj_name=None, 
 
     if save_path is not None:
         if 'm' in plot_types:
-            fig_m.savefig(f"{save_path}/{proj_name}_merged.png")
+            fig_m.savefig(os.path.join(save_path, 'proj_name_merged.pdf'))
         if 'b' in plot_types:
-            fig_b.savefig(f"{save_path}/{proj_name}_boosted.png")
+            fig_b.savefig(os.path.join(save_path, proj_name+'_boosted.pdf'))
         if 'r' in plot_types:
-            fig_r.savefig(f"{save_path}/{proj_name}_resolved.png")
+            fig_r.savefig(os.path.join(save_path, proj_name+'_resolved.pdf'))
         if 'or' in plot_types:
-            fig_r_or.savefig(f"{save_path}/{proj_name}_resolved_wOR.png")
+            fig_r_or.savefig(os.path.join(save_path, proj_name+'_resolved_wOR.pdf'))
 
     return
