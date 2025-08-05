@@ -24,26 +24,26 @@ def calc_pur_eff(target_path, pred_path, bins):
     LUT_resolved_pred, LUT_resolved_target, _ = parse_resolved_w_target(target_h5, pred_h5, fjs_reco=None)
     LUT_resolved_wOR_pred, LUT_resolved_wOR_target, _ = parse_resolved_w_target(target_h5, pred_h5, fjs_reco=fjs_reco)
 
-    # LUT_resolved_pred_no_OR = []
-    # for event in LUT_resolved_wOR_pred:
-    #     event_no_OR = []
-    #     for predFRt in event:
-    #         if predFRt[2] == 0:
-    #             event_no_OR.append(predFRt)
-    #     LUT_resolved_pred_no_OR.append(event_no_OR)
+    LUT_resolved_pred_no_OR = []
+    for event in LUT_resolved_wOR_pred:
+        event_no_OR = []
+        for predFRt in event:
+            if predFRt[2] == 0:
+                event_no_OR.append(predFRt)
+        LUT_resolved_pred_no_OR.append(event_no_OR)
 
-    # LUT_resolved_target_no_OR = []
-    # for event in LUT_resolved_wOR_target:
-    #     event_no_OR = []
-    #     for targetFRt in event:
-    #         if targetFRt[2] == 0:
-    #             event_no_OR.append(targetFRt)
-    #     LUT_resolved_target_no_OR.append(event_no_OR)
+    LUT_resolved_target_no_OR = []
+    for event in LUT_resolved_wOR_target:
+        event_no_OR = []
+        for targetFRt in event:
+            if targetFRt[2] == 0:
+                event_no_OR.append(targetFRt)
+        LUT_resolved_target_no_OR.append(event_no_OR)
 
     # calculate efficiencies and purities for b+r, b, and r
     results = {}
-    # results["pur_m"], results["purerr_m"] = calc_eff(LUT_boosted_pred, LUT_resolved_wOR_pred, bins)
-    # results["eff_m"], results["efferr_m"] = calc_pur(LUT_boosted_target, LUT_resolved_wOR_target, bins)
+    results["pur_m"], results["purerr_m"] = calc_eff(LUT_boosted_pred, LUT_resolved_wOR_pred, bins)
+    results["eff_m"], results["efferr_m"] = calc_pur(LUT_boosted_target, LUT_resolved_wOR_target, bins)
 
     results["pur_b"], results["purerr_b"] = calc_eff(LUT_boosted_pred, None, bins)
     results["eff_b"], results["efferr_b"] = calc_pur(LUT_boosted_target, None, bins)
@@ -51,18 +51,18 @@ def calc_pur_eff(target_path, pred_path, bins):
     results["pur_r"], results["purerr_r"] = calc_eff(None, LUT_resolved_pred, bins)
     results["eff_r"], results["efferr_r"] = calc_pur(None, LUT_resolved_target, bins)
 
-    # results["pur_r_or"], results["purerr_r_or"] = calc_eff(None, LUT_resolved_pred_no_OR, bins)
-    # results["eff_r_or"], results["efferr_r_or"] = calc_pur(None, LUT_resolved_target_no_OR, bins)
+    results["pur_r_or"], results["purerr_r_or"] = calc_eff(None, LUT_resolved_pred_no_OR, bins)
+    results["eff_r_or"], results["efferr_r_or"] = calc_pur(None, LUT_resolved_target_no_OR, bins)
 
     print("Number of Boosted Prediction:", np.array([pred for event in LUT_boosted_pred for pred in event]).shape[0])
     print(
         "Number of Resolved Prediction before OR:",
         np.array([pred for event in LUT_resolved_pred for pred in event]).shape[0],
     )
-    # print(
-    #     "Number of Resolved Prediction after OR:",
-    #     np.array([pred for event in LUT_resolved_pred_no_OR for pred in event]).shape[0],
-    # )
+    print(
+        "Number of Resolved Prediction after OR:",
+        np.array([pred for event in LUT_resolved_pred_no_OR for pred in event]).shape[0],
+    )
 
     return results
 
@@ -70,7 +70,7 @@ def calc_pur_eff(target_path, pred_path, bins):
 # I started to use "efficiency" for describing how many gen tops were reconstructed
 # and "purity" for desrcribing how many reco tops are actually gen tops
 def plot_pur_eff_w_dict(plot_dict, target_path, save_path=None, proj_name=None, bins=None):
-    if bins == None:
+    if bins is None:
         bins = np.arange(0, 1050, 50)
 
     plot_bins = np.append(bins, 2 * bins[-1] - bins[-2])

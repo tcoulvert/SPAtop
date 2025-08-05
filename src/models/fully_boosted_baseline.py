@@ -12,11 +12,14 @@ vec.register_awkward()
 FILEPATH = os.path.abspath(__file__)
 DIRPATH = '/'.join(FILEPATH.split('/')[:-1])
 
+N_TOPS = 2
 TOP_MASS = 172.52  # GeV
 
-PLOT_CHI2_HISTS = True
-PLOT_ROCS = True
-PLOT_MASSES = True
+PLOT_CHI2_HISTS = False
+PLOT_ROCS = False
+PLOT_MASSES = False
+SAVE_H5 = True
+
 
 #make the file path
 file_path = os.path.join(DIRPATH, "../../data/delphes/v4/tt_hadronic_testing_SLIMMED.h5")
@@ -29,9 +32,10 @@ with h5py.File(file_path, 'r') as f:
     tgt_t1_bqq = f['TARGETS/FBt1/bqq'][:]
     tgt_t1_mask = f['TARGETS/FBt1/mask'][:]
 
-    tgt_t2_bqq = f['TARGETS/FBt1/bqq'][:]
-    tgt_t2_mask = f['TARGETS/FBt1/mask'][:]
+    tgt_t2_bqq = f['TARGETS/FBt2/bqq'][:]
+    tgt_t2_mask = f['TARGETS/FBt2/mask'][:]
     
+
 vf_jets = ak.zip({
     "pt": pt,
     "eta": eta,
@@ -40,6 +44,7 @@ vf_jets = ak.zip({
 }, with_name="Momentum4D")
 vf_jets = ak.with_field(vf_jets, ak.local_index(vf_jets, axis=1), "index")
 
+
 # Fully Boosted χ² calculations only rely on the mass of the very-fat-jets vs the top
 mass_diff = ak.where(
     vf_jets.mass > TOP_MASS,
@@ -47,33 +52,42 @@ mass_diff = ak.where(
     TOP_MASS - vf_jets.mass
 )
 
-chi2_t1 = mass_diff[ak.local_index(mass_diff) == 0]
-t1_bqq_idx = vf_jets.index[ak.local_index(vf_jets.index) == 0]
-chi2_t2 = mass_diff[ak.local_index(mass_diff) == 1]
-t2_bqq_idx = vf_jets.index[ak.local_index(vf_jets.index) == 1]
+
+# Tops
+top_dict = {}
+for i in range(N_TOPS):
+    top_dict[f't{i+1}_chi2'] = mass_diff[ak.local_index(mass_diff) == i]
+    top_dict[f't{i+1}_bqq'] = vf_jets.index[ak.local_index(vf_jets.index) == i]
+    top_dict[f't{i+1}_pt'] = vf_jets.pt[ak.local_index(vf_jets.pt) == i]
+
+
+# Save out new h5 file
+if SAVE_H5:
+    out_filepath = os.path.join(DIRPATH, "../../data/delphes/v4/tt_hadronic_baseline.h5")
+    with h5py.File(out_filepath, 'a') as f:
+        with h5py.File(file_path, 'r') as test_f:
+            f['INPUTS'] = test_f['INPUTS']
+
+        for i in range(N_TOPS):
+            f[f'TARGETS/FBt{i+1}/mask'] = ak.to_numpy(ak.num(mass_diff, axis=1) >= i+1)
+            f[f'TARGETS/FBt{i+1}/bqq'] = ak.to_numpy(top_dict[f't{i+1}_bqq'])
+            f[f'TARGETS/FBt{i+1}/pt'] = ak.to_numpy(top_dict[f't{i+1}_pt'])
+            f[f'TARGETS/FBt{i+1}/chi2'] = ak.to_numpy(top_dict[f't{i+1}_chi2'])
+
 
 # Plot the "χ²" histograms
 if PLOT_CHI2_HISTS:
-    # Plot Top1 χ² histogram
-    chi2_t1_vals = ak.ravel(chi2_t1[~ak.is_none(chi2_t1)])
-    plt.figure()
-    plt.hist(chi2_t1_vals, bins=50)
-    plt.xlabel("χ² (Top1)")
-    plt.ylabel("Frequency")
-    plt.yscale('log')
-    plt.title("Chi-Squared Distribution for Top1 Candidates")
-    plt.grid(True)
-    plt.savefig(os.path.join(DIRPATH, "fully_boosted_chisq_top1.pdf"))
-    # Plot Top2 χ² histogram 
-    chi2_t2_vals = ak.ravel(chi2_t2[~ak.is_none(chi2_t2)])
-    plt.figure()
-    plt.hist(chi2_t2_vals, bins=50)
-    plt.xlabel("χ² (Top2)")
-    plt.ylabel("Frequency")
-    plt.yscale('log')
-    plt.title("Chi-Squared Distribution for Top2 Candidates")
-    plt.grid(True)
-    plt.savefig(os.path.join(DIRPATH, "fully_boosted_chisq_top2.pdf"))
+    # Plot Top χ² histograms
+    for i in range(N_TOPS):
+        chi2_t1_vals = ak.ravel(top_dict[f't{i+1}_chi2'][~ak.is_none(top_dict[f't{i+1}_chi2'])])
+        plt.figure()
+        plt.hist(chi2_t1_vals, bins=50)
+        plt.xlabel(f"χ² (Top{i+1})")
+        plt.ylabel("Frequency")
+        plt.yscale('log')
+        plt.title(f"Chi-Squared Distribution for Top{i+1} Candidates")
+        plt.grid(True)
+        plt.savefig(os.path.join(DIRPATH, f"fully_boosted_chisq_top{i+1}.pdf"))
 
 # Plot the ROCs for the fully-boosted baseline
 if PLOT_ROCS:
@@ -86,8 +100,8 @@ if PLOT_ROCS:
             & (pred_bqq == tgt_t2_bqq)
         )
     
-    correct_t1 = correct_mask(t1_bqq_idx)
-    correct_t2 = correct_mask(t2_bqq_idx)
+    correct_t1 = correct_mask(top_dict[f't{1}_bqq'])
+    correct_t2 = correct_mask(top_dict[f't{2}_bqq'])
 
     valid_t1 = ~ak.is_none(correct_t1)
     valid_t2 = ~ak.is_none(correct_t2)
@@ -97,8 +111,8 @@ if PLOT_ROCS:
     print(f"num correct and valid t1 = {ak.sum(correct_t1[valid_t1])} out of {ak.num(correct_t1[valid_t1], axis=0)}")
     print(f"num correct and valid t2 = {ak.sum(correct_t2[valid_t2])} out of {ak.num(correct_t2[valid_t2], axis=0)}")
 
-    chi2_t1 = ak.to_numpy(chi2_t1[valid_t1])
-    chi2_t2 = ak.to_numpy(chi2_t2[valid_t2])
+    chi2_t1 = ak.to_numpy(top_dict[f't{1}_chi2'][valid_t1])
+    chi2_t2 = ak.to_numpy(top_dict[f't{2}_chi2'][valid_t2])
     label_t1 = ak.to_numpy(correct_t1[valid_t1])
     label_t2 = ak.to_numpy(correct_t2[valid_t2])
 

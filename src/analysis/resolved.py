@@ -259,13 +259,23 @@ def parse_resolved_w_target(
     q2_ps = ak.Array(q2_ps)
 
 
-    # jet detection probability
-    dp_FRt1 = np.array(predfile[predfile_dict["TARGETS"]]["FRt1"]["detection_probability"])
-    dp_FRt2 = np.array(predfile[predfile_dict["TARGETS"]]["FRt2"]["detection_probability"])
+    try:
+        # jet detection probability
+        dp_FRt1 = np.array(predfile[predfile_dict["TARGETS"]]["FRt1"]["detection_probability"])
+        dp_FRt2 = np.array(predfile[predfile_dict["TARGETS"]]["FRt2"]["detection_probability"])
+        # jet assignment probability
+        ap_FRt1 = np.array(predfile[predfile_dict["TARGETS"]]["FRt1"]["assignment_probability"])
+        ap_FRt2 = np.array(predfile[predfile_dict["TARGETS"]]["FRt2"]["assignment_probability"])
+    except:
+        # boosted Higgs detection probability
+        dp_FRt1 = np.array(predfile[predfile_dict["TARGETS"]]["FRt1"]["mask"]).astype("float")
+        dp_FRt2 = np.array(predfile[predfile_dict["TARGETS"]]["FRt2"]["mask"]).astype("float")
+
+        # fatjet assignment probability
+        ap_FRt1 = np.array(predfile[predfile_dict["TARGETS"]]["FRt1"]["mask"]).astype("float")
+        ap_FRt2 = np.array(predfile[predfile_dict["TARGETS"]]["FRt2"]["mask"]).astype("float")
+
     dps = np.concatenate((dp_FRt1.reshape(-1, 1), dp_FRt2.reshape(-1, 1)), axis=1)
-    # jet assignment probability
-    ap_FRt1 = np.array(predfile[predfile_dict["TARGETS"]]["FRt1"]["assignment_probability"])
-    ap_FRt2 = np.array(predfile[predfile_dict["TARGETS"]]["FRt2"]["assignment_probability"])
     aps = np.concatenate((ap_FRt1.reshape(-1, 1), ap_FRt2.reshape(-1, 1)), axis=1)
     # convert some numpy arrays to ak arrays
     dps = reset_collision_dp(dps, aps)

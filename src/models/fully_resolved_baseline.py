@@ -15,11 +15,13 @@ vec.register_awkward()
 FILEPATH = os.path.abspath(__file__)
 DIRPATH = '/'.join(FILEPATH.split('/')[:-1])
 
+N_TOPS = 2
 TOP_MASS = 172.52  # GeV
 W_MASS = 80.37  # GeV
 
 PLOT_CHI2_HISTS = False
-PLOT_ROCS = True
+PLOT_ROCS = False
+SAVE_H5 = True
 
 file_path = os.path.join(DIRPATH, "../../data/delphes/v4/tt_hadronic_testing_SLIMMED.h5")
 # 1) Load arrays
@@ -50,77 +52,73 @@ jets = ak.zip({
 }, with_name="Momentum4D")
 jets = ak.with_field(jets, ak.local_index(jets, axis=1), "index")
 
-## Top 1 ##
+
 # 3) Split jets
 bjets_mask = (jets.btag == 1)
 bjets = ak.drop_none(ak.mask(jets, bjets_mask))
 ljets = ak.drop_none(ak.mask(jets, ~bjets_mask))
 
-# 4) W1 jj combinations
-w1 = ak.combinations(ljets, 2, axis=1, fields=["j1", "j2"])
-w1 = ak.with_field(w1, (w1.j1 + w1.j2).mass, "w_mass")
 
-# 5) Top1 combinations
-t1 = ak.cartesian({"w": w1, "b": bjets}, axis=1)
-t1 = ak.with_field(t1, (t1.w.j1 + t1.w.j2 + t1.b).mass, "top_mass")
+top_dict = {}
+for i in range(N_TOPS):
+    # 4) W jj combinations
+    w = ak.combinations(ljets, 2, axis=1, fields=["j1", "j2"])
+    w = ak.with_field(w, (w.j1 + w.j2).mass, "w_mass")
 
-# 6) Top1 χ²
-chi2_all1 = ( (t1.w.w_mass - W_MASS) / (0.1 * W_MASS) )**2 + ( (t1.top_mass - TOP_MASS) / (0.1 * TOP_MASS) )**2
-idx1 = ak.argmin(chi2_all1, axis=1)
-best1 = ak.firsts(t1[ak.local_index(t1) == idx1])
-best_chi2_1 = ak.firsts(chi2_all1[ak.local_index(t1) == idx1])
+    # 5) Top combinations
+    t = ak.cartesian({"w": w, "b": bjets}, axis=1)
+    t = ak.with_field(t, (t.w.j1 + t.w.j2 + t.b).mass, "top_mass")
+    t = ak.with_field(t, (t.w.j1 + t.w.j2 + t.b).pt, "top_pt")
 
-## Top 2 ##
-# 7) Build ak arrays of unused jets
-t1_bjet_idx = ak.firsts(t1.b.index[ak.local_index(t1) == idx1])
-t1_qjet1_idx = ak.firsts(t1.w.j1.index[ak.local_index(t1) == idx1])
-t1_qjet2_idx = ak.firsts(t1.w.j2.index[ak.local_index(t1) == idx1])
+    # 6) Top χ²
+    chi2_all1 = ( (t.w.w_mass - W_MASS) / (0.1 * W_MASS) )**2 + ( (t.top_mass - TOP_MASS) / (0.1 * TOP_MASS) )**2
+    idx1 = ak.argmin(chi2_all1, axis=1)
+    best_t = ak.firsts(t[ak.local_index(t) == idx1])
 
-top2_bjets = bjets[bjets.index != t1_bjet_idx]
-top2_ljets = ljets[(ljets.index != t1_qjet1_idx) & (ljets.index != t1_qjet2_idx)]
+    top_dict[f'FRt{i+1}_mask'] = ~ak.is_none(best_t)
+    top_dict[f'FRt{i+1}_b'] = best_t.b.index
+    top_dict[f'FRt{i+1}_q1'] = best_t.w.j1.index
+    top_dict[f'FRt{i+1}_q2'] = best_t.w.j2.index
+    top_dict[f'FRt{i+1}_pt'] = best_t.pt
+    top_dict[f'FRt{i+1}_chi2'] = ak.firsts(chi2_all1[ak.local_index(chi2_all1) == idx1])
 
-# 8) W2 jj combinations
-w2 = ak.combinations(top2_ljets, 2, axis=1, fields=["j1", "j2"])
-w2 = ak.with_field(w2, (w2.j1 + w2.j2).mass, "w_mass")
+    # 7) Build ak arrays of unused jets
+    bjets = bjets[bjets.index != best_t.b.index]
+    ljets = ljets[(ljets.index != best_t.w.j1.index) & (ljets.index != best_t.w.j2.index)]
 
-# 9) Top2 combinations
-t2 = ak.cartesian({"w": w2, "b": top2_bjets}, axis=1)
-t2 = ak.with_field(t2, (t2.w.j1 + t2.w.j2 + t2.b).mass, "top_mass")
+    # 9) Repeat
 
-# 10) Top2 χ²
-chi2_all2 = ( (t2.w.w_mass - W_MASS) / (0.1 * W_MASS) )**2 + ( (t2.top_mass - TOP_MASS) / (0.1 * TOP_MASS) )**2
-idx2 = ak.argmin(chi2_all2, axis=1)
-best2 = ak.firsts(t2[ak.local_index(t2) == idx2])
-best_chi2_2 = ak.firsts(chi2_all2[ak.local_index(t2) == idx2])
 
-t2_bjet_idx = ak.firsts(t2.b.index[ak.local_index(t2) == idx2])
-t2_qjet1_idx = ak.firsts(t2.w.j1.index[ak.local_index(t2) == idx2])
-t2_qjet2_idx = ak.firsts(t2.w.j2.index[ak.local_index(t2) == idx2])
+# Save out new h5 file
+if SAVE_H5:
+    out_filepath = os.path.join(DIRPATH, "../../data/delphes/v4/tt_hadronic_baseline.h5")
+    with h5py.File(out_filepath, 'a') as f:
+        with h5py.File(file_path, 'r') as test_f:
+            f['INPUTS'] = test_f['INPUTS']
+
+        for i in range(N_TOPS):
+            f[f'TARGETS/FRt{i+1}/mask'] = ak.to_numpy(top_dict[f't{i+1}_mask'])
+            f[f'TARGETS/FRt{i+1}/b'] = ak.to_numpy(top_dict[f't{i+1}_b'])
+            f[f'TARGETS/FRt{i+1}/q1'] = ak.to_numpy(top_dict[f't{i+1}_q1'])
+            f[f'TARGETS/FRt{i+1}/q2'] = ak.to_numpy(top_dict[f't{i+1}_q2'])
+            f[f'TARGETS/FRt{i+1}/pt'] = ak.to_numpy(top_dict[f't{i+1}_pt'])
+            f[f'TARGETS/FRt{i+1}/chi2'] = ak.to_numpy(top_dict[f't{i+1}_chi2'])
 
 
 ## Outputs ##
 # Plot resolved baseline χ² distributions
 if PLOT_CHI2_HISTS:
-    # Plot Top1 χ² histogram
-    chi2_vals_1 = ak.ravel(best_chi2_1[~ak.is_none(best_chi2_1)])
-    plt.figure()
-    plt.hist(chi2_vals_1, bins=50)
-    plt.xlabel("χ² (Top1)")
-    plt.ylabel("Frequency")
-    plt.yscale('log')
-    plt.title("Chi-Squared Distribution for Top1 Candidates")
-    plt.grid(True)
-    plt.savefig(os.path.join(DIRPATH, "fully_resolved_chisq_top1.pdf"))
-    # Plot Top2 χ² histogram 
-    chi2_vals_2 = ak.ravel(best_chi2_2[~ak.is_none(best_chi2_2)])
-    plt.figure()
-    plt.hist(chi2_vals_2, bins=50)
-    plt.xlabel("χ² (Top2)")
-    plt.ylabel("Frequency")
-    plt.yscale('log')
-    plt.title("Chi-Squared Distribution for Top2 Candidates")
-    plt.grid(True)
-    plt.savefig(os.path.join(DIRPATH, "fully_resolved_chisq_top2.pdf"))
+    # Plot Top χ² histograms
+    for i in range(N_TOPS):
+        chi2_vals_1 = ak.ravel(top_dict[f'FRt{i+1}_chi2'][~ak.is_none(top_dict[f'FRt{i+1}_chi2'])])
+        plt.figure()
+        plt.hist(chi2_vals_1, bins=50)
+        plt.xlabel(f"χ² (Top{i+1})")
+        plt.ylabel("Frequency")
+        plt.yscale('log')
+        plt.title(f"Chi-Squared Distribution for Top{i+1} Candidates")
+        plt.grid(True)
+        plt.savefig(os.path.join(DIRPATH, f"fully_resolved_chisq_top{i+1}.pdf"))
 
 # Plot resolved baseline ROC curve
 if PLOT_ROCS:
@@ -142,8 +140,8 @@ if PLOT_ROCS:
             )
         )
 
-    correct_t1 = correct_mask(t1_bjet_idx, t1_qjet1_idx, t1_qjet2_idx)
-    correct_t2 = correct_mask(t2_bjet_idx, t2_qjet1_idx, t2_qjet2_idx)
+    correct_t1 = correct_mask(top_dict[f't{1}_b'], top_dict[f't{1}_q1'], top_dict[f't{1}_q2'])
+    correct_t2 = correct_mask(top_dict[f't{2}_b'], top_dict[f't{2}_q1'], top_dict[f't{2}_q2'])
     
     valid_t1 = ~ak.is_none(correct_t1)
     valid_t2 = ~ak.is_none(correct_t2)
@@ -153,8 +151,8 @@ if PLOT_ROCS:
     print(f"num correct and valid t1 = {ak.sum(correct_t1[valid_t1])} out of {ak.num(correct_t1[valid_t1], axis=0)}")
     print(f"num correct and valid t2 = {ak.sum(correct_t2[valid_t2])} out of {ak.num(correct_t2[valid_t2], axis=0)}")
 
-    chi2_t1 = ak.to_numpy(best_chi2_1[valid_t1])
-    chi2_t2 = ak.to_numpy(best_chi2_2[valid_t2])
+    chi2_t1 = ak.to_numpy(top_dict[f'FRt{1}_chi2'][valid_t1])
+    chi2_t2 = ak.to_numpy(top_dict[f'FRt{2}_chi2'][valid_t2])
     label_t1 = ak.to_numpy(correct_t1[valid_t1])
     label_t2 = ak.to_numpy(correct_t2[valid_t2])
 
