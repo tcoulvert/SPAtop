@@ -77,132 +77,109 @@ def plot_pur_eff_w_dict(plot_dict, target_path, save_path=None, proj_name=None, 
     bin_centers = [(plot_bins[i] + plot_bins[i + 1]) / 2 for i in range(plot_bins.size - 1)]
     xerr = (plot_bins[1] - plot_bins[0]) / 2 * np.ones(plot_bins.shape[0] - 1)
 
-    plot_types = set([key.split('_')[-1] for key in plot_dict.keys() if 'err' not in key])
-    print(plot_types)
-
     # m: merged (b+r w OR)
     # b: boosted
     # r: resolved
-    if 'm' in plot_types:
-        fig_m, ax_m = plt.subplots(1, 2, figsize=(12, 5))
-    if 'b' in plot_types:
-        fig_b, ax_b = plt.subplots(1, 2, figsize=(12, 5))
-    if 'r' in plot_types:
-        fig_r, ax_r = plt.subplots(1, 2, figsize=(12, 5))
-    if 'or' in plot_types:
-        fig_r_or, ax_r_or = plt.subplots(1, 2, figsize=(12, 5))
+    fig_m, ax_m = plt.subplots(1, 2, figsize=(12, 5))
+    fig_b, ax_b = plt.subplots(1, 2, figsize=(12, 5))
+    fig_r, ax_r = plt.subplots(1, 2, figsize=(12, 5))
+    fig_r_or, ax_r_or = plt.subplots(1, 2, figsize=(12, 5))
 
     # preset figure labels, titles, limits, etc.
-    if 'm' in plot_types:
-        ax_m[0].set(
-            xlabel=r"Merged Reco top pT (GeV)",
-            ylabel=r"Reconstruction Purity",
-            title=f"Reconstruction Purity vs. Merged Reco top pT",
-        )
-        ax_m[1].set(
-            xlabel=r"Merged Gen top pT (GeV)",
-            ylabel=r"Reconstruction Efficiency",
-            title=f"Reconstruction Efficiency vs. Merged Gen top pT",
-        )
-    if 'b' in plot_types:
-        ax_b[0].set(
-            xlabel=r"Reco Boosted top pT (GeV)",
-            ylabel=r"Reconstruction Purity",
-            title=f"Reconstruction Purity vs. Reco Boosted top pT",
-        )
-        ax_b[1].set(
-            xlabel=r"Gen Boosted top pT (GeV)",
-            ylabel=r"Reconstruction Efficiency",
-            title=f"Reconstruction Efficiency vs. Gen Boosted top pT",
-        )
-    if 'r' in plot_types:
-        ax_r[0].set(
-            xlabel=r"Reco Resolved top pT (GeV)",
-            ylabel=r"Reconstruction Purity",
-            title=f"Reconstruction Purity vs. Reco Resolved top pT",
-        )
-        ax_r[1].set(
-            xlabel=r"Gen Resolved top pT (GeV)",
-            ylabel=r"Reconstruction Efficiency",
-            title=f"Reconstruction Efficiency vs. Gen Resolved top pT",
-        )
-    if 'or' in plot_types:
-        ax_r_or[0].set(
-            xlabel=r"Reco Resolved top pT (GeV)",
-            ylabel=r"Reconstruction Purity",
-            title=f"Resolved Purity After OR  vs. Reco Resolved top pT",
-        )
-        ax_r_or[1].set(
-            xlabel=r"Gen Resolved top pT (GeV)",
-            ylabel=r"Reconstruction Efficiency",
-            title=f"Resolved Efficiency After OR vs. Gen Resolved top pT",
-        )
+    ax_m[0].set(
+        xlabel=r"Merged Reco top pT (GeV)",
+        ylabel=r"Reconstruction Purity",
+        title=f"Reconstruction Purity vs. Merged Reco top pT",
+    )
+    ax_m[1].set(
+        xlabel=r"Merged Gen top pT (GeV)",
+        ylabel=r"Reconstruction Efficiency",
+        title=f"Reconstruction Efficiency vs. Merged Gen top pT",
+    )
+    ax_b[0].set(
+        xlabel=r"Reco Boosted top pT (GeV)",
+        ylabel=r"Reconstruction Purity",
+        title=f"Reconstruction Purity vs. Reco Boosted top pT",
+    )
+    ax_b[1].set(
+        xlabel=r"Gen Boosted top pT (GeV)",
+        ylabel=r"Reconstruction Efficiency",
+        title=f"Reconstruction Efficiency vs. Gen Boosted top pT",
+    )
+    ax_r[0].set(
+        xlabel=r"Reco Resolved top pT (GeV)",
+        ylabel=r"Reconstruction Purity",
+        title=f"Reconstruction Purity vs. Reco Resolved top pT",
+    )
+    ax_r[1].set(
+        xlabel=r"Gen Resolved top pT (GeV)",
+        ylabel=r"Reconstruction Efficiency",
+        title=f"Reconstruction Efficiency vs. Gen Resolved top pT",
+    )
+    ax_r_or[0].set(
+        xlabel=r"Reco Resolved top pT (GeV)",
+        ylabel=r"Reconstruction Purity",
+        title=f"Resolved Purity After OR  vs. Reco Resolved top pT",
+    )
+    ax_r_or[1].set(
+        xlabel=r"Gen Resolved top pT (GeV)",
+        ylabel=r"Reconstruction Efficiency",
+        title=f"Resolved Efficiency After OR vs. Gen Resolved top pT",
+    )
 
     # plot purities and efficiencies
     for tag, pred_path in plot_dict.items():
         print("Processing", tag)
         results = calc_pur_eff(target_path, pred_path, bins)
-        if 'm' in plot_types:
-            ax_m[0].errorbar(
-                x=bin_centers, y=results["pur_m"], xerr=xerr, yerr=results["purerr_m"], fmt="o", capsize=5, label=tag
-            )
-            ax_m[1].errorbar(
-                x=bin_centers, y=results["eff_m"], xerr=xerr, yerr=results["efferr_m"], fmt="o", capsize=5, label=tag
-            )
-        if 'b' in plot_types:
-            ax_b[0].errorbar(
-                x=bin_centers, y=results["pur_b"], xerr=xerr, yerr=results["purerr_b"], fmt="o", capsize=5, label=tag
-            )
-            ax_b[1].errorbar(
-                x=bin_centers, y=results["eff_b"], xerr=xerr, yerr=results["efferr_b"], fmt="o", capsize=5, label=tag
-            )
-        if 'r' in plot_types:
-            ax_r[0].errorbar(
-                x=bin_centers, y=results["pur_r"], xerr=xerr, yerr=results["purerr_r"], fmt="o", capsize=5, label=tag
-            )
-            ax_r[1].errorbar(
-                x=bin_centers, y=results["eff_r"], xerr=xerr, yerr=results["efferr_r"], fmt="o", capsize=5, label=tag
-            )
-        if 'or' in plot_types:
-            ax_r_or[0].errorbar(
-                x=bin_centers, y=results["pur_r_or"], xerr=xerr, yerr=results["purerr_r_or"], fmt="o", capsize=5, label=tag
-            )
-            ax_r_or[1].errorbar(
-                x=bin_centers, y=results["eff_r_or"], xerr=xerr, yerr=results["efferr_r_or"], fmt="o", capsize=5, label=tag
-            )
+        ax_m[0].errorbar(
+            x=bin_centers, y=results["pur_m"], xerr=xerr, yerr=results["purerr_m"], fmt="o", capsize=5, label=tag
+        )
+        ax_m[1].errorbar(
+            x=bin_centers, y=results["eff_m"], xerr=xerr, yerr=results["efferr_m"], fmt="o", capsize=5, label=tag
+        )
+        ax_b[0].errorbar(
+            x=bin_centers, y=results["pur_b"], xerr=xerr, yerr=results["purerr_b"], fmt="o", capsize=5, label=tag
+        )
+        ax_b[1].errorbar(
+            x=bin_centers, y=results["eff_b"], xerr=xerr, yerr=results["efferr_b"], fmt="o", capsize=5, label=tag
+        )
+        ax_r[0].errorbar(
+            x=bin_centers, y=results["pur_r"], xerr=xerr, yerr=results["purerr_r"], fmt="o", capsize=5, label=tag
+        )
+        ax_r[1].errorbar(
+            x=bin_centers, y=results["eff_r"], xerr=xerr, yerr=results["efferr_r"], fmt="o", capsize=5, label=tag
+        )
+        ax_r_or[0].errorbar(
+            x=bin_centers, y=results["pur_r_or"], xerr=xerr, yerr=results["purerr_r_or"], fmt="o", capsize=5, label=tag
+        )
+        ax_r_or[1].errorbar(
+            x=bin_centers, y=results["eff_r_or"], xerr=xerr, yerr=results["efferr_r_or"], fmt="o", capsize=5, label=tag
+        )
 
     # adjust limits and legends
-    if 'm' in plot_types:
-        ax_m[0].legend()
-        ax_m[1].legend()
-        ax_m[0].set_ylim([-0.1, 1.1])
-        ax_m[1].set_ylim([-0.1, 1.1])
-    if 'b' in plot_types:
-        ax_b[0].legend()
-        ax_b[1].legend()
-        ax_b[0].set_ylim([-0.1, 1.1])
-        ax_b[1].set_ylim([-0.1, 1.1])
-    if 'r' in plot_types:
-        ax_r[0].legend()
-        ax_r[1].legend()
-        ax_r[0].set_ylim([-0.1, 1.1])
-        ax_r[1].set_ylim([-0.1, 1.1])
-    if 'or' in plot_types:
-        ax_r_or[0].legend()
-        ax_r_or[1].legend()
-        ax_r_or[0].set_ylim([-0.1, 1.1])
-        ax_r_or[1].set_ylim([-0.1, 1.1])
+    ax_m[0].legend()
+    ax_m[1].legend()
+    ax_m[0].set_ylim([-0.1, 1.1])
+    ax_m[1].set_ylim([-0.1, 1.1])
+    ax_b[0].legend()
+    ax_b[1].legend()
+    ax_b[0].set_ylim([-0.1, 1.1])
+    ax_b[1].set_ylim([-0.1, 1.1])
+    ax_r[0].legend()
+    ax_r[1].legend()
+    ax_r[0].set_ylim([-0.1, 1.1])
+    ax_r[1].set_ylim([-0.1, 1.1])
+    ax_r_or[0].legend()
+    ax_r_or[1].legend()
+    ax_r_or[0].set_ylim([-0.1, 1.1])
+    ax_r_or[1].set_ylim([-0.1, 1.1])
 
     plt.show()
 
     if save_path is not None:
-        if 'm' in plot_types:
-            fig_m.savefig(os.path.join(save_path, 'proj_name_merged.pdf'))
-        if 'b' in plot_types:
-            fig_b.savefig(os.path.join(save_path, proj_name+'_boosted.pdf'))
-        if 'r' in plot_types:
-            fig_r.savefig(os.path.join(save_path, proj_name+'_resolved.pdf'))
-        if 'or' in plot_types:
-            fig_r_or.savefig(os.path.join(save_path, proj_name+'_resolved_wOR.pdf'))
+        fig_m.savefig(os.path.join(save_path, 'proj_name_merged.pdf'))
+        fig_b.savefig(os.path.join(save_path, proj_name+'_boosted.pdf'))
+        fig_r.savefig(os.path.join(save_path, proj_name+'_resolved.pdf'))
+        fig_r_or.savefig(os.path.join(save_path, proj_name+'_resolved_wOR.pdf'))
 
     return
