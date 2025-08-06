@@ -306,12 +306,12 @@ def plot_pur_eff_w_dict(
             tag_list = tag.split('_')
             tag = tag_list[0]
             chi2_cuts = [int(cut) for cut in tag_list[1:]]
-            
+
             print("Processing", tag_label)
             results, SR_condition = calc_pur_eff(target_path, pred_path, bins_dict, chi2_cuts=chi2_cuts)
-        
-        print("Processing", tag_label)
-        results, SR_condition = calc_pur_eff(target_path, pred_path, bins_dict)
+        else:
+            print("Processing", tag_label)
+            results, SR_condition = calc_pur_eff(target_path, pred_path, bins_dict)
 
         # merged
         ax_m[0].errorbar(
