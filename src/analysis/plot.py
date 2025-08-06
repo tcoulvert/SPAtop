@@ -10,7 +10,7 @@ from src.analysis.semi_resolved import parse_semi_resolved_w_target
 from src.analysis.utils import calc_eff, calc_pur
 
 
-def calc_pur_eff(target_path, pred_path, bins_dict):
+def calc_pur_eff(target_path, pred_path, bins_dict, chi2_cuts=[45, 20]):
     # open files
     pred_h5 = h5.File(pred_path, "a")
     target_h5 = h5.File(target_path)
@@ -24,7 +24,10 @@ def calc_pur_eff(target_path, pred_path, bins_dict):
 
     ## generate look up tables ##
     # boosted
-    LUT_boosted_pred, LUT_boosted_target, vfjs_reco = parse_boosted_w_target(target_h5, pred_h5)
+    LUT_boosted_pred, LUT_boosted_target, vfjs_reco = parse_boosted_w_target(
+        target_h5, pred_h5, 
+        chi2_cut=chi2_cuts[0]
+    )
     # semi-resolved
     if SR_condition:
         LUT_semiresolved_qq_pred, LUT_semiresolved_qq_target, fjs_reco_qq = parse_semi_resolved_w_target(target_h5, pred_h5, 'qq', vfjs_reco=None)
@@ -35,11 +38,23 @@ def calc_pur_eff(target_path, pred_path, bins_dict):
         LUT_semiresolved_qq_pred, LUT_semiresolved_qq_target = None, None
         LUT_semiresolved_bq_pred, LUT_semiresolved_bq_target = None, None
     # resolved
-    LUT_resolved_pred, LUT_resolved_target, _ = parse_resolved_w_target(target_h5, pred_h5, fjs_reco=None)
+    LUT_resolved_pred, LUT_resolved_target, _ = parse_resolved_w_target(
+        target_h5, pred_h5, 
+        fjs_reco=None, 
+        chi2_cut=chi2_cuts[1]
+    )
     if SR_condition:
-        LUT_resolved_wOR_pred, LUT_resolved_wOR_target, _ = parse_resolved_w_target(target_h5, pred_h5, fjs_reco=[vfjs_reco, fjs_reco_qq, fjs_reco_bq])
+        LUT_resolved_wOR_pred, LUT_resolved_wOR_target, _ = parse_resolved_w_target(
+            target_h5, pred_h5, 
+            fjs_reco=[vfjs_reco, fjs_reco_qq, fjs_reco_bq], 
+            chi2_cut=chi2_cuts[1]
+        )
     else:
-        LUT_resolved_wOR_pred, LUT_resolved_wOR_target, _ = parse_resolved_w_target(target_h5, pred_h5, fjs_reco=vfjs_reco)
+        LUT_resolved_wOR_pred, LUT_resolved_wOR_target, _ = parse_resolved_w_target(
+            target_h5, pred_h5, 
+            fjs_reco=vfjs_reco,
+            chi2_cut=chi2_cuts[1]
+        )
 
     # make no_OR LUTs
     LUT_resolved_pred_no_OR = []
@@ -91,6 +106,9 @@ def calc_pur_eff(target_path, pred_path, bins_dict):
                 if targetSRt[2] == 0:
                     event_no_OR.append(targetSRt)
             LUT_semiresolved_bq_target_no_OR.append(event_no_OR)
+    else:
+        LUT_semiresolved_qq_wOR_pred, LUT_semiresolved_qq_wOR_target = None, None
+        LUT_semiresolved_bq_wOR_pred, LUT_semiresolved_bq_wOR_target = None, None
 
 
     ## calculate efficiencies and purities for b+r, b, and r (and srqq, srbq if available) ##
@@ -282,8 +300,12 @@ def plot_pur_eff_w_dict(
     SR_condition = False
     ## plot purities and efficiencies ##
     for tag, pred_path in plot_dict.items():
+        if 'chi2' in tag:
+            tag_list = tag.split('_')
+            tag = tag_list[0]
+            chi2_cuts = [int(cut) for cut in tag_list[1:]]
         print("Processing", tag)
-        results, SR_condition = calc_pur_eff(target_path, pred_path, bins_dict)
+        results, SR_condition = calc_pur_eff(target_path, pred_path, bins_dict, chi2_cuts=chi2_cuts)
 
         # merged
         ax_m[0].errorbar(

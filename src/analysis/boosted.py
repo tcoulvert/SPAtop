@@ -109,7 +109,7 @@ def gen_target_FBt_LUT(bqq_ps_passed, bqq_ts_selected, targetFBt_pts, builder):
 # or
 # [targetFBt retrieved or not, target FBt pt]
 def parse_boosted_w_target(
-    testfile, predfile,
+    testfile, predfile, chi2_cut=BOOSTED_CHI2_CUT
 ):
     # Collect H pt, mask, target and predicted jet and fjets for 3 Hs in each event
     # t pt
@@ -153,21 +153,21 @@ def parse_boosted_w_target(
         # boosted top detection probability
         dp_FBt1 = np.logical_and(
             np.array(predfile["TARGETS"]["FBt1"]["mask"]),
-            np.array(predfile["TARGETS"]["FBt1"]["chi2"]) < BOOSTED_CHI2_CUT
+            np.array(predfile["TARGETS"]["FBt1"]["chi2"]) < chi2_cut
         ).astype("float")
         dp_FBt2 = np.logical_and(
             np.array(predfile["TARGETS"]["FBt2"]["mask"]),
-            np.array(predfile["TARGETS"]["FBt2"]["chi2"]) < BOOSTED_CHI2_CUT
+            np.array(predfile["TARGETS"]["FBt2"]["chi2"]) < chi2_cut
         ).astype("float")
 
         # veryfatjet assignment probability
         ap_FBt1 = np.logical_and(
             np.array(predfile["TARGETS"]["FBt1"]["mask"]),
-            np.array(predfile["TARGETS"]["FBt1"]["chi2"]) < BOOSTED_CHI2_CUT
+            np.array(predfile["TARGETS"]["FBt1"]["chi2"]) < chi2_cut
         ).astype("float")
         ap_FBt2 = np.logical_and(
             np.array(predfile["TARGETS"]["FBt2"]["mask"]),
-            np.array(predfile["TARGETS"]["FBt2"]["chi2"]) < BOOSTED_CHI2_CUT
+            np.array(predfile["TARGETS"]["FBt2"]["chi2"]) < chi2_cut
         ).astype("float")
 
     bqq_ps = np.concatenate((bqq_FBt1_p.reshape(-1, 1), bqq_FBt2_p.reshape(-1, 1)), axis=1)
