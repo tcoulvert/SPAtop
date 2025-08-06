@@ -102,10 +102,7 @@ if SAVE_H5:
                         f[f'INPUTS/{jet_class}/{variable}'] = test_f[f'INPUTS/{jet_class}/{variable}'][:]
 
         for i in range(N_TOPS):
-            f[f'TARGETS/FRt{i+1}/mask'] = ak.to_numpy(
-                top_dict[f'FRt{i+1}_mask']
-                & (top_dict[f'FRt{i+1}_chi2'] < RESOLVED_CHI2_CUT)
-            )
+            f[f'TARGETS/FRt{i+1}/mask'] = ak.to_numpy(top_dict[f'FRt{i+1}_mask'])
             f[f'TARGETS/FRt{i+1}/b'] = ak.to_numpy(top_dict[f'FRt{i+1}_b'])
             f[f'TARGETS/FRt{i+1}/q1'] = ak.to_numpy(top_dict[f'FRt{i+1}_q1'])
             f[f'TARGETS/FRt{i+1}/q2'] = ak.to_numpy(top_dict[f'FRt{i+1}_q2'])

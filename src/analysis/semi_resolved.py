@@ -200,8 +200,8 @@ def parse_semi_resolved_w_target(
 
 
     # target jets
-    q_SRt1_t = np.array(testfile["TARGETS"][f"SR{method}t1"][f"{method[0]}"])
-    q_SRt2_t = np.array(testfile["TARGETS"][f"SR{method}t2"][f"{method[0]}"])
+    q_SRt1_t = np.array(testfile["TARGETS"][f"SR{method}t1"][f"{'b' if method == 'qq' else 'q'}"])
+    q_SRt2_t = np.array(testfile["TARGETS"][f"SR{method}t2"][f"{'b' if method == 'qq' else 'q'}"])
 
     qq_SRt1_t = np.array(testfile["TARGETS"][f"SR{method}t1"][f"{method}"])
     qq_SRt2_t = np.array(testfile["TARGETS"][f"SR{method}t2"][f"{method}"])
@@ -217,8 +217,8 @@ def parse_semi_resolved_w_target(
 
 
     # pred jets
-    q_SRt1_p = np.array(predfile["TARGETS"][f"SR{method}t1"][f"{method[0]}"])
-    q_SRt2_p = np.array(predfile["TARGETS"][f"SR{method}t2"][f"{method[0]}"])
+    q_SRt1_p = np.array(predfile["TARGETS"][f"SR{method}t1"][f"{'b' if method == 'qq' else 'q'}"])
+    q_SRt2_p = np.array(predfile["TARGETS"][f"SR{method}t2"][f"{'b' if method == 'qq' else 'q'}"])
 
     qq_SRt1_p = np.array(predfile["TARGETS"][f"SR{method}t1"][f"{method}"])
     qq_SRt2_p = np.array(predfile["TARGETS"][f"SR{method}t2"][f"{method}"])

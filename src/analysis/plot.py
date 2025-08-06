@@ -98,28 +98,28 @@ def calc_pur_eff(target_path, pred_path, bins):
     results["pur_m"], results["purerr_m"] = calc_eff(LUT_boosted_pred, LUT_semiresolved_qq_wOR_pred, LUT_semiresolved_bq_wOR_pred, LUT_resolved_wOR_pred, bins)
     results["eff_m"], results["efferr_m"] = calc_pur(LUT_boosted_target, LUT_semiresolved_qq_wOR_target, LUT_semiresolved_bq_wOR_target, LUT_resolved_wOR_target, bins)
     # boosted
-    results["pur_b"], results["purerr_b"] = calc_eff(LUT_boosted_pred, None, bins)
-    results["eff_b"], results["efferr_b"] = calc_pur(LUT_boosted_target, None, bins)
+    results["pur_b"], results["purerr_b"] = calc_eff(LUT_boosted_pred, None, None, None, bins)
+    results["eff_b"], results["efferr_b"] = calc_pur(LUT_boosted_target, None, None, None, bins)
     # resolved
-    results["pur_r"], results["purerr_r"] = calc_eff(None, LUT_resolved_pred, bins)
-    results["eff_r"], results["efferr_r"] = calc_pur(None, LUT_resolved_target, bins)
+    results["pur_r"], results["purerr_r"] = calc_eff(None, None, None, LUT_resolved_pred, bins)
+    results["eff_r"], results["efferr_r"] = calc_pur(None, None, None, LUT_resolved_target, bins)
     # resolved no OR
-    results["pur_r_or"], results["purerr_r_or"] = calc_eff(None, LUT_resolved_pred_no_OR, bins)
-    results["eff_r_or"], results["efferr_r_or"] = calc_pur(None, LUT_resolved_target_no_OR, bins)
+    results["pur_r_or"], results["purerr_r_or"] = calc_eff(None, None, None, LUT_resolved_pred_no_OR, bins)
+    results["eff_r_or"], results["efferr_r_or"] = calc_pur(None, None, None, LUT_resolved_target_no_OR, bins)
     # semi-resolved
     if SR_condition:
         # semi-resolved qq
-        results["pur_srqq"], results["purerr_srqq"] = calc_eff(None, LUT_semiresolved_qq_pred, bins)
-        results["eff_srqq"], results["efferr_srqq"] = calc_pur(None, LUT_semiresolved_qq_target, bins)
+        results["pur_srqq"], results["purerr_srqq"] = calc_eff(None, LUT_semiresolved_qq_pred, None, None, bins)
+        results["eff_srqq"], results["efferr_srqq"] = calc_pur(None, LUT_semiresolved_qq_target, None, None, bins)
         # semi-resolved qq no OR
-        results["pur_srqq_or"], results["purerr_srqq_or"] = calc_eff(None, LUT_semiresolved_qq_pred_no_OR, bins)
-        results["eff_srqq_or"], results["efferr_srqq_or"] = calc_pur(None, LUT_semiresolved_qq_target_no_OR, bins)
+        results["pur_srqq_or"], results["purerr_srqq_or"] = calc_eff(None, LUT_semiresolved_qq_pred_no_OR, None, None, bins)
+        results["eff_srqq_or"], results["efferr_srqq_or"] = calc_pur(None, LUT_semiresolved_qq_target_no_OR, None, None, bins)
         # semi-resolved bq
-        results["pur_srbq"], results["purerr_srbq"] = calc_eff(None, LUT_semiresolved_bq_pred, bins)
-        results["eff_srbq"], results["efferr_srbq"] = calc_pur(None, LUT_semiresolved_bq_target, bins)
+        results["pur_srbq"], results["purerr_srbq"] = calc_eff(None, None, LUT_semiresolved_bq_pred, None, bins)
+        results["eff_srbq"], results["efferr_srbq"] = calc_pur(None, None, LUT_semiresolved_bq_target, None, bins)
         # semi-resolved bq no OR
-        results["pur_srbq_or"], results["purerr_srbq_or"] = calc_eff(None, LUT_semiresolved_bq_pred_no_OR, bins)
-        results["eff_srbq_or"], results["efferr_srbq_or"] = calc_pur(None, LUT_semiresolved_bq_target_no_OR, bins)
+        results["pur_srbq_or"], results["purerr_srbq_or"] = calc_eff(None, None, LUT_semiresolved_bq_pred_no_OR, None, bins)
+        results["eff_srbq_or"], results["efferr_srbq_or"] = calc_pur(None, None, LUT_semiresolved_bq_target_no_OR, None, bins)
 
 
     print("Number of Boosted Prediction:", np.array([pred for event in LUT_boosted_pred for pred in event]).shape[0])

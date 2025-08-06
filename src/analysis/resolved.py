@@ -15,7 +15,7 @@ RESOLVED_CHI2_CUT = 20  # taken by-eye from boosted chi2 plots
 
 
 def get_unoverlapped_jet_index(fjs, js, dR_min=0.5):
-    if fjs is not list:
+    if type(fjs) is not list:
         fjs = [fjs]
 
     overlapped = ak.sum(js[:, np.newaxis].deltaR(fjs[0]) < dR_min, axis=-2) > 0
@@ -270,12 +270,32 @@ def parse_resolved_w_target(
         ap_FRt2 = np.array(predfile["TARGETS"]["FRt2"]["assignment_probability"])
     except:
         # resolved top detection probability
-        dp_FRt1 = np.array(predfile["TARGETS"]["FRt1"]["mask"]).astype("float")
-        dp_FRt2 = np.array(predfile["TARGETS"]["FRt2"]["mask"]).astype("float")
+        dp_FRt1 = np.array(
+            np.logical_and(
+                predfile["TARGETS"]["FRt1"]["mask"],
+                predfile["TARGETS"]["FRt1"]["chi2"] < RESOLVED_CHI2_CUT
+            )
+        ).astype("float")
+        dp_FRt2 = np.array(
+            np.logical_and(
+                predfile["TARGETS"]["FRt2"]["mask"],
+                predfile["TARGETS"]["FRt2"]["chi2"] < RESOLVED_CHI2_CUT
+            )
+        ).astype("float")
 
         # jet assignment probability
-        ap_FRt1 = np.array(predfile["TARGETS"]["FRt1"]["mask"]).astype("float")
-        ap_FRt2 = np.array(predfile["TARGETS"]["FRt2"]["mask"]).astype("float")
+        ap_FRt1 = np.array(
+            np.logical_and(
+                predfile["TARGETS"]["FRt1"]["mask"],
+                predfile["TARGETS"]["FRt1"]["chi2"] < RESOLVED_CHI2_CUT
+            )
+        ).astype("float")
+        ap_FRt2 = np.array(
+            np.logical_and(
+                predfile["TARGETS"]["FRt2"]["mask"],
+                predfile["TARGETS"]["FRt2"]["chi2"] < RESOLVED_CHI2_CUT
+            )
+        ).astype("float")
 
     dps = np.concatenate((dp_FRt1.reshape(-1, 1), dp_FRt2.reshape(-1, 1)), axis=1)
     aps = np.concatenate((ap_FRt1.reshape(-1, 1), ap_FRt2.reshape(-1, 1)), axis=1)

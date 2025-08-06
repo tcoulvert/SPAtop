@@ -61,40 +61,40 @@ def calc_eff(LUT_boosted_pred, LUT_semiresolved_qq_pred, LUT_semiresolved_bq_pre
     # boosted
     if LUT_boosted_pred is not None:
         # boosted Top don't need post processing
-        targetTops_boosted = [targetTop for event in LUT_boosted_pred for targetTop in event]
-        targetTops += targetTops_boosted
+        predTops_boosted = [predTop for event in LUT_boosted_pred for predTop in event]
+        predTops += predTops_boosted
     # semi-resolved
     if LUT_semiresolved_qq_pred is not None:
         if LUT_boosted_pred is not None:
             # calculate merged purity
             # only consider semi-resolved target Top that doesn't have a corresponding boosted Top target
-            targetTops_semi_resolved = [targetTop[0:2] for event in LUT_semiresolved_qq_pred for targetTop in event if targetTop[2] == 0]
-            targetTops += targetTops_semi_resolved
+            predTops_semi_resolved = [predTop[0:2] for event in LUT_semiresolved_qq_pred for predTop in event if predTop[2] == 0]
+            predTops += predTops_semi_resolved
         else:
             # calculate resolved only purity
-            targetTops_semi_resolved = [targetTop[0:2] for event in LUT_semiresolved_qq_pred for targetTop in event]
-            targetTops += targetTops_semi_resolved
+            predTops_semi_resolved = [predTop[0:2] for event in LUT_semiresolved_qq_pred for predTop in event]
+            predTops += predTops_semi_resolved
     if LUT_semiresolved_bq_pred is not None:
         if LUT_boosted_pred is not None:
             # calculate merged purity
             # only consider semi-resolved target Top that doesn't have a corresponding boosted Top target
-            targetTops_semi_resolved = [targetTop[0:2] for event in LUT_semiresolved_bq_pred for targetTop in event if targetTop[2] == 0]
-            targetTops += targetTops_semi_resolved
+            predTops_semi_resolved = [predTop[0:2] for event in LUT_semiresolved_bq_pred for predTop in event if predTop[2] == 0]
+            predTops += predTops_semi_resolved
         else:
             # calculate resolved only purity
-            targetTops_semi_resolved = [targetTop[0:2] for event in LUT_semiresolved_bq_pred for targetTop in event]
-            targetTops += targetTops_semi_resolved
+            predTops_semi_resolved = [predTop[0:2] for event in LUT_semiresolved_bq_pred for predTop in event]
+            predTops += predTops_semi_resolved
     # resolved
     if LUT_resolved_pred is not None:
         if LUT_boosted_pred is not None or LUT_semiresolved_qq_pred is not None or LUT_semiresolved_bq_pred is not None:
             # calculate merged purity
             # only consider resolved target Top that doesn't have a corresponding boosted Top target
-            targetTops_resolved = [targetTop[0:2] for event in LUT_resolved_pred for targetTop in event if targetTop[2] == 0]
-            targetTops += targetTops_resolved
+            predTops_resolved = [predTop[0:2] for event in LUT_resolved_pred for predTop in event if predTop[2] == 0]
+            predTops += predTops_resolved
         else:
             # calculate resolved only purity
-            targetTops_resolved = [targetTop[0:2] for event in LUT_resolved_pred for targetTop in event]
-            targetTops += targetTops_resolved
+            predTops_resolved = [predTop[0:2] for event in LUT_resolved_pred for predTop in event]
+            predTops += predTops_resolved
 
     # then merge into the list with their pT
     predTops = np.array(predTops)
