@@ -17,8 +17,9 @@ TOP_MASS = 172.52  # GeV
 
 PLOT_CHI2_HISTS = False
 PLOT_ROCS = False
-PLOT_MASSES = False
 SAVE_H5 = True
+
+BOOSTED_CHI2_CUT = 45  # taken by-eye from boosted chi2 plots
 
 
 #make the file path
@@ -72,19 +73,32 @@ if SAVE_H5:
                         f[f'INPUTS/{jet_class}/{variable}'] = test_f[f'INPUTS/{jet_class}/{variable}'][:]
 
         for i in range(N_TOPS):
-            f[f'TARGETS/FBt{i+1}/mask'] = ak.to_numpy(ak.num(mass_diff, axis=1) >= i+1)
+            f[f'TARGETS/FBt{i+1}/mask'] = ak.to_numpy(
+                (ak.num(mass_diff, axis=1) >= i+1)
+                & (top_dict[f'FBt{i+1}_chi2'] < BOOSTED_CHI2_CUT)
+            )
             f[f'TARGETS/FBt{i+1}/bqq'] = ak.to_numpy(top_dict[f'FBt{i+1}_bqq'])
             f[f'TARGETS/FBt{i+1}/pt'] = ak.to_numpy(top_dict[f'FBt{i+1}_pt'])
             f[f'TARGETS/FBt{i+1}/chi2'] = ak.to_numpy(top_dict[f'FBt{i+1}_chi2'])
 
 
+def correct_mask(pred_bqq):
+    return (
+        tgt_t1_mask
+        & (pred_bqq == tgt_t1_bqq)
+    ) | (
+        tgt_t2_mask
+        & (pred_bqq == tgt_t2_bqq)
+    )
+
 # Plot the "χ²" histograms
 if PLOT_CHI2_HISTS:
     # Plot Top χ² histograms
     for i in range(N_TOPS):
-        chi2_t1_vals = ak.ravel(top_dict[f't{i+1}_chi2'][~ak.is_none(top_dict[f't{i+1}_chi2'])])
+        valid_t = ~ak.is_none(top_dict[f'FBt{i+1}_chi2'])
+        chi2_t_vals = ak.ravel(top_dict[f'FBt{i+1}_chi2'][valid_t])
         plt.figure()
-        plt.hist(chi2_t1_vals, bins=50)
+        plt.hist(chi2_t_vals, bins=50)
         plt.xlabel(f"χ² (Top{i+1})")
         plt.ylabel("Frequency")
         plt.yscale('log')
@@ -92,19 +106,26 @@ if PLOT_CHI2_HISTS:
         plt.grid(True)
         plt.savefig(os.path.join(DIRPATH, f"fully_boosted_chisq_top{i+1}.pdf"))
 
+    # Plot Top χ² histograms
+    for i in range(N_TOPS):
+        correct_t = correct_mask(top_dict[f'FBt{i+1}_bqq'])
+        valid_t = ~ak.is_none(correct_t)
+        corr_chi2_t_vals = ak.ravel(top_dict[f'FBt{i+1}_chi2'][valid_t][correct_t[valid_t]])
+        incorr_chi2_t_vals = ak.ravel(top_dict[f'FBt{i+1}_chi2'][valid_t][~correct_t[valid_t]])
+        plt.figure()
+        plt.hist(corr_chi2_t_vals, bins=50, label='Correct top assignment', alpha=0.7)
+        plt.hist(incorr_chi2_t_vals, bins=50, label='Incorrect top assignment', alpha=0.7)
+        plt.xlabel(f"χ² (Top{i+1})")
+        plt.ylabel("Frequency")
+        plt.yscale('log')
+        plt.title(f"Chi-Squared Distribution for Top{i+1} Candidates")
+        plt.grid(True)
+        plt.savefig(os.path.join(DIRPATH, f"fully_boosted_chisqCorr_top{i+1}.pdf"))
+
 # Plot the ROCs for the fully-boosted baseline
 if PLOT_ROCS:
-    def correct_mask(pred_bqq):
-        return (
-            tgt_t1_mask
-            & (pred_bqq == tgt_t1_bqq)
-        ) | (
-            tgt_t2_mask
-            & (pred_bqq == tgt_t2_bqq)
-        )
-    
-    correct_t1 = correct_mask(top_dict[f't{1}_bqq'])
-    correct_t2 = correct_mask(top_dict[f't{2}_bqq'])
+    correct_t1 = correct_mask(top_dict[f'FBt{1}_bqq'])
+    correct_t2 = correct_mask(top_dict[f'FBt{2}_bqq'])
 
     valid_t1 = ~ak.is_none(correct_t1)
     valid_t2 = ~ak.is_none(correct_t2)
@@ -114,8 +135,8 @@ if PLOT_ROCS:
     print(f"num correct and valid t1 = {ak.sum(correct_t1[valid_t1])} out of {ak.num(correct_t1[valid_t1], axis=0)}")
     print(f"num correct and valid t2 = {ak.sum(correct_t2[valid_t2])} out of {ak.num(correct_t2[valid_t2], axis=0)}")
 
-    chi2_t1 = ak.to_numpy(top_dict[f't{1}_chi2'][valid_t1])
-    chi2_t2 = ak.to_numpy(top_dict[f't{2}_chi2'][valid_t2])
+    chi2_t1 = ak.to_numpy(top_dict[f'FBt{1}_chi2'][valid_t1])
+    chi2_t2 = ak.to_numpy(top_dict[f'FBt{2}_chi2'][valid_t2])
     label_t1 = ak.to_numpy(correct_t1[valid_t1])
     label_t2 = ak.to_numpy(correct_t2[valid_t2])
 

@@ -11,6 +11,9 @@ N_AK8_JETS = 2
 N_AK15_JETS = 2
 N_TOPS = 2
 
+RESOLVED_CHI2_CUT = 20  # taken by-eye from boosted chi2 plots
+
+
 def get_unoverlapped_jet_index(fjs, js, dR_min=0.5):
     if fjs is not list:
         fjs = [fjs]
@@ -266,11 +269,11 @@ def parse_resolved_w_target(
         ap_FRt1 = np.array(predfile["TARGETS"]["FRt1"]["assignment_probability"])
         ap_FRt2 = np.array(predfile["TARGETS"]["FRt2"]["assignment_probability"])
     except:
-        # boosted Higgs detection probability
+        # resolved top detection probability
         dp_FRt1 = np.array(predfile["TARGETS"]["FRt1"]["mask"]).astype("float")
         dp_FRt2 = np.array(predfile["TARGETS"]["FRt2"]["mask"]).astype("float")
 
-        # fatjet assignment probability
+        # jet assignment probability
         ap_FRt1 = np.array(predfile["TARGETS"]["FRt1"]["mask"]).astype("float")
         ap_FRt2 = np.array(predfile["TARGETS"]["FRt2"]["mask"]).astype("float")
 

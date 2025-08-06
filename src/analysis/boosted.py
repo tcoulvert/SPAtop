@@ -11,6 +11,8 @@ N_AK8_JETS = 2
 N_AK15_JETS = 2
 N_TOPS = 2
 
+BOOSTED_CHI2_CUT = 45  # taken by-eye from boosted chi2 plots
+
 
 def sel_pred_FBt_by_dp_ap(dps, aps, bqq_ps):
     # get most possible number of H_reco by dps
@@ -148,11 +150,11 @@ def parse_boosted_w_target(
         bqq_FBt1_p = np.array(predfile["TARGETS"]["FBt1"]["bqq"]) + (N_AK4_JETS + N_AK8_JETS)
         bqq_FBt2_p = np.array(predfile["TARGETS"]["FBt2"]["bqq"]) + (N_AK4_JETS + N_AK8_JETS)
 
-        # boosted Higgs detection probability
+        # boosted top detection probability
         dp_FBt1 = np.array(predfile["TARGETS"]["FBt1"]["mask"]).astype("float")
         dp_FBt2 = np.array(predfile["TARGETS"]["FBt2"]["mask"]).astype("float")
 
-        # fatjet assignment probability
+        # veryfatjet assignment probability
         ap_FBt1 = np.array(predfile["TARGETS"]["FBt1"]["mask"]).astype("float")
         ap_FBt2 = np.array(predfile["TARGETS"]["FBt2"]["mask"]).astype("float")
 

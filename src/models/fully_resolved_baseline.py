@@ -23,6 +23,8 @@ PLOT_CHI2_HISTS = False
 PLOT_ROCS = False
 SAVE_H5 = True
 
+RESOLVED_CHI2_CUT = 20  # taken by-eye from boosted chi2 plots
+
 file_path = os.path.join(DIRPATH, "../../data/delphes/v4/tt_hadronic_testing_SLIMMED.h5")
 # 1) Load arrays
 with h5py.File(file_path, "r") as f:
@@ -100,7 +102,10 @@ if SAVE_H5:
                         f[f'INPUTS/{jet_class}/{variable}'] = test_f[f'INPUTS/{jet_class}/{variable}'][:]
 
         for i in range(N_TOPS):
-            f[f'TARGETS/FRt{i+1}/mask'] = ak.to_numpy(top_dict[f'FRt{i+1}_mask'])
+            f[f'TARGETS/FRt{i+1}/mask'] = ak.to_numpy(
+                top_dict[f'FRt{i+1}_mask']
+                & (top_dict[f'FRt{i+1}_chi2'] < RESOLVED_CHI2_CUT)
+            )
             f[f'TARGETS/FRt{i+1}/b'] = ak.to_numpy(top_dict[f'FRt{i+1}_b'])
             f[f'TARGETS/FRt{i+1}/q1'] = ak.to_numpy(top_dict[f'FRt{i+1}_q1'])
             f[f'TARGETS/FRt{i+1}/q2'] = ak.to_numpy(top_dict[f'FRt{i+1}_q2'])
@@ -108,12 +113,31 @@ if SAVE_H5:
             f[f'TARGETS/FRt{i+1}/chi2'] = ak.to_numpy(top_dict[f'FRt{i+1}_chi2'])
 
 
+# Computes if χ² method found correct tops
+def correct_mask(pred_b, pred_q1, pred_q2):
+    return (
+        tgt_t1_mask
+        & (pred_b == tgt_t1_b)
+        & (
+            ( (pred_q1 == tgt_t1_q1) & (pred_q2 == tgt_t1_q2) ) 
+            | ( (pred_q1 == tgt_t1_q2) & (pred_q2 == tgt_t1_q1) )
+        )
+    ) | (
+        tgt_t2_mask
+        & (pred_b == tgt_t2_b)
+        & (
+            ( (pred_q1 == tgt_t2_q1) & (pred_q2 == tgt_t2_q2) ) 
+            | ( (pred_q1 == tgt_t2_q2) & (pred_q2 == tgt_t2_q1) )
+        )
+    )
+
 ## Outputs ##
 # Plot resolved baseline χ² distributions
 if PLOT_CHI2_HISTS:
     # Plot Top χ² histograms
     for i in range(N_TOPS):
-        chi2_vals_1 = ak.ravel(top_dict[f'FRt{i+1}_chi2'][~ak.is_none(top_dict[f'FRt{i+1}_chi2'])])
+        valid_t = ~ak.is_none(top_dict[f'FRt{i+1}_chi2'])
+        chi2_vals_1 = ak.ravel(top_dict[f'FRt{i+1}_chi2'][valid_t])
         plt.figure()
         plt.hist(chi2_vals_1, bins=50)
         plt.xlabel(f"χ² (Top{i+1})")
@@ -123,28 +147,26 @@ if PLOT_CHI2_HISTS:
         plt.grid(True)
         plt.savefig(os.path.join(DIRPATH, f"fully_resolved_chisq_top{i+1}.pdf"))
 
+    # Plot Top χ² histograms
+    for i in range(N_TOPS):
+        correct_t = correct_mask(top_dict[f'FRt{i+1}_b'], top_dict[f'FRt{i+1}_q1'], top_dict[f'FRt{i+1}_q2'])
+        valid_t = ~ak.is_none(correct_t)
+        corr_chi2_t_vals = ak.ravel(top_dict[f'FRt{i+1}_chi2'][valid_t][correct_t[valid_t]])
+        incorr_chi2_t_vals = ak.ravel(top_dict[f'FRt{i+1}_chi2'][valid_t][~correct_t[valid_t]])
+        plt.figure()
+        plt.hist(corr_chi2_t_vals, bins=50, label='Correct top assignment', alpha=0.7)
+        plt.hist(incorr_chi2_t_vals, bins=50, label='Incorrect top assignment', alpha=0.7)
+        plt.xlabel(f"χ² (Top{i+1})")
+        plt.ylabel("Frequency")
+        plt.yscale('log')
+        plt.title(f"Chi-Squared Distribution for Top{i+1} Candidates")
+        plt.grid(True)
+        plt.savefig(os.path.join(DIRPATH, f"fully_resolved_chisqCorr_top{i+1}.pdf"))
+
 # Plot resolved baseline ROC curve
 if PLOT_ROCS:
-    # Computes if χ² method found correct tops
-    def correct_mask(pred_b, pred_q1, pred_q2):
-        return (
-            tgt_t1_mask
-            & (pred_b == tgt_t1_b)
-            & (
-                ( (pred_q1 == tgt_t1_q1) & (pred_q2 == tgt_t1_q2) ) 
-                | ( (pred_q1 == tgt_t1_q2) & (pred_q2 == tgt_t1_q1) )
-            )
-        ) | (
-            tgt_t2_mask
-            & (pred_b == tgt_t2_b)
-            & (
-                ( (pred_q1 == tgt_t2_q1) & (pred_q2 == tgt_t2_q2) ) 
-                | ( (pred_q1 == tgt_t2_q2) & (pred_q2 == tgt_t2_q1) )
-            )
-        )
-
-    correct_t1 = correct_mask(top_dict[f't{1}_b'], top_dict[f't{1}_q1'], top_dict[f't{1}_q2'])
-    correct_t2 = correct_mask(top_dict[f't{2}_b'], top_dict[f't{2}_q1'], top_dict[f't{2}_q2'])
+    correct_t1 = correct_mask(top_dict[f'FRt{1}_b'], top_dict[f'FRt{1}_q1'], top_dict[f'FRt{1}_q2'])
+    correct_t2 = correct_mask(top_dict[f'FRt{2}_b'], top_dict[f'FRt{2}_q1'], top_dict[f'FRt{2}_q2'])
     
     valid_t1 = ~ak.is_none(correct_t1)
     valid_t2 = ~ak.is_none(correct_t2)

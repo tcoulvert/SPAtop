@@ -240,11 +240,11 @@ def parse_semi_resolved_w_target(
         ap_SRt1 = np.array(predfile["TARGETS"][f"SR{method}t1"]["assignment_probability"])
         ap_SRt2 = np.array(predfile["TARGETS"][f"SR{method}t2"]["assignment_probability"])
     except:
-        # boosted Higgs detection probability
+        # semi-boosted top detection probability
         dp_SRt1 = np.array(predfile["TARGETS"][f"SR{method}t1"]["mask"]).astype("float")
         dp_SRt2 = np.array(predfile["TARGETS"][f"SR{method}t2"]["mask"]).astype("float")
 
-        # fatjet assignment probability
+        # jet/fatjet assignment probability
         ap_SRt1 = np.array(predfile["TARGETS"][f"SR{method}t1"]["mask"]).astype("float")
         ap_SRt2 = np.array(predfile["TARGETS"][f"SR{method}t2"]["mask"]).astype("float")
 
