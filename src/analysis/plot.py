@@ -59,20 +59,28 @@ def calc_pur_eff(target_path, pred_path, bins):
         LUT_resolved_target_no_OR.append(event_no_OR)
 
     if SR_condition:
+        LUT_semiresolved_qq_pred_no_OR_size = 0
+        LUT_semiresolved_qq_target_no_OR_size = 0
+        LUT_semiresolved_bq_pred_no_OR_size = 0
+        LUT_semiresolved_bq_target_no_OR_size = 0
+
         LUT_semiresolved_qq_pred_no_OR = []
         for event in LUT_semiresolved_qq_wOR_pred:
             event_no_OR = []
             for predSRt in event:
                 if predSRt[2] == 0:
                     event_no_OR.append(predSRt)
+                    LUT_semiresolved_qq_pred_no_OR_size += 1
             LUT_semiresolved_qq_pred_no_OR.append(event_no_OR)
 
         LUT_semiresolved_qq_target_no_OR = []
+        
         for event in LUT_semiresolved_qq_wOR_target:
             event_no_OR = []
             for targetSRt in event:
                 if targetSRt[2] == 0:
                     event_no_OR.append(targetSRt)
+                    LUT_semiresolved_qq_target_no_OR_size += 1
             LUT_semiresolved_qq_target_no_OR.append(event_no_OR)
 
         LUT_semiresolved_bq_pred_no_OR = []
@@ -81,6 +89,7 @@ def calc_pur_eff(target_path, pred_path, bins):
             for predSRt in event:
                 if predSRt[2] == 0:
                     event_no_OR.append(predSRt)
+                    LUT_semiresolved_bq_pred_no_OR_size += 1
             LUT_semiresolved_bq_pred_no_OR.append(event_no_OR)
 
         LUT_semiresolved_bq_target_no_OR = []
@@ -89,7 +98,13 @@ def calc_pur_eff(target_path, pred_path, bins):
             for targetSRt in event:
                 if targetSRt[2] == 0:
                     event_no_OR.append(targetSRt)
+                    LUT_semiresolved_bq_target_no_OR_size += 1
             LUT_semiresolved_bq_target_no_OR.append(event_no_OR)
+
+        print(LUT_semiresolved_qq_pred_no_OR_size)
+        print(LUT_semiresolved_qq_target_no_OR_size)
+        print(LUT_semiresolved_bq_pred_no_OR_size)
+        print(LUT_semiresolved_bq_target_no_OR_size)
 
 
     ## calculate efficiencies and purities for b+r, b, and r (and srqq, srbq if available) ##

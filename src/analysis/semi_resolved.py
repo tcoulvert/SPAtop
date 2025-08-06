@@ -87,7 +87,7 @@ def gen_pred_SRt_LUT(
 
         for q_p, qq_p in zip(q_ps_e, qq_ps_e):
 
-            if (q_p in goodJetIdx_e) and (qq_p in goodFatJetIdx_e):
+            if (q_p in goodJetIdx_e) and (qq_p - N_AK4_JETS in goodFatJetIdx_e):
                 overlap = 0
             else:
                 overlap = 1
@@ -269,10 +269,10 @@ def parse_semi_resolved_w_target(
         with_name="Momentum4D",
     )
 
-    fj_pt = np.array(testfile["INPUTS"]["Jets"]["pt"])
-    fj_eta = np.array(testfile["INPUTS"]["Jets"]["eta"])
-    fj_phi = np.array(testfile["INPUTS"]["Jets"]["phi"])
-    fj_mass = np.array(testfile["INPUTS"]["Jets"]["mass"])
+    fj_pt = np.array(testfile["INPUTS"]["BoostedJets"]["fj_pt"])
+    fj_eta = np.array(testfile["INPUTS"]["BoostedJets"]["fj_eta"])
+    fj_phi = np.array(testfile["INPUTS"]["BoostedJets"]["fj_phi"])
+    fj_mass = np.array(testfile["INPUTS"]["BoostedJets"]["fj_mass"])
     fjs = ak.zip(
         {
             "pt": fj_pt,
@@ -296,8 +296,8 @@ def parse_semi_resolved_w_target(
         goodJetIdx = ak.local_index(js)
         goodFatJetIdx = ak.local_index(fjs)
     else:
-        goodJetIdx = get_unoverlapped_jet_index(vfjs_reco, js, dR_min=0.8)
-        goodFatJetIdx = get_unoverlapped_jet_index(vfjs_reco, fjs, dR_min=0.8)
+        goodJetIdx = get_unoverlapped_jet_index(vfjs_reco, js, dR_min=0.4)
+        goodFatJetIdx = get_unoverlapped_jet_index(vfjs_reco, fjs, dR_min=0.6)
 
 
     # generate look up tables
