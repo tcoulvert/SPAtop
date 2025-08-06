@@ -81,8 +81,8 @@ def calc_eff(LUT_boosted_pred, LUT_semiresolved_qq_pred, LUT_semiresolved_bq_pre
             predTops += predTops_semiresolved_bq
         else:
             # calculate resolved efficiency
-            predTops_semiresolved_qq = [predTop[0:2] for event in LUT_semiresolved_qq_pred for predTop in event]
-            predTops += predTops_semiresolved_qq
+            predTops_semiresolved_bq = [predTop[0:2] for event in LUT_semiresolved_bq_pred for predTop in event]
+            predTops += predTops_semiresolved_bq
 
     if LUT_resolved_pred is not None:
         if LUT_boosted_pred is not None or LUT_semiresolved_qq_pred is not None or LUT_semiresolved_bq_pred is not None:
@@ -97,7 +97,6 @@ def calc_eff(LUT_boosted_pred, LUT_semiresolved_qq_pred, LUT_semiresolved_bq_pre
 
     # then merge into the list with their pT
     predTops = np.array(predTops)
-    print(f"predTops shape = {np.shape(predTops)}")
 
     predTops_inds = np.digitize(predTops[:, 1], bins)
 
@@ -160,7 +159,6 @@ def calc_pur(LUT_boosted_target, LUT_semiresolved_qq_target, LUT_semiresolved_bq
             targetTops += targetTops_resolved
 
     targetTops = np.array(targetTops)
-    print(f"targetTops shape = {np.shape(targetTops)}")
 
     targetTops_inds = np.digitize(targetTops[:, 1], bins)
 

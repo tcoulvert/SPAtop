@@ -270,31 +270,23 @@ def parse_resolved_w_target(
         ap_FRt2 = np.array(predfile["TARGETS"]["FRt2"]["assignment_probability"])
     except:
         # resolved top detection probability
-        dp_FRt1 = np.array(
-            np.logical_and(
-                predfile["TARGETS"]["FRt1"]["mask"],
-                predfile["TARGETS"]["FRt1"]["chi2"] < RESOLVED_CHI2_CUT
-            )
+        dp_FRt1 = np.logical_and(
+            np.array(predfile["TARGETS"]["FRt1"]["mask"]),
+            np.array(predfile["TARGETS"]["FRt1"]["chi2"]) < RESOLVED_CHI2_CUT
         ).astype("float")
-        dp_FRt2 = np.array(
-            np.logical_and(
-                predfile["TARGETS"]["FRt2"]["mask"],
-                predfile["TARGETS"]["FRt2"]["chi2"] < RESOLVED_CHI2_CUT
-            )
+        dp_FRt2 = np.logical_and(
+            np.array(predfile["TARGETS"]["FRt2"]["mask"]),
+            np.array(predfile["TARGETS"]["FRt2"]["chi2"]) < RESOLVED_CHI2_CUT
         ).astype("float")
 
         # jet assignment probability
-        ap_FRt1 = np.array(
-            np.logical_and(
-                predfile["TARGETS"]["FRt1"]["mask"],
-                predfile["TARGETS"]["FRt1"]["chi2"] < RESOLVED_CHI2_CUT
-            )
+        ap_FRt1 = np.logical_and(
+            np.array(predfile["TARGETS"]["FRt1"]["mask"]),
+            np.array(predfile["TARGETS"]["FRt1"]["chi2"]) < RESOLVED_CHI2_CUT
         ).astype("float")
-        ap_FRt2 = np.array(
-            np.logical_and(
-                predfile["TARGETS"]["FRt2"]["mask"],
-                predfile["TARGETS"]["FRt2"]["chi2"] < RESOLVED_CHI2_CUT
-            )
+        ap_FRt2 = np.logical_and(
+            np.array(predfile["TARGETS"]["FRt2"]["mask"]),
+            np.array(predfile["TARGETS"]["FRt2"]["chi2"]) < RESOLVED_CHI2_CUT
         ).astype("float")
 
     dps = np.concatenate((dp_FRt1.reshape(-1, 1), dp_FRt2.reshape(-1, 1)), axis=1)

@@ -10,7 +10,7 @@ from src.analysis.semi_resolved import parse_semi_resolved_w_target
 from src.analysis.utils import calc_eff, calc_pur
 
 
-def calc_pur_eff(target_path, pred_path, bins):
+def calc_pur_eff(target_path, pred_path, bins_dict):
     # open files
     pred_h5 = h5.File(pred_path, "a")
     target_h5 = h5.File(target_path)
@@ -59,18 +59,12 @@ def calc_pur_eff(target_path, pred_path, bins):
         LUT_resolved_target_no_OR.append(event_no_OR)
 
     if SR_condition:
-        LUT_semiresolved_qq_pred_no_OR_size = 0
-        LUT_semiresolved_qq_target_no_OR_size = 0
-        LUT_semiresolved_bq_pred_no_OR_size = 0
-        LUT_semiresolved_bq_target_no_OR_size = 0
-
         LUT_semiresolved_qq_pred_no_OR = []
         for event in LUT_semiresolved_qq_wOR_pred:
             event_no_OR = []
             for predSRt in event:
                 if predSRt[2] == 0:
                     event_no_OR.append(predSRt)
-                    LUT_semiresolved_qq_pred_no_OR_size += 1
             LUT_semiresolved_qq_pred_no_OR.append(event_no_OR)
 
         LUT_semiresolved_qq_target_no_OR = []
@@ -80,7 +74,6 @@ def calc_pur_eff(target_path, pred_path, bins):
             for targetSRt in event:
                 if targetSRt[2] == 0:
                     event_no_OR.append(targetSRt)
-                    LUT_semiresolved_qq_target_no_OR_size += 1
             LUT_semiresolved_qq_target_no_OR.append(event_no_OR)
 
         LUT_semiresolved_bq_pred_no_OR = []
@@ -89,7 +82,6 @@ def calc_pur_eff(target_path, pred_path, bins):
             for predSRt in event:
                 if predSRt[2] == 0:
                     event_no_OR.append(predSRt)
-                    LUT_semiresolved_bq_pred_no_OR_size += 1
             LUT_semiresolved_bq_pred_no_OR.append(event_no_OR)
 
         LUT_semiresolved_bq_target_no_OR = []
@@ -98,43 +90,37 @@ def calc_pur_eff(target_path, pred_path, bins):
             for targetSRt in event:
                 if targetSRt[2] == 0:
                     event_no_OR.append(targetSRt)
-                    LUT_semiresolved_bq_target_no_OR_size += 1
             LUT_semiresolved_bq_target_no_OR.append(event_no_OR)
-
-        print(LUT_semiresolved_qq_pred_no_OR_size)
-        print(LUT_semiresolved_qq_target_no_OR_size)
-        print(LUT_semiresolved_bq_pred_no_OR_size)
-        print(LUT_semiresolved_bq_target_no_OR_size)
 
 
     ## calculate efficiencies and purities for b+r, b, and r (and srqq, srbq if available) ##
     results = {}
     # merged
-    results["pur_m"], results["purerr_m"] = calc_eff(LUT_boosted_pred, LUT_semiresolved_qq_wOR_pred, LUT_semiresolved_bq_wOR_pred, LUT_resolved_wOR_pred, bins)
-    results["eff_m"], results["efferr_m"] = calc_pur(LUT_boosted_target, LUT_semiresolved_qq_wOR_target, LUT_semiresolved_bq_wOR_target, LUT_resolved_wOR_target, bins)
+    results["pur_m"], results["purerr_m"] = calc_eff(LUT_boosted_pred, LUT_semiresolved_qq_wOR_pred, LUT_semiresolved_bq_wOR_pred, LUT_resolved_wOR_pred, bins_dict['all'])
+    results["eff_m"], results["efferr_m"] = calc_pur(LUT_boosted_target, LUT_semiresolved_qq_wOR_target, LUT_semiresolved_bq_wOR_target, LUT_resolved_wOR_target, bins_dict['all'])
     # boosted
-    results["pur_b"], results["purerr_b"] = calc_eff(LUT_boosted_pred, None, None, None, bins)
-    results["eff_b"], results["efferr_b"] = calc_pur(LUT_boosted_target, None, None, None, bins)
+    results["pur_b"], results["purerr_b"] = calc_eff(LUT_boosted_pred, None, None, None, bins_dict['FB'])
+    results["eff_b"], results["efferr_b"] = calc_pur(LUT_boosted_target, None, None, None, bins_dict['FB'])
     # resolved
-    results["pur_r"], results["purerr_r"] = calc_eff(None, None, None, LUT_resolved_pred, bins)
-    results["eff_r"], results["efferr_r"] = calc_pur(None, None, None, LUT_resolved_target, bins)
+    results["pur_r"], results["purerr_r"] = calc_eff(None, None, None, LUT_resolved_pred, bins_dict['FR'])
+    results["eff_r"], results["efferr_r"] = calc_pur(None, None, None, LUT_resolved_target, bins_dict['FR'])
     # resolved no OR
-    results["pur_r_or"], results["purerr_r_or"] = calc_eff(None, None, None, LUT_resolved_pred_no_OR, bins)
-    results["eff_r_or"], results["efferr_r_or"] = calc_pur(None, None, None, LUT_resolved_target_no_OR, bins)
+    results["pur_r_or"], results["purerr_r_or"] = calc_eff(None, None, None, LUT_resolved_pred_no_OR, bins_dict['FR'])
+    results["eff_r_or"], results["efferr_r_or"] = calc_pur(None, None, None, LUT_resolved_target_no_OR, bins_dict['FR'])
     # semi-resolved
     if SR_condition:
         # semi-resolved qq
-        results["pur_srqq"], results["purerr_srqq"] = calc_eff(None, LUT_semiresolved_qq_pred, None, None, bins)
-        results["eff_srqq"], results["efferr_srqq"] = calc_pur(None, LUT_semiresolved_qq_target, None, None, bins)
+        results["pur_srqq"], results["purerr_srqq"] = calc_eff(None, LUT_semiresolved_qq_pred, None, None, bins_dict['SRqq'])
+        results["eff_srqq"], results["efferr_srqq"] = calc_pur(None, LUT_semiresolved_qq_target, None, None, bins_dict['SRqq'])
         # semi-resolved qq no OR
-        results["pur_srqq_or"], results["purerr_srqq_or"] = calc_eff(None, LUT_semiresolved_qq_pred_no_OR, None, None, bins)
-        results["eff_srqq_or"], results["efferr_srqq_or"] = calc_pur(None, LUT_semiresolved_qq_target_no_OR, None, None, bins)
+        results["pur_srqq_or"], results["purerr_srqq_or"] = calc_eff(None, LUT_semiresolved_qq_pred_no_OR, None, None, bins_dict['SRqq'])
+        results["eff_srqq_or"], results["efferr_srqq_or"] = calc_pur(None, LUT_semiresolved_qq_target_no_OR, None, None, bins_dict['SRqq'])
         # semi-resolved bq
-        results["pur_srbq"], results["purerr_srbq"] = calc_eff(None, None, LUT_semiresolved_bq_pred, None, bins)
-        results["eff_srbq"], results["efferr_srbq"] = calc_pur(None, None, LUT_semiresolved_bq_target, None, bins)
+        results["pur_srbq"], results["purerr_srbq"] = calc_eff(None, None, LUT_semiresolved_bq_pred, None, bins_dict['SRbq'])
+        results["eff_srbq"], results["efferr_srbq"] = calc_pur(None, None, LUT_semiresolved_bq_target, None, bins_dict['SRbq'])
         # semi-resolved bq no OR
-        results["pur_srbq_or"], results["purerr_srbq_or"] = calc_eff(None, None, LUT_semiresolved_bq_pred_no_OR, None, bins)
-        results["eff_srbq_or"], results["efferr_srbq_or"] = calc_pur(None, None, LUT_semiresolved_bq_target_no_OR, None, bins)
+        results["pur_srbq_or"], results["purerr_srbq_or"] = calc_eff(None, None, LUT_semiresolved_bq_pred_no_OR, None, bins_dict['SRbq'])
+        results["eff_srbq_or"], results["efferr_srbq_or"] = calc_pur(None, None, LUT_semiresolved_bq_target_no_OR, None, bins_dict['SRbq'])
 
 
     print("Number of Boosted Prediction:", np.array([pred for event in LUT_boosted_pred for pred in event]).shape[0])
@@ -164,18 +150,34 @@ def calc_pur_eff(target_path, pred_path, bins):
             np.array([pred for event in LUT_semiresolved_bq_pred_no_OR for pred in event]).shape[0],
         )
 
-    return results
+    return results, SR_condition
 
 
 # I started to use "efficiency" for describing how many gen tops were reconstructed
 # and "purity" for desrcribing how many reco tops are actually gen tops
-def plot_pur_eff_w_dict(plot_dict, target_path, save_path=None, proj_name=None, bins=None):
-    if bins is None:
-        bins = np.arange(0, 1050, 50)
+def plot_pur_eff_w_dict(
+    plot_dict, target_path, save_path=None, proj_name=None, 
+    bins_dict={
+        'FR': np.arange(0, 300, 10),
+        'SRqq': np.arange(100, 400, 10),
+        'SRbq': np.arange(100, 400, 10),
+        'FB': np.arange(200, 1000, 50),
+        'all': np.arange(0, 1000, 50),
+    }
+):
 
-    plot_bins = np.append(bins, 2 * bins[-1] - bins[-2])
-    bin_centers = [(plot_bins[i] + plot_bins[i + 1]) / 2 for i in range(plot_bins.size - 1)]
-    xerr = (plot_bins[1] - plot_bins[0]) / 2 * np.ones(plot_bins.shape[0] - 1)
+    plot_bins_dict = {
+        key: np.append(bins, 2 * bins[-1] - bins[-2])
+        for key, bins in bins_dict.items()
+    }
+    bin_centers_dict = {
+        key: [(plot_bins[i] + plot_bins[i + 1]) / 2 for i in range(plot_bins.size - 1)]
+        for key, plot_bins in plot_bins_dict.items()
+    }
+    xerr_dict = {
+        key: (plot_bins[1] - plot_bins[0]) / 2 * np.ones(plot_bins.shape[0] - 1)
+        for key, plot_bins in plot_bins_dict.items()
+    }
 
     # m: merged (b+r w OR)
     # b: boosted
@@ -281,63 +283,62 @@ def plot_pur_eff_w_dict(plot_dict, target_path, save_path=None, proj_name=None, 
     ## plot purities and efficiencies ##
     for tag, pred_path in plot_dict.items():
         print("Processing", tag)
-        results = calc_pur_eff(target_path, pred_path, bins)
-        SR_condition = any('sr' in key.split('_')[-1] for key in results.keys())
+        results, SR_condition = calc_pur_eff(target_path, pred_path, bins_dict)
 
         # merged
         ax_m[0].errorbar(
-            x=bin_centers, y=results["pur_m"], xerr=xerr, yerr=results["purerr_m"], fmt="o", capsize=5, label=tag
+            x=bin_centers_dict['all'], y=results["pur_m"], xerr=xerr_dict['all'], yerr=results["purerr_m"], fmt="o", capsize=5, label=tag
         )
         ax_m[1].errorbar(
-            x=bin_centers, y=results["eff_m"], xerr=xerr, yerr=results["efferr_m"], fmt="o", capsize=5, label=tag
+            x=bin_centers_dict['all'], y=results["eff_m"], xerr=xerr_dict['all'], yerr=results["efferr_m"], fmt="o", capsize=5, label=tag
         )
         # boosted
         ax_b[0].errorbar(
-            x=bin_centers, y=results["pur_b"], xerr=xerr, yerr=results["purerr_b"], fmt="o", capsize=5, label=tag
+            x=bin_centers_dict['FB'], y=results["pur_b"], xerr=xerr_dict['FB'], yerr=results["purerr_b"], fmt="o", capsize=5, label=tag
         )
         ax_b[1].errorbar(
-            x=bin_centers, y=results["eff_b"], xerr=xerr, yerr=results["efferr_b"], fmt="o", capsize=5, label=tag
+            x=bin_centers_dict['FB'], y=results["eff_b"], xerr=xerr_dict['FB'], yerr=results["efferr_b"], fmt="o", capsize=5, label=tag
         )
         # resolved
         ax_r[0].errorbar(
-            x=bin_centers, y=results["pur_r"], xerr=xerr, yerr=results["purerr_r"], fmt="o", capsize=5, label=tag
+            x=bin_centers_dict['FR'], y=results["pur_r"], xerr=xerr_dict['FR'], yerr=results["purerr_r"], fmt="o", capsize=5, label=tag
         )
         ax_r[1].errorbar(
-            x=bin_centers, y=results["eff_r"], xerr=xerr, yerr=results["efferr_r"], fmt="o", capsize=5, label=tag
+            x=bin_centers_dict['FR'], y=results["eff_r"], xerr=xerr_dict['FR'], yerr=results["efferr_r"], fmt="o", capsize=5, label=tag
         )
         ax_r_or[0].errorbar(
-            x=bin_centers, y=results["pur_r_or"], xerr=xerr, yerr=results["purerr_r_or"], fmt="o", capsize=5, label=tag
+            x=bin_centers_dict['FR'], y=results["pur_r_or"], xerr=xerr_dict['FR'], yerr=results["purerr_r_or"], fmt="o", capsize=5, label=tag
         )
         ax_r_or[1].errorbar(
-            x=bin_centers, y=results["eff_r_or"], xerr=xerr, yerr=results["efferr_r_or"], fmt="o", capsize=5, label=tag
+            x=bin_centers_dict['FR'], y=results["eff_r_or"], xerr=xerr_dict['FR'], yerr=results["efferr_r_or"], fmt="o", capsize=5, label=tag
         )
         # semi-resolved
         if SR_condition:
             # semi-resolved qq
             ax_srqq[0].errorbar(
-                x=bin_centers, y=results["pur_srqq"], xerr=xerr, yerr=results["purerr_srqq"], fmt="o", capsize=5, label=tag
+                x=bin_centers_dict['SRqq'], y=results["pur_srqq"], xerr=xerr_dict['SRqq'], yerr=results["purerr_srqq"], fmt="o", capsize=5, label=tag
             )
             ax_srqq[1].errorbar(
-                x=bin_centers, y=results["eff_srqq"], xerr=xerr, yerr=results["efferr_srqq"], fmt="o", capsize=5, label=tag
+                x=bin_centers_dict['SRqq'], y=results["eff_srqq"], xerr=xerr_dict['SRqq'], yerr=results["efferr_srqq"], fmt="o", capsize=5, label=tag
             )
             ax_srqq_or[0].errorbar(
-                x=bin_centers, y=results["pur_srqq_or"], xerr=xerr, yerr=results["purerr_srqq_or"], fmt="o", capsize=5, label=tag
+                x=bin_centers_dict['SRqq'], y=results["pur_srqq_or"], xerr=xerr_dict['SRqq'], yerr=results["purerr_srqq_or"], fmt="o", capsize=5, label=tag
             )
             ax_srqq_or[1].errorbar(
-                x=bin_centers, y=results["eff_srqq_or"], xerr=xerr, yerr=results["efferr_srqq_or"], fmt="o", capsize=5, label=tag
+                x=bin_centers_dict['SRqq'], y=results["eff_srqq_or"], xerr=xerr_dict['SRqq'], yerr=results["efferr_srqq_or"], fmt="o", capsize=5, label=tag
             )
             # semi-resolved bq
             ax_srbq[0].errorbar(
-                x=bin_centers, y=results["pur_srbq"], xerr=xerr, yerr=results["purerr_srbq"], fmt="o", capsize=5, label=tag
+                x=bin_centers_dict['SRbq'], y=results["pur_srbq"], xerr=xerr_dict['SRbq'], yerr=results["purerr_srbq"], fmt="o", capsize=5, label=tag
             )
             ax_srbq[1].errorbar(
-                x=bin_centers, y=results["eff_srbq"], xerr=xerr, yerr=results["efferr_srbq"], fmt="o", capsize=5, label=tag
+                x=bin_centers_dict['SRbq'], y=results["eff_srbq"], xerr=xerr_dict['SRbq'], yerr=results["efferr_srbq"], fmt="o", capsize=5, label=tag
             )
             ax_srbq_or[0].errorbar(
-                x=bin_centers, y=results["pur_srbq_or"], xerr=xerr, yerr=results["purerr_srbq_or"], fmt="o", capsize=5, label=tag
+                x=bin_centers_dict['SRbq'], y=results["pur_srbq_or"], xerr=xerr_dict['SRbq'], yerr=results["purerr_srbq_or"], fmt="o", capsize=5, label=tag
             )
             ax_srbq_or[1].errorbar(
-                x=bin_centers, y=results["eff_srbq_or"], xerr=xerr, yerr=results["efferr_srbq_or"], fmt="o", capsize=5, label=tag
+                x=bin_centers_dict['SRbq'], y=results["eff_srbq_or"], xerr=xerr_dict['SRbq'], yerr=results["efferr_srbq_or"], fmt="o", capsize=5, label=tag
             )
 
 
