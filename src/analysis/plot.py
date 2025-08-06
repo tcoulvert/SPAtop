@@ -212,14 +212,14 @@ def plot_pur_eff_w_dict(
     ## preset figure labels, titles, limits, etc. ##
     # merged
     ax_m[0].set(
-        xlabel=r"Merged Reco top pT (GeV)",
+        xlabel=r"All categories Reco top pT (GeV)",
         ylabel=r"Reconstruction Purity",
-        title=f"Reconstruction Purity vs. Merged Reco top pT",
+        title=f"Reconstruction Purity vs. All category Reco top pT",
     )
     ax_m[1].set(
-        xlabel=r"Merged Gen top pT (GeV)",
+        xlabel=r"All categories Gen top pT (GeV)",
         ylabel=r"Reconstruction Efficiency",
-        title=f"Reconstruction Efficiency vs. Merged Gen top pT",
+        title=f"Reconstruction Efficiency vs. All category Gen top pT",
     )
     # boosted
     ax_b[0].set(
@@ -300,6 +300,7 @@ def plot_pur_eff_w_dict(
     SR_condition = False
     ## plot purities and efficiencies ##
     for tag, pred_path in plot_dict.items():
+        tag_label = tag
         if 'chi2' in tag:
             tag_list = tag.split('_')
             tag = tag_list[0]
@@ -309,58 +310,58 @@ def plot_pur_eff_w_dict(
 
         # merged
         ax_m[0].errorbar(
-            x=bin_centers_dict['all'], y=results["pur_m"], xerr=xerr_dict['all'], yerr=results["purerr_m"], fmt="o", capsize=5, label=tag
+            x=bin_centers_dict['all'], y=results["pur_m"], xerr=xerr_dict['all'], yerr=results["purerr_m"], fmt="o", capsize=5, label=tag_label
         )
         ax_m[1].errorbar(
-            x=bin_centers_dict['all'], y=results["eff_m"], xerr=xerr_dict['all'], yerr=results["efferr_m"], fmt="o", capsize=5, label=tag
+            x=bin_centers_dict['all'], y=results["eff_m"], xerr=xerr_dict['all'], yerr=results["efferr_m"], fmt="o", capsize=5, label=tag_label
         )
         # boosted
         ax_b[0].errorbar(
-            x=bin_centers_dict['FB'], y=results["pur_b"], xerr=xerr_dict['FB'], yerr=results["purerr_b"], fmt="o", capsize=5, label=tag
+            x=bin_centers_dict['FB'], y=results["pur_b"], xerr=xerr_dict['FB'], yerr=results["purerr_b"], fmt="o", capsize=5, label=tag_label
         )
         ax_b[1].errorbar(
-            x=bin_centers_dict['FB'], y=results["eff_b"], xerr=xerr_dict['FB'], yerr=results["efferr_b"], fmt="o", capsize=5, label=tag
+            x=bin_centers_dict['FB'], y=results["eff_b"], xerr=xerr_dict['FB'], yerr=results["efferr_b"], fmt="o", capsize=5, label=tag_label
         )
         # resolved
         ax_r[0].errorbar(
-            x=bin_centers_dict['FR'], y=results["pur_r"], xerr=xerr_dict['FR'], yerr=results["purerr_r"], fmt="o", capsize=5, label=tag
+            x=bin_centers_dict['FR'], y=results["pur_r"], xerr=xerr_dict['FR'], yerr=results["purerr_r"], fmt="o", capsize=5, label=tag_label
         )
         ax_r[1].errorbar(
-            x=bin_centers_dict['FR'], y=results["eff_r"], xerr=xerr_dict['FR'], yerr=results["efferr_r"], fmt="o", capsize=5, label=tag
+            x=bin_centers_dict['FR'], y=results["eff_r"], xerr=xerr_dict['FR'], yerr=results["efferr_r"], fmt="o", capsize=5, label=tag_label
         )
         ax_r_or[0].errorbar(
-            x=bin_centers_dict['FR'], y=results["pur_r_or"], xerr=xerr_dict['FR'], yerr=results["purerr_r_or"], fmt="o", capsize=5, label=tag
+            x=bin_centers_dict['FR'], y=results["pur_r_or"], xerr=xerr_dict['FR'], yerr=results["purerr_r_or"], fmt="o", capsize=5, label=tag_label
         )
         ax_r_or[1].errorbar(
-            x=bin_centers_dict['FR'], y=results["eff_r_or"], xerr=xerr_dict['FR'], yerr=results["efferr_r_or"], fmt="o", capsize=5, label=tag
+            x=bin_centers_dict['FR'], y=results["eff_r_or"], xerr=xerr_dict['FR'], yerr=results["efferr_r_or"], fmt="o", capsize=5, label=tag_label
         )
         # semi-resolved
         if SR_condition:
             # semi-resolved qq
             ax_srqq[0].errorbar(
-                x=bin_centers_dict['SRqq'], y=results["pur_srqq"], xerr=xerr_dict['SRqq'], yerr=results["purerr_srqq"], fmt="o", capsize=5, label=tag
+                x=bin_centers_dict['SRqq'], y=results["pur_srqq"], xerr=xerr_dict['SRqq'], yerr=results["purerr_srqq"], fmt="o", capsize=5, label=tag_label
             )
             ax_srqq[1].errorbar(
-                x=bin_centers_dict['SRqq'], y=results["eff_srqq"], xerr=xerr_dict['SRqq'], yerr=results["efferr_srqq"], fmt="o", capsize=5, label=tag
+                x=bin_centers_dict['SRqq'], y=results["eff_srqq"], xerr=xerr_dict['SRqq'], yerr=results["efferr_srqq"], fmt="o", capsize=5, label=tag_label
             )
             ax_srqq_or[0].errorbar(
-                x=bin_centers_dict['SRqq'], y=results["pur_srqq_or"], xerr=xerr_dict['SRqq'], yerr=results["purerr_srqq_or"], fmt="o", capsize=5, label=tag
+                x=bin_centers_dict['SRqq'], y=results["pur_srqq_or"], xerr=xerr_dict['SRqq'], yerr=results["purerr_srqq_or"], fmt="o", capsize=5, label=tag_label
             )
             ax_srqq_or[1].errorbar(
-                x=bin_centers_dict['SRqq'], y=results["eff_srqq_or"], xerr=xerr_dict['SRqq'], yerr=results["efferr_srqq_or"], fmt="o", capsize=5, label=tag
+                x=bin_centers_dict['SRqq'], y=results["eff_srqq_or"], xerr=xerr_dict['SRqq'], yerr=results["efferr_srqq_or"], fmt="o", capsize=5, label=tag_label
             )
             # semi-resolved bq
             ax_srbq[0].errorbar(
-                x=bin_centers_dict['SRbq'], y=results["pur_srbq"], xerr=xerr_dict['SRbq'], yerr=results["purerr_srbq"], fmt="o", capsize=5, label=tag
+                x=bin_centers_dict['SRbq'], y=results["pur_srbq"], xerr=xerr_dict['SRbq'], yerr=results["purerr_srbq"], fmt="o", capsize=5, label=tag_label
             )
             ax_srbq[1].errorbar(
-                x=bin_centers_dict['SRbq'], y=results["eff_srbq"], xerr=xerr_dict['SRbq'], yerr=results["efferr_srbq"], fmt="o", capsize=5, label=tag
+                x=bin_centers_dict['SRbq'], y=results["eff_srbq"], xerr=xerr_dict['SRbq'], yerr=results["efferr_srbq"], fmt="o", capsize=5, label=tag_label
             )
             ax_srbq_or[0].errorbar(
-                x=bin_centers_dict['SRbq'], y=results["pur_srbq_or"], xerr=xerr_dict['SRbq'], yerr=results["purerr_srbq_or"], fmt="o", capsize=5, label=tag
+                x=bin_centers_dict['SRbq'], y=results["pur_srbq_or"], xerr=xerr_dict['SRbq'], yerr=results["purerr_srbq_or"], fmt="o", capsize=5, label=tag_label
             )
             ax_srbq_or[1].errorbar(
-                x=bin_centers_dict['SRbq'], y=results["eff_srbq_or"], xerr=xerr_dict['SRbq'], yerr=results["efferr_srbq_or"], fmt="o", capsize=5, label=tag
+                x=bin_centers_dict['SRbq'], y=results["eff_srbq_or"], xerr=xerr_dict['SRbq'], yerr=results["efferr_srbq_or"], fmt="o", capsize=5, label=tag_label
             )
 
 
