@@ -12,7 +12,13 @@ N_AK15_JETS = 2
 N_TOPS = 2
 
 def get_unoverlapped_jet_index(fjs, js, dR_min=0.5):
-    overlapped = ak.sum(js[:, np.newaxis].deltaR(fjs) < dR_min, axis=-2) > 0
+    if fjs is not list:
+        fjs = [fjs]
+
+    overlapped = ak.sum(js[:, np.newaxis].deltaR(fjs[0]) < dR_min, axis=-2) > 0
+    for i in range(1, len(fjs)):
+        overlapped = overlapped | ak.sum(js[:, np.newaxis].deltaR(fjs[i]) < dR_min, axis=-2) > 0
+
     jet_index_passed = ak.local_index(js).mask[~overlapped]
     jet_index_passed = ak.drop_none(jet_index_passed)
     return jet_index_passed
@@ -34,7 +40,7 @@ def sel_pred_FRt_by_dp_ap(dps, aps, b_ps, q1_ps, q2_ps):
     q1_ps_sel = q1_ps[idx_sel]
     q2_ps_sel = q2_ps[idx_sel]
 
-    # require b1 b2 assignment are AK4 jet
+    # require b, q1, q2 assignment are AK4 jet
     b_ak4_filter = b_ps_sel < N_AK4_JETS
     q1_ak4_filter = q1_ps_sel < N_AK4_JETS
     q2_ak4_filter = q2_ps_sel < N_AK4_JETS
@@ -163,63 +169,56 @@ def gen_target_FRt_LUT(
 
     return builder
 
+# Calculate the most probable number of resonant particles
 
 def parse_resolved_w_target(
-    testfile, predfile, fjs_reco=None,
-    overlap='Boosted',
-    testfile_dict={'INPUTS': 'INPUTS', 'TARGETS': 'TARGETS'},
-    predfile_dict={'INPUTS': 'INPUTS', 'TARGETS': 'TARGETS'},
+    testfile, predfile, 
+    vfjs_reco=None, fjs_reco=None, overlap='All',
 ):
     # FRt pt
-    FRt1_pt = np.array(testfile[testfile_dict["TARGETS"]]["FRt1"]["pt"])
-    FRt2_pt = np.array(testfile[testfile_dict["TARGETS"]]["FRt2"]["pt"])
+    FRt1_pt = np.array(testfile["TARGETS"]["FRt1"]["pt"])
+    FRt2_pt = np.array(testfile["TARGETS"]["FRt2"]["pt"])
     FRt_pts = np.concatenate((FRt1_pt.reshape(-1, 1), FRt2_pt.reshape(-1, 1)), axis=1)
     FRt_pts = ak.Array(FRt_pts)
 
 
     # resolved mask
-    FRt1_mask = np.array(testfile[testfile_dict["TARGETS"]]["FRt1"]["mask"])
-    FRt2_mask = np.array(testfile[testfile_dict["TARGETS"]]["FRt2"]["mask"])
+    FRt1_mask = np.array(testfile["TARGETS"]["FRt1"]["mask"])
+    FRt2_mask = np.array(testfile["TARGETS"]["FRt2"]["mask"])
     FRt_masks = np.concatenate((FRt1_mask.reshape(-1, 1), FRt2_mask.reshape(-1, 1)), axis=1)
     FRt_masks = ak.Array(FRt_masks)
 
 
     # boosted mask
+    # FB
+    FBt1_mask = np.array(testfile["TARGETS"]["FBt1"]["mask"])
+    FBt2_mask = np.array(testfile["TARGETS"]["FBt2"]["mask"])
+    FBt_masks = np.concatenate((FBt1_mask.reshape(-1, 1), FBt2_mask.reshape(-1, 1)), axis=1)
+    FBt_masks = ak.Array(FBt_masks)
     # SRqq
-    SRqqt1_mask = np.array(testfile[testfile_dict["TARGETS"]]["SRqqt1"]["mask"])
-    SRqqt2_mask = np.array(testfile[testfile_dict["TARGETS"]]["SRqqt2"]["mask"])
+    SRqqt1_mask = np.array(testfile["TARGETS"]["SRqqt1"]["mask"])
+    SRqqt2_mask = np.array(testfile["TARGETS"]["SRqqt2"]["mask"])
     SRqqt_masks = np.concatenate((SRqqt1_mask.reshape(-1, 1), SRqqt2_mask.reshape(-1, 1)), axis=1)
     SRqqt_masks = ak.Array(SRqqt_masks)
     # SRbq
-    SRbqt1_mask = np.array(testfile[testfile_dict["TARGETS"]]["SRbqt1"]["mask"])
-    SRbqt2_mask = np.array(testfile[testfile_dict["TARGETS"]]["SRbqt2"]["mask"])
+    SRbqt1_mask = np.array(testfile["TARGETS"]["SRbqt1"]["mask"])
+    SRbqt2_mask = np.array(testfile["TARGETS"]["SRbqt2"]["mask"])
     SRbqt_masks = np.concatenate((SRbqt1_mask.reshape(-1, 1), SRbqt2_mask.reshape(-1, 1)), axis=1)
     SRbqt_masks = ak.Array(SRbqt_masks)
-    # FB
-    FBt1_mask = np.array(testfile[testfile_dict["TARGETS"]]["FBt1"]["mask"])
-    FBt2_mask = np.array(testfile[testfile_dict["TARGETS"]]["FBt2"]["mask"])
-    FBt_masks = np.concatenate((FBt1_mask.reshape(-1, 1), FBt2_mask.reshape(-1, 1)), axis=1)
-    FBt_masks = ak.Array(FBt_masks)
 
-    # FR overlap with FB
-    if overlap.lower() == 'boosted':
-        FRt_overlap = FRt_masks & FBt_masks  # only FR / FB overlap
-    elif overlap.lower() == 'all':
-        FRt_overlap = FRt_masks & (SRqqt_masks | SRbqt_masks | FBt_masks)  # FR / all overlap
-    else:
-        raise Exception(f"Overlap criteria {overlap} not implemented, try \'Boosted\' or \'All\'.")
+    FRt_overlap = FRt_masks & (SRqqt_masks | SRbqt_masks | FBt_masks)  # FR / all overlap
     FRt_overlap = ak.Array(ak.to_numpy(FRt_overlap).astype(float))  # necessary for downstream analysis, b/c NumPy requires uniform typing
 
 
     # target jets
-    b_FRt1_t = np.array(testfile[testfile_dict["TARGETS"]]["FRt1"]["b"])
-    b_FRt2_t = np.array(testfile[testfile_dict["TARGETS"]]["FRt2"]["b"])
+    b_FRt1_t = np.array(testfile["TARGETS"]["FRt1"]["b"])
+    b_FRt2_t = np.array(testfile["TARGETS"]["FRt2"]["b"])
 
-    q1_FRt1_t = np.array(testfile[testfile_dict["TARGETS"]]["FRt1"]["q1"])
-    q1_FRt2_t = np.array(testfile[testfile_dict["TARGETS"]]["FRt2"]["q1"])
+    q1_FRt1_t = np.array(testfile["TARGETS"]["FRt1"]["q1"])
+    q1_FRt2_t = np.array(testfile["TARGETS"]["FRt2"]["q1"])
 
-    q2_FRt1_t = np.array(testfile[testfile_dict["TARGETS"]]["FRt1"]["q2"])
-    q2_FRt2_t = np.array(testfile[testfile_dict["TARGETS"]]["FRt2"]["q2"])
+    q2_FRt1_t = np.array(testfile["TARGETS"]["FRt1"]["q2"])
+    q2_FRt2_t = np.array(testfile["TARGETS"]["FRt2"]["q2"])
 
     b_ts = np.concatenate(
         (b_FRt1_t.reshape(-1, 1), b_FRt2_t.reshape(-1, 1)), axis=1
@@ -236,14 +235,14 @@ def parse_resolved_w_target(
 
 
     # pred jets
-    b_FRt1_p = np.array(predfile[predfile_dict["TARGETS"]]["FRt1"]["b"])
-    b_FRt2_p = np.array(predfile[predfile_dict["TARGETS"]]["FRt2"]["b"])
+    b_FRt1_p = np.array(predfile["TARGETS"]["FRt1"]["b"])
+    b_FRt2_p = np.array(predfile["TARGETS"]["FRt2"]["b"])
 
-    q1_FRt1_p = np.array(predfile[predfile_dict["TARGETS"]]["FRt1"]["q1"])
-    q1_FRt2_p = np.array(predfile[predfile_dict["TARGETS"]]["FRt2"]["q1"])
+    q1_FRt1_p = np.array(predfile["TARGETS"]["FRt1"]["q1"])
+    q1_FRt2_p = np.array(predfile["TARGETS"]["FRt2"]["q1"])
 
-    q2_FRt1_p = np.array(predfile[predfile_dict["TARGETS"]]["FRt1"]["q2"])
-    q2_FRt2_p = np.array(predfile[predfile_dict["TARGETS"]]["FRt2"]["q2"])
+    q2_FRt1_p = np.array(predfile["TARGETS"]["FRt1"]["q2"])
+    q2_FRt2_p = np.array(predfile["TARGETS"]["FRt2"]["q2"])
 
     b_ps = np.concatenate(
         (b_FRt1_p.reshape(-1, 1), b_FRt2_p.reshape(-1, 1)), axis=1
@@ -261,19 +260,19 @@ def parse_resolved_w_target(
 
     try:
         # jet detection probability
-        dp_FRt1 = np.array(predfile[predfile_dict["TARGETS"]]["FRt1"]["detection_probability"])
-        dp_FRt2 = np.array(predfile[predfile_dict["TARGETS"]]["FRt2"]["detection_probability"])
+        dp_FRt1 = np.array(predfile["TARGETS"]["FRt1"]["detection_probability"])
+        dp_FRt2 = np.array(predfile["TARGETS"]["FRt2"]["detection_probability"])
         # jet assignment probability
-        ap_FRt1 = np.array(predfile[predfile_dict["TARGETS"]]["FRt1"]["assignment_probability"])
-        ap_FRt2 = np.array(predfile[predfile_dict["TARGETS"]]["FRt2"]["assignment_probability"])
+        ap_FRt1 = np.array(predfile["TARGETS"]["FRt1"]["assignment_probability"])
+        ap_FRt2 = np.array(predfile["TARGETS"]["FRt2"]["assignment_probability"])
     except:
         # boosted Higgs detection probability
-        dp_FRt1 = np.array(predfile[predfile_dict["TARGETS"]]["FRt1"]["mask"]).astype("float")
-        dp_FRt2 = np.array(predfile[predfile_dict["TARGETS"]]["FRt2"]["mask"]).astype("float")
+        dp_FRt1 = np.array(predfile["TARGETS"]["FRt1"]["mask"]).astype("float")
+        dp_FRt2 = np.array(predfile["TARGETS"]["FRt2"]["mask"]).astype("float")
 
         # fatjet assignment probability
-        ap_FRt1 = np.array(predfile[predfile_dict["TARGETS"]]["FRt1"]["mask"]).astype("float")
-        ap_FRt2 = np.array(predfile[predfile_dict["TARGETS"]]["FRt2"]["mask"]).astype("float")
+        ap_FRt1 = np.array(predfile["TARGETS"]["FRt1"]["mask"]).astype("float")
+        ap_FRt2 = np.array(predfile["TARGETS"]["FRt2"]["mask"]).astype("float")
 
     dps = np.concatenate((dp_FRt1.reshape(-1, 1), dp_FRt2.reshape(-1, 1)), axis=1)
     aps = np.concatenate((ap_FRt1.reshape(-1, 1), ap_FRt2.reshape(-1, 1)), axis=1)
@@ -282,10 +281,10 @@ def parse_resolved_w_target(
 
 
     # reconstruct jet 4-momentum objects
-    j_pt = np.array(testfile[testfile_dict["INPUTS"]]["Jets"]["pt"])
-    j_eta = np.array(testfile[testfile_dict["INPUTS"]]["Jets"]["eta"])
-    j_phi = np.array(testfile[testfile_dict["INPUTS"]]["Jets"]["phi"])
-    j_mass = np.array(testfile[testfile_dict["INPUTS"]]["Jets"]["mass"])
+    j_pt = np.array(testfile["INPUTS"]["Jets"]["pt"])
+    j_eta = np.array(testfile["INPUTS"]["Jets"]["eta"])
+    j_phi = np.array(testfile["INPUTS"]["Jets"]["phi"])
+    j_mass = np.array(testfile["INPUTS"]["Jets"]["mass"])
     js = ak.zip(
         {
             "pt": j_pt,
@@ -308,20 +307,22 @@ def parse_resolved_w_target(
     if fjs_reco is None:
         goodJetIdx = ak.local_index(js)
     else:
-        goodJetIdx = get_unoverlapped_jet_index(fjs_reco, js, dR_min=0.8)
+        goodJetIdx = get_unoverlapped_jet_index(fjs_reco, js, dR_min=0.4)
 
 
     # generate look up tables
     LUT_pred = gen_pred_FRt_LUT(
         b_ps_selected, q1_ps_selected, q2_ps_selected, 
         b_ts_selected, q1_ts_selected, q2_ts_selected, 
-        js, goodJetIdx, overlap_selected, 
+        js, goodJetIdx, 
+        overlap_selected, 
         ak.ArrayBuilder()
     ).snapshot()
     LUT_target = gen_target_FRt_LUT(
         b_ps_selected, q1_ps_selected, q2_ps_selected,
         b_ts_selected, q1_ts_selected, q2_ts_selected, 
-        FRt_selected_pts, overlap_selected,
+        FRt_selected_pts, 
+        overlap_selected,
         ak.ArrayBuilder(),
     ).snapshot()
 

@@ -6,6 +6,7 @@ import numpy as np
 
 from src.analysis.boosted import parse_boosted_w_target
 from src.analysis.resolved import parse_resolved_w_target
+from src.analysis.semi_resolved import parse_semi_resolved_w_target
 from src.analysis.utils import calc_eff, calc_pur
 
 
@@ -19,10 +20,21 @@ def calc_pur_eff(target_path, pred_path, bins):
         pred_h5["INPUTS"] = pred_h5["SpecialKey.Inputs"]
         pred_h5["TARGETS"] = pred_h5["SpecialKey.Targets"]
 
+    SR_condition = any("SR" in key for key in pred_h5["TARGETS"].keys())
+
     # generate look up tables
-    LUT_boosted_pred, LUT_boosted_target, fjs_reco = parse_boosted_w_target(target_h5, pred_h5)
+    LUT_boosted_pred, LUT_boosted_target, vfjs_reco = parse_boosted_w_target(target_h5, pred_h5)
+    if SR_condition:
+        LUT_semiresolved_qq_pred, LUT_semiresolved_qq_target, fjs_reco_qq = parse_semi_resolved_w_target(target_h5, pred_h5, 'qq', vfjs_reco=None)
+        LUT_semiresolved_qq_wOR_pred, LUT_semiresolved_qq_wOR_target, _ = parse_semi_resolved_w_target(target_h5, pred_h5, 'qq', vfjs_reco=vfjs_reco)
+        LUT_semiresolved_bq_pred, LUT_semiresolved_bq_target, fjs_reco_bq = parse_semi_resolved_w_target(target_h5, pred_h5, 'bq', vfjs_reco=None)
+        LUT_semiresolved_bq_wOR_pred, LUT_semiresolved_bq_wOR_target, _ = parse_semi_resolved_w_target(target_h5, pred_h5, 'bq', vfjs_reco=vfjs_reco)
     LUT_resolved_pred, LUT_resolved_target, _ = parse_resolved_w_target(target_h5, pred_h5, fjs_reco=None)
-    LUT_resolved_wOR_pred, LUT_resolved_wOR_target, _ = parse_resolved_w_target(target_h5, pred_h5, fjs_reco=fjs_reco)
+    if SR_condition:
+        LUT_resolved_wOR_pred, LUT_resolved_wOR_target, _ = parse_resolved_w_target(target_h5, pred_h5, fjs_reco=[vfjs_reco, fjs_reco_qq, fjs_reco_bq])
+    else:
+        LUT_resolved_wOR_pred, LUT_resolved_wOR_target, _ = parse_resolved_w_target(target_h5, pred_h5, fjs_reco=vfjs_reco)
+    
 
     LUT_resolved_pred_no_OR = []
     for event in LUT_resolved_wOR_pred:
@@ -39,6 +51,39 @@ def calc_pur_eff(target_path, pred_path, bins):
             if targetFRt[2] == 0:
                 event_no_OR.append(targetFRt)
         LUT_resolved_target_no_OR.append(event_no_OR)
+
+    if SR_condition:
+        LUT_semiresolved_qq_pred_no_OR = []
+        for event in LUT_semiresolved_qq_wOR_pred:
+            event_no_OR = []
+            for predSRt in event:
+                if predSRt[2] == 0:
+                    event_no_OR.append(predSRt)
+            LUT_semiresolved_qq_pred_no_OR.append(event_no_OR)
+
+        LUT_semiresolved_qq_target_no_OR = []
+        for event in LUT_semiresolved_qq_wOR_target:
+            event_no_OR = []
+            for targetSRt in event:
+                if targetSRt[2] == 0:
+                    event_no_OR.append(targetSRt)
+            LUT_semiresolved_qq_target_no_OR.append(event_no_OR)
+
+        LUT_semiresolved_bq_pred_no_OR = []
+        for event in LUT_semiresolved_bq_wOR_pred:
+            event_no_OR = []
+            for predSRt in event:
+                if predSRt[2] == 0:
+                    event_no_OR.append(predSRt)
+            LUT_semiresolved_bq_pred_no_OR.append(event_no_OR)
+
+        LUT_semiresolved_bq_target_no_OR = []
+        for event in LUT_semiresolved_bq_wOR_target:
+            event_no_OR = []
+            for targetSRt in event:
+                if targetSRt[2] == 0:
+                    event_no_OR.append(targetSRt)
+            LUT_semiresolved_bq_target_no_OR.append(event_no_OR)
 
     # calculate efficiencies and purities for b+r, b, and r
     results = {}

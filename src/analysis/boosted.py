@@ -22,10 +22,10 @@ def sel_pred_FBt_by_dp_ap(dps, aps, bqq_ps):
     idx_descend = np.flip(np.argsort(ps, axis=-1), axis=-1)
     idx_sel = [idx_e[:N_e] for idx_e, N_e in zip(idx_descend, TopNum)]
 
-    # select the predicted bb assignment via the indices
+    # select the predicted bqq assignment via the indices
     bqq_ps_sel = bqq_ps[idx_sel]
 
-    # require bb assignment is a fatjet
+    # require bqq assignment is a AK15 jet
     ak15Filter = bqq_ps_sel >= (N_AK4_JETS + N_AK8_JETS)
     bqq_ps_passed = bqq_ps_sel.mask[ak15Filter]
     bqq_ps_passed = ak.drop_none(bqq_ps_passed)
@@ -59,7 +59,7 @@ def gen_pred_FBt_LUT(bqq_ps_passed, bqq_ts_selected, fj_pts, builder):
             correct = 0.
             predFBt_pt = fj_pt_event[bqq_p - (N_AK4_JETS + N_AK8_JETS)]
             for bqq_t in bqq_t_event:
-                if bqq_p == bqq_t + (N_AK4_JETS + N_AK8_JETS):
+                if bqq_p - (N_AK4_JETS + N_AK8_JETS) == bqq_t:
                     correct = 1.
 
             builder.begin_list()
@@ -89,7 +89,7 @@ def gen_target_FBt_LUT(bqq_ps_passed, bqq_ts_selected, targetFBt_pts, builder):
             retrieved = 0.
             targetFBt_pt = targetH_pts_event[i]
             for bqq_p in bqq_p_event:
-                if bqq_p == bqq_t + (N_AK4_JETS + N_AK8_JETS):
+                if bqq_p - (N_AK4_JETS + N_AK8_JETS) == bqq_t:
                     retrieved = 1.
 
             builder.begin_list()
@@ -108,25 +108,23 @@ def gen_target_FBt_LUT(bqq_ps_passed, bqq_ts_selected, targetFBt_pts, builder):
 # [targetFBt retrieved or not, target FBt pt]
 def parse_boosted_w_target(
     testfile, predfile,
-    testfile_dict={'INPUTS': 'INPUTS', 'TARGETS': 'TARGETS'},
-    predfile_dict={'INPUTS': 'INPUTS', 'TARGETS': 'TARGETS'},
 ):
     # Collect H pt, mask, target and predicted jet and fjets for 3 Hs in each event
     # t pt
-    FBt1_pt = np.array(testfile[testfile_dict["TARGETS"]]["FBt1"]["pt"])
-    FBt2_pt = np.array(testfile[testfile_dict["TARGETS"]]["FBt2"]["pt"])
+    FBt1_pt = np.array(testfile["TARGETS"]["FBt1"]["pt"])
+    FBt2_pt = np.array(testfile["TARGETS"]["FBt2"]["pt"])
     FBt_pts = np.concatenate((FBt1_pt.reshape(-1, 1), FBt2_pt.reshape(-1, 1)), axis=1)
     FBt_pts = ak.Array(FBt_pts)
 
     # mask
-    FBt1_mask = np.array(testfile[testfile_dict["TARGETS"]]["FBt1"]["mask"])
-    FBt2_mask = np.array(testfile[testfile_dict["TARGETS"]]["FBt2"]["mask"])
+    FBt1_mask = np.array(testfile["TARGETS"]["FBt1"]["mask"])
+    FBt2_mask = np.array(testfile["TARGETS"]["FBt2"]["mask"])
     FBt_masks = np.concatenate((FBt1_mask.reshape(-1, 1), FBt2_mask.reshape(-1, 1)), axis=1)
     FBt_masks = ak.Array(FBt_masks)
 
     # target jet/fjets
-    bqq_FBt1_t = np.array(testfile[testfile_dict["TARGETS"]]["FBt1"]["bqq"])
-    bqq_FBt2_t = np.array(testfile[testfile_dict["TARGETS"]]["FBt2"]["bqq"])
+    bqq_FBt1_t = np.array(testfile["TARGETS"]["FBt1"]["bqq"])
+    bqq_FBt2_t = np.array(testfile["TARGETS"]["FBt2"]["bqq"])
     bqq_ts = np.concatenate(
         (bqq_FBt1_t.reshape(-1, 1), bqq_FBt2_t.reshape(-1, 1)), axis=1
     )
@@ -135,28 +133,28 @@ def parse_boosted_w_target(
     # pred jet/fjets
     try:
         # pred assignment
-        bqq_FBt1_p = np.array(predfile[predfile_dict["TARGETS"]]["FBt1"]["bqq"])
-        bqq_FBt2_p = np.array(predfile[predfile_dict["TARGETS"]]["FBt2"]["bqq"])
+        bqq_FBt1_p = np.array(predfile["TARGETS"]["FBt1"]["bqq"])
+        bqq_FBt2_p = np.array(predfile["TARGETS"]["FBt2"]["bqq"])
 
         # FBt detection probability
-        dp_FBt1 = np.array(predfile[predfile_dict["TARGETS"]]["FBt1"]["detection_probability"])
-        dp_FBt2 = np.array(predfile[predfile_dict["TARGETS"]]["FBt2"]["detection_probability"])
+        dp_FBt1 = np.array(predfile["TARGETS"]["FBt1"]["detection_probability"])
+        dp_FBt2 = np.array(predfile["TARGETS"]["FBt2"]["detection_probability"])
 
         # FBt assignment probability
-        ap_FBt1 = np.array(predfile[predfile_dict["TARGETS"]]["FBt1"]["assignment_probability"])
-        ap_FBt2 = np.array(predfile[predfile_dict["TARGETS"]]["FBt2"]["assignment_probability"])
+        ap_FBt1 = np.array(predfile["TARGETS"]["FBt1"]["assignment_probability"])
+        ap_FBt2 = np.array(predfile["TARGETS"]["FBt2"]["assignment_probability"])
     except:
         # pred assignment
-        bqq_FBt1_p = np.array(predfile[predfile_dict["TARGETS"]]["FBt1"]["bqq"]) + (N_AK4_JETS + N_AK8_JETS)
-        bqq_FBt2_p = np.array(predfile[predfile_dict["TARGETS"]]["FBt2"]["bqq"]) + (N_AK4_JETS + N_AK8_JETS)
+        bqq_FBt1_p = np.array(predfile["TARGETS"]["FBt1"]["bqq"]) + (N_AK4_JETS + N_AK8_JETS)
+        bqq_FBt2_p = np.array(predfile["TARGETS"]["FBt2"]["bqq"]) + (N_AK4_JETS + N_AK8_JETS)
 
         # boosted Higgs detection probability
-        dp_FBt1 = np.array(predfile[predfile_dict["TARGETS"]]["FBt1"]["mask"]).astype("float")
-        dp_FBt2 = np.array(predfile[predfile_dict["TARGETS"]]["FBt2"]["mask"]).astype("float")
+        dp_FBt1 = np.array(predfile["TARGETS"]["FBt1"]["mask"]).astype("float")
+        dp_FBt2 = np.array(predfile["TARGETS"]["FBt2"]["mask"]).astype("float")
 
         # fatjet assignment probability
-        ap_FBt1 = np.array(predfile[predfile_dict["TARGETS"]]["FBt1"]["mask"]).astype("float")
-        ap_FBt2 = np.array(predfile[predfile_dict["TARGETS"]]["FBt2"]["mask"]).astype("float")
+        ap_FBt1 = np.array(predfile["TARGETS"]["FBt1"]["mask"]).astype("float")
+        ap_FBt2 = np.array(predfile["TARGETS"]["FBt2"]["mask"]).astype("float")
 
     bqq_ps = np.concatenate((bqq_FBt1_p.reshape(-1, 1), bqq_FBt2_p.reshape(-1, 1)), axis=1)
     bqq_ps = ak.Array(bqq_ps)
@@ -165,10 +163,10 @@ def parse_boosted_w_target(
 
 
     # collect veryfatjet kinematics
-    vfj_pt = np.array(testfile[testfile_dict["INPUTS"]]["VeryBoostedJets"]["vfj_pt"])
-    vfj_eta = np.array(testfile[testfile_dict["INPUTS"]]["VeryBoostedJets"]["vfj_eta"])
-    vfj_phi = np.array(testfile[testfile_dict["INPUTS"]]["VeryBoostedJets"]["vfj_pt"])
-    vfj_mass = np.array(testfile[testfile_dict["INPUTS"]]["VeryBoostedJets"]["vfj_pt"])
+    vfj_pt = np.array(testfile["INPUTS"]["VeryBoostedJets"]["vfj_pt"])
+    vfj_eta = np.array(testfile["INPUTS"]["VeryBoostedJets"]["vfj_eta"])
+    vfj_phi = np.array(testfile["INPUTS"]["VeryBoostedJets"]["vfj_pt"])
+    vfj_mass = np.array(testfile["INPUTS"]["VeryBoostedJets"]["vfj_pt"])
     vfjs = ak.zip({
         "pt": vfj_pt,
         "eta": vfj_eta,
