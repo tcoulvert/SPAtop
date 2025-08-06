@@ -65,7 +65,7 @@ def sel_target_SRt_by_mask(q_ts, qq_ts, SRt_pts, SRt_overlap, SRt_masks):
 # A pred look up table is in shape
 # [event,
 #    pred_SRt,
-#       [correct_or_not, pt, overlap_w_SRt_reco, has_boost_FBt_target, which_SRt_target]]
+#       [correct_or_not, pred_pt, overlap_w_SRt_reco, has_boost_FBt_target, which_SRt_target]]
 @nb.njit
 def gen_pred_SRt_LUT(
     q_ps_passed, qq_ps_passed,

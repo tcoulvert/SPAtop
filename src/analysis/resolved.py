@@ -82,7 +82,7 @@ def sel_target_FRt_by_mask(b_ts, q1_ts, q2_ts, FRt_pts, FRt_overlap, FRt_masks):
 # A pred look up table is in shape
 # [event,
 #    pred_FRt,
-#       [correct_or_not, pt, overlap_w_FRt_reco, has_boost_FBt_target, which_FRt_target]]
+#       [correct_or_not, pred_pt, overlap_w_FRt_reco, has_boost_FBt_target, which_FRt_target]]
 @nb.njit
 def gen_pred_FRt_LUT(
     b_ps_passed, q1_ps_passed, q2_ps_passed, 

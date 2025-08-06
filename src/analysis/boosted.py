@@ -48,7 +48,7 @@ def sel_target_FBt_by_mask(bqq_ts, FBt_pts, FBt_masks):
 # A pred look up table is in shape
 # [event,
 #    pred_FBt,
-#       [correct, pred_FBt_pt]]
+#       [correct, pred_pt]]
 @nb.njit
 def gen_pred_FBt_LUT(bqq_ps_passed, bqq_ts_selected, fj_pts, builder):
     # for each event
