@@ -6,12 +6,35 @@ spec:
   securityContext:
     runAsUser: 0
     fsGroup: 0
+
   containers:
-  - name: gpu-container
-    image:  gitlab-registry.nrp-nautilus.io/jmduarte/hhh:latest
-    command: ["/bin/bash", "-c", "sleep infinity"]
+  - name: spatop-container
+    image: gitlab-registry.nrp-nautilus.io/mquinnan/top-spanet:spatop-container
+    env:
+      - name: SPATOP_BRANCH         
+        value: "meldev"
+    command: ["/bin/bash", "-c"]    
+    args:
+      - |
+        set -euo pipefail
+
+        echo "Cloning SPATop (branch: $SPATOP_BRANCH)…"
+        git clone https://github.com/quinnanm/SPATop.git -b "$SPATOP_BRANCH"
+
+        echo "Installing SPATop package…"
+        cd SPATop
+        pip install .
+
+        echo "Installing latest SPANet + extras…"
+        pip install rich tensorboard \
+          git+https://github.com/Alexanders101/SPANet.git@v2.3
+
+        echo "Setup complete — keeping pod alive."
+        exec sleep infinity
+
     stdin: true
     tty: true
+
     resources:
       limits:
         nvidia.com/gpu: 1
@@ -21,15 +44,14 @@ spec:
         nvidia.com/gpu: 1
         memory: 30Gi
         cpu: 3
+
     volumeMounts:
-    - mountPath: /spatopvol
-      name: spatopvol
+      - mountPath: /spatopvol
+        name: spatopvol
+
   restartPolicy: Never
+
   volumes:
     - name: spatopvol
       persistentVolumeClaim:
         claimName: spatopvol
-  tolerations:
-    - key: "nautilus.io/axol1tl"
-      operator: "Exists"
-      effect: "NoSchedule"
