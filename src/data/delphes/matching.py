@@ -238,51 +238,52 @@ def match_vfjet_to_fjet(vfjets, fjets, builder):
 #-------------------------------------------------------------------------------------------------
 # compute delta R matrices for all pairwise combinations of jets, fjets, vfjets
 #-------------------------------------------------------------------------------------------------
-@nb.njit
+@nb.njit(parallel=True)
 def jets_to_jets_deltaR(jets, builder):
     for jets_event in jets:
         builder.begin_list()
-        for i, ji in enumerate(jets_event):
+        for jet_i in jets_event:
             builder.begin_list()
-            for j, jj in enumerate(jets_event):
-                deltaR2 = (ji.deltaR(jj) / REF_DR)**2
+            for jet_j in jets_event:
+                deltaR2 = (jet_i.deltaR(jet_j) / REF_DR)**2
                 builder.append(deltaR2)
             builder.end_list()
         builder.end_list()
     return builder
 
-@nb.njit
+@nb.njit(parallel=True)
 def fjets_to_fjets_deltaR(fjets, builder):
     for fjets_event in fjets:
         builder.begin_list()
-        for i, fi in enumerate(fjets_event):
+        for fjet_i in fjets_event:
             builder.begin_list()
-            for j, fj in enumerate(fjets_event):
-                deltaR2 = (fi.deltaR(fj) / REF_DR)**2
+            for fjet_j in fjets_event:
+                deltaR2 = (fjet_i.deltaR(fjet_j) / REF_DR)**2
                 builder.append(deltaR2)
             builder.end_list()
         builder.end_list()
     return builder
 
-@nb.njit
+@nb.njit(parallel=True)
 def vfjets_to_vfjets_deltaR(vfjets, builder):
     for vfjets_event in vfjets:
         builder.begin_list()
-        for i, vi in enumerate(vfjets_event):
+        for vfjet_i in vfjets_event:
             builder.begin_list()
-            for j, vj in enumerate(vfjets_event):
-                builder.append((vi.deltaR(vj) / REF_DR)**2)
+            for vfjet_j in vfjets_event:
+                deltaR2 = (vfjet_i.deltaR(vfjet_j) / REF_DR)**2
+                builder.append(deltaR2)
             builder.end_list()
         builder.end_list()
     return builder
 
-@nb.njit
+@nb.njit(parallel=True)
 def vfjet_to_fjet_deltaR(vfjets, fjets, builder):
     for vfjets_event, fjets_event in zip(vfjets, fjets):
         builder.begin_list()
-        for i, fjet in enumerate(fjets_event):
+        for fjet in fjets_event:
             builder.begin_list()
-            for j, vfjet in enumerate(vfjets_event):
+            for vfjet in vfjets_event:
                 deltaR2 = (fjet.deltaR(vfjet) / REF_DR)**2 # square to supress very large values in bias
                 builder.append(deltaR2)
             builder.end_list()
@@ -290,13 +291,13 @@ def vfjet_to_fjet_deltaR(vfjets, fjets, builder):
 
     return builder
 
-@nb.njit
+@nb.njit(parallel=True)
 def vfjet_to_jet_deltaR(vfjets, jets, builder):
     for vfjets_event, jets_event in zip(vfjets, jets):
         builder.begin_list()
-        for i, jet in enumerate(jets_event):
+        for jet in jets_event:
             builder.begin_list()
-            for j, vfjet in enumerate(vfjets_event):
+            for vfjet in vfjets_event:
                 deltaR2 = (jet.deltaR(vfjet) / REF_DR)**2 # square to supress very large values in bias
                 builder.append(deltaR2)
             builder.end_list()
@@ -304,13 +305,13 @@ def vfjet_to_jet_deltaR(vfjets, jets, builder):
 
     return builder
 
-@nb.njit
+@nb.njit(parallel=True)
 def fjet_to_jet_deltaR(fjets, jets, builder):
     for fjets_event, jets_event in zip(fjets, jets):
         builder.begin_list()
-        for i, jet in enumerate(jets_event):
+        for jet in jets_event:
             builder.begin_list()
-            for j, fjet in enumerate(fjets_event):
+            for fjet in fjets_event:
                 deltaR2 = (jet.deltaR(fjet) / REF_DR)**2 # square to supress very large values in bias
                 builder.append(deltaR2)
             builder.end_list()
