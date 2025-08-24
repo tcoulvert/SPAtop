@@ -856,6 +856,8 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     datasets["INPUTS/VeryBoostedJets/vfj_nneutral"] = to_np_array(vfj_nneutral, max_n=N_VFJETS)
     datasets["INPUTS/VeryBoostedJets/vfj_ncharged"] = to_np_array(vfj_ncharged, max_n=N_VFJETS)
 
+    datasets["INPUTS/deltaR_bias/deltaR_bias"] = full_attention_bias
+
     # Store the truth-level info
     for i in range(n_tops):
         # fully-resolved tops
