@@ -235,6 +235,47 @@ def match_vfjet_to_fjet(vfjets, fjets, builder):
 
     return builder
 
+#-------------------------------------------------------------------------------------------------
+# compute delta R matrices for all pairwise combinations of jets, fjets, vfjets
+#-------------------------------------------------------------------------------------------------
+@nb.njit
+def jets_to_jets_deltaR(jets, builder):
+    for jets_event in jets:
+        builder.begin_list()
+        for i, ji in enumerate(jets_event):
+            builder.begin_list()
+            for j, jj in enumerate(jets_event):
+                deltaR2 = (ji.deltaR(jj) / REF_DR)**2
+                builder.append(deltaR2)
+            builder.end_list()
+        builder.end_list()
+    return builder
+
+@nb.njit
+def fjets_to_fjets_deltaR(fjets, builder):
+    for fjets_event in fjets:
+        builder.begin_list()
+        for i, fi in enumerate(fjets_event):
+            builder.begin_list()
+            for j, fj in enumerate(fjets_event):
+                deltaR2 = (fi.deltaR(fj) / REF_DR)**2
+                builder.append(deltaR2)
+            builder.end_list()
+        builder.end_list()
+    return builder
+
+@nb.njit
+def vfjets_to_vfjets_deltaR(vfjets, builder):
+    for vfjets_event in vfjets:
+        builder.begin_list()
+        for i, vi in enumerate(vfjets_event):
+            builder.begin_list()
+            for j, vj in enumerate(vfjets_event):
+                builder.append((vi.deltaR(vj) / REF_DR)**2)
+            builder.end_list()
+        builder.end_list()
+    return builder
+
 @nb.njit
 def vfjet_to_fjet_deltaR(vfjets, fjets, builder):
     for vfjets_event, fjets_event in zip(vfjets, fjets):

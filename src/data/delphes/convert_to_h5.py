@@ -26,6 +26,9 @@ from src.data.delphes.matching import (
     match_top_to_fjet,
     match_top_to_vfjet,
     match_top_to_jet,
+    vfjet_to_jet_deltaR,
+    vfjet_to_fjet_deltaR,
+    fjet_to_jet_deltaR,
 )
 
 vector.register_awkward()
@@ -43,6 +46,11 @@ PLOTS = True
 
 def to_np_array(ak_array, max_n=10, pad=0):
     return ak.fill_none(ak.pad_none(ak_array, max_n, clip=True, axis=-1), pad).to_numpy()
+
+def to_np_matrix(ak_matrix, max_rows, max_cols, pad=0.0):
+    m = ak.pad_none(ak_matrix, max_cols, clip=True, axis=-1)  
+    m = ak.pad_none(m,        max_rows, clip=True, axis=-2)   
+    return ak.fill_none(m, pad).to_numpy()
 
 def final_particle(particle_pdgid, mother_pdgid, particles, final_status=-1, intermediate_particles=None):
     if intermediate_particles is None:
@@ -339,6 +347,11 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     print(f"    -> Num events with >=3 jets per top & quark fiducial mask = {ak.sum(mask_minjets & quark_fid_mask, axis=0)}")
     print('-'*60)
 
+    # build detla R matrices 
+    jet_vfj_dr2 = vfjet_to_jet_deltaR(vfjets, jets, ak.ArrayBuilder()).snapshot()
+    fjet_vfj_dr2 = vfjet_to_fjet_deltaR(vfjets, fjets, ak.ArrayBuilder()).snapshot()
+    jet_fj_dr2  = fjet_to_jet_deltaR(fjets, jets, ak.ArrayBuilder()).snapshot()
+
     ## Jets ##
     # sort by pt
     sorted_by_pt = ak.argsort(pt, ascending=False, axis=-1)
@@ -354,6 +367,10 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     top_q2_idx = top_q2_idx[sorted_by_pt][mask_minjets]
     matched_fj_j_idx = matched_fj_j_idx[sorted_by_pt][mask_minjets]
     matched_vfj_j_idx = matched_vfj_j_idx[sorted_by_pt][mask_minjets]
+    jet_vfj_dr2 = jet_vfj_dr2[sorted_by_pt][mask_minjets]   # sort first dim of jet,vfj dR matrix
+    jet_fj_dr2 = jet_fj_dr2[sorted_by_pt][mask_minjets]    # sort first dim of jet,fj dR matrix
+              # reorder rows by jet pt + mask
+
 
     if PLOTS:
         # jet pt
@@ -444,6 +461,8 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     fj_top_bq2_idx = fj_top_bq2_idx[sorted_by_fj_pt][mask_minjets]
     fj_top_qq_idx = fj_top_qq_idx[sorted_by_fj_pt][mask_minjets]
     matched_vfj_fj_idx = matched_vfj_fj_idx[sorted_by_fj_pt][mask_minjets]
+    fjet_vfj_dr2 = fjet_vfj_dr2[sorted_by_fj_pt][mask_minjets]   # sort first dim of fj,vfj dR matrix
+    jet_fj_dr2 = jet_fj_dr2[..., sorted_by_fj_pt][mask_minjets]   # sort second dim of jet,fj dR matrix
 
     # keep only top N_FJETS
     N_FJETS = n_tops
@@ -484,6 +503,9 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     vfj_ncharged = vfj_ncharged[sorted_by_vfj_pt][mask_minjets]
     vfj_top_idx = vfj_top_idx[sorted_by_vfj_pt][mask_minjets]
     vfj_top_bqq_idx = vfj_top_bqq_idx[sorted_by_vfj_pt][mask_minjets]
+    jet_vfj_dr2 = jet_vfj_dr2[..., sorted_by_vfj_pt][mask_minjets]   # sort second dim of jet,vfj dR matrix
+    fjet_vfj_dr2 = fjet_vfj_dr2[..., sorted_by_vfj_pt][mask_minjets] # sort second dim of fj,vfj dR matrix
+
 
     # keep only top N_FJETS
     N_VFJETS = n_tops
@@ -502,6 +524,11 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     vfj_ncharged = vfj_ncharged[:, :N_VFJETS]
     vfj_top_idx = vfj_top_idx[:, :N_VFJETS]
     vfj_top_bqq_idx = vfj_top_bqq_idx[:, :N_VFJETS]
+
+    # keep top N_VFJETS, N_FJETS, N_JETS for delta R matrices
+    jet_vfj_dr2  = jet_vfj_dr2[:, :N_JETS,  :N_VFJETS]
+    fjet_vfj_dr2 = fjet_vfj_dr2[:, :N_FJETS, :N_VFJETS]
+    jet_fj_dr2   = jet_fj_dr2[:,  :N_JETS,  :N_FJETS]
 
     # add top pT info
     top_pt = topquarks[mask_minjets].pt
