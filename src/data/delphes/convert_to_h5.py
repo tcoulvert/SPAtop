@@ -83,8 +83,8 @@ def to_np_matrix(ak_matrix, max_rows, max_cols, pad=0.0):
     return ak.fill_none(m, pad).to_numpy()
 
 def pt_sort_and_mask_pair_matrix(mat, pt_sorted, mask_minjets):
-    tmp = mat[pt_sorted]
-    tmp = tmp[..., pt_sorted]
+    tmp = ak.take(mat,pt_sorted, axis=1)
+    tmp = ak.take(tmp, pt_sorted, axis=2)
     return tmp[mask_minjets]
 
 def final_particle(particle_pdgid, mother_pdgid, particles, final_status=-1, intermediate_particles=None):
