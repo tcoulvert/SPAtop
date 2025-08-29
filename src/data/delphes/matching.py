@@ -250,7 +250,7 @@ def jets_to_jets_pair_values(jets, dr_builder, mjj_builder):
                 if i != j:
                     deltaR2 = (jet_i.deltaR(jet_j) / REF_DR)**2
                     dr_builder.append(deltaR2)
-                    mjj = jet_i.mass + jet_j.mass
+                    mjj = (jet_i + jet_j).mass
                     mjj_builder.append(mjj)
                 
                 else:
@@ -275,7 +275,7 @@ def fjets_to_fjets_pair_values(fjets, dr_builder, mjj_builder):
                 if i != j:
                     deltaR2 = (fjet_i.deltaR(fjet_j) / REF_DR)**2
                     dr_builder.append(deltaR2)
-                    mjj = fjet_i.mass + fjet_j.mass
+                    mjj = (fjet_i + fjet_j).mass
                     mjj_builder.append(mjj)
                 else: 
                     dr_builder.append(0)
@@ -298,7 +298,7 @@ def vfjets_to_vfjets_pair_values(vfjets, dr_builder, mjj_builder):
                 if i != j:
                     deltaR2 = (vfjet_i.deltaR(vfjet_j) / REF_DR)**2
                     dr_builder.append(deltaR2)
-                    mjj = vfjet_i.mass + vfjet_j.mass
+                    mjj = (vfjet_i + vfjet_j).mass
                     mjj_builder.append(mjj)
                 else:
                     dr_builder.append(0)
@@ -320,7 +320,7 @@ def vfjet_to_fjet_pair_values(vfjets, fjets, dr_builder, mjj_builder):
             for j, vfjet in enumerate(vfjets_event):
                 deltaR2 = (fjet.deltaR(vfjet) / REF_DR)**2 # square to supress very large values in bias
                 dr_builder.append(deltaR2)
-                mjj = fjet.mass + vfjet.mass
+                mjj = (fjet + vfjet).mass
                 mjj_builder.append(mjj)
             dr_builder.end_list()
             mjj_builder.end_list()
@@ -340,7 +340,7 @@ def vfjet_to_jet_pair_values(vfjets, jets, dr_builder, mjj_builder):
             for j, vfjet in enumerate(vfjets_event):
                 deltaR2 = (jet.deltaR(vfjet) / REF_DR)**2 # square to supress very large values in bias
                 dr_builder.append(deltaR2)
-                mjj = jet.mass + vfjet.mass
+                mjj = (jet + vfjet).mass
                 mjj_builder.append(mjj)
             dr_builder.end_list()
             mjj_builder.end_list()
@@ -359,7 +359,7 @@ def fjet_to_jet_pair_values(fjets, jets, dr_builder, mjj_builder):
             for j, fjet in enumerate(fjets_event):
                 deltaR2 = (jet.deltaR(fjet) / REF_DR)**2 # square to supress very large values in bias
                 dr_builder.append(deltaR2)
-                mjj = jet.mass + fjet.mass
+                mjj = (jet + fjet).mass
                 mjj_builder.append(mjj)
             dr_builder.end_list()
             mjj_builder.end_list()
