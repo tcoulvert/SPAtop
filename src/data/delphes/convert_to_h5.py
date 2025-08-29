@@ -49,6 +49,7 @@ PLOTS = True
 
 # separate builder functions so that ak.ArrayBuilder is created inside the process to avoid memory issues
 # for multiprocessing block
+# there's probably a less redundant way to do this
 def _build_jet_jet_pair_values(jets):
     jets_to_jets_deltaR, jets_to_jets_mjj = jets_to_jets_pair_values(jets, ak.ArrayBuilder(), ak.ArrayBuilder())
     return jets_to_jets_deltaR.snapshot(), jets_to_jets_mjj.snapshot()
@@ -80,6 +81,11 @@ def to_np_matrix(ak_matrix, max_rows, max_cols, pad=0.0):
     m = ak.pad_none(ak_matrix, max_cols, clip=True, axis=-1)  
     m = ak.pad_none(m,        max_rows, clip=True, axis=-2)   
     return ak.fill_none(m, pad).to_numpy()
+
+def pt_sort_and_mask_pair_matrix(mat, pt_sorted, mask_minjets):
+    tmp = mat[pt_sorted]
+    tmp = tmp[..., pt_sorted]
+    return tmp[mask_minjets]
 
 def final_particle(particle_pdgid, mother_pdgid, particles, final_status=-1, intermediate_particles=None):
     if intermediate_particles is None:
@@ -412,14 +418,36 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     top_q2_idx = top_q2_idx[sorted_by_pt][mask_minjets]
     matched_fj_j_idx = matched_fj_j_idx[sorted_by_pt][mask_minjets]
     matched_vfj_j_idx = matched_vfj_j_idx[sorted_by_pt][mask_minjets]
-    jet_vfj_dr2 = jet_vfj_dr2[sorted_by_pt][mask_minjets]   # sort first dim of jet,vfj dR matrix
-    jet_fj_dr2 = jet_fj_dr2[sorted_by_pt][mask_minjets]    # sort first dim of jet,fj dR matrix
-    jet_jet_dr2 = jet_jet_dr2[sorted_by_pt][mask_minjets]
-    jet_jet_dr2 = jet_jet_dr2[..., sorted_by_pt][mask_minjets]
-    jet_vfj_mjj = jet_vfj_mjj[sorted_by_pt][mask_minjets]
-    jet_fj_mjj = jet_fj_mjj[sorted_by_pt][mask_minjets]    # sort first dim of jet,fj dR matrix
-    jet_jet_mjj = jet_jet_mjj[sorted_by_pt][mask_minjets]
-    jet_jet_mjj = jet_jet_mjj[..., sorted_by_pt][mask_minjets]
+
+
+    #----------------------------------------------------------------------------------
+    # sort all bias matrices by pt
+    #----------------------------------------------------------------------------------
+    
+    # jet-jet pairs
+    jet_jet_dr2 = pt_sort_and_mask_pair_matrix(jet_jet_dr2, sorted_by_pt, mask_minjets)
+    jet_jet_mjj = pt_sort_and_mask_pair_matrix(jet_jet_mjj, sorted_by_pt, mask_minjets)
+    
+    #fjet-fjet pairs
+    fjet_fjet_dr2 = pt_sort_and_mask_pair_matrix(fjet_fjet_dr2, sorted_by_pt, mask_minjets)
+    fjet_fjet_mjj = pt_sort_and_mask_pair_matrix(fjet_fjet_mjj, sorted_by_pt, mask_minjets)
+    
+    # vfjet-vfjet pairs
+    vfjet_vfjet_dr2 = pt_sort_and_mask_pair_matrix(vfjet_vfjet_dr2, sorted_by_pt, mask_minjets)
+    vfjet_vfjet_mjj = pt_sort_and_mask_pair_matrix(vfjet_vfjet_mjj, sorted_by_pt, mask_minjets)
+    
+    # jet-fjet pairs
+    jet_fj_dr2 = pt_sort_and_mask_pair_matrix(jet_fj_dr2, sorted_by_pt, mask_minjets)
+    jet_fj_mjj = pt_sort_and_mask_pair_matrix(jet_fj_mjj, sorted_by_pt, mask_minjets)
+    
+    # jet-vfjet pairs
+    jet_vfj_dr2 = pt_sort_and_mask_pair_matrix(jet_vfj_dr2, sorted_by_pt, mask_minjets)
+    jet_vfj_mjj = pt_sort_and_mask_pair_matrix(jet_vfj_mjj, sorted_by_pt, mask_minjets)
+    
+    # fjet-vfjet pairs
+    fjet_vfj_dr2 = pt_sort_and_mask_pair_matrix(fjet_vfj_dr2, sorted_by_pt, mask_minjets)
+    fjet_vfj_mjj = pt_sort_and_mask_pair_matrix(fjet_vfj_mjj, sorted_by_pt, mask_minjets)
+    
 
 
     if PLOTS:
@@ -511,14 +539,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     fj_top_bq2_idx = fj_top_bq2_idx[sorted_by_fj_pt][mask_minjets]
     fj_top_qq_idx = fj_top_qq_idx[sorted_by_fj_pt][mask_minjets]
     matched_vfj_fj_idx = matched_vfj_fj_idx[sorted_by_fj_pt][mask_minjets]
-    fjet_vfj_dr2 = fjet_vfj_dr2[sorted_by_fj_pt][mask_minjets]   # sort first dim of fj,vfj dR matrix
-    jet_fj_dr2 = jet_fj_dr2[..., sorted_by_fj_pt][mask_minjets]   # sort second dim of jet,fj dR matrix
-    fjet_fjet_dr2 = fjet_fjet_dr2[sorted_by_fj_pt][mask_minjets]   
-    fjet_fjet_dr2 = fjet_fjet_dr2[..., sorted_by_fj_pt][mask_minjets]
-    fjet_vfj_mjj = fjet_vfj_mjj[sorted_by_fj_pt][mask_minjets]
-    jet_fj_mjj = jet_fj_mjj[..., sorted_by_fj_pt][mask_minjets]
-    fjet_fjet_mjj = fjet_fjet_mjj[sorted_by_fj_pt][mask_minjets]
-    fjet_fjet_mjj = fjet_fjet_mjj[..., sorted_by_fj_pt][mask_minjets]
+    
 
     # keep only top N_FJETS
     N_FJETS = n_tops
@@ -559,14 +580,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     vfj_ncharged = vfj_ncharged[sorted_by_vfj_pt][mask_minjets]
     vfj_top_idx = vfj_top_idx[sorted_by_vfj_pt][mask_minjets]
     vfj_top_bqq_idx = vfj_top_bqq_idx[sorted_by_vfj_pt][mask_minjets]
-    jet_vfj_dr2 = jet_vfj_dr2[..., sorted_by_vfj_pt][mask_minjets]   # sort second dim of jet,vfj dR matrix
-    fjet_vfj_dr2 = fjet_vfj_dr2[..., sorted_by_vfj_pt][mask_minjets] # sort second dim of fj,vfj dR matrix
-    vfjet_vfjet_dr2 = vfjet_vfjet_dr2[sorted_by_vfj_pt][mask_minjets]
-    vfjet_vfjet_dr2 = vfjet_vfjet_dr2[..., sorted_by_vfj_pt][mask_minjets]
-    jet_vfj_mjj = jet_vfj_mjj[..., sorted_by_vfj_pt][mask_minjets]
-    fjet_vfj_mjj = fjet_vfj_mjj[..., sorted_by_vfj_pt][mask_minjets]
-    vfjet_vfjet_mjj = vfjet_vfjet_mjj[sorted_by_vfj_pt][mask_minjets]
-    vfjet_vfjet_mjj = vfjet_vfjet_mjj[..., sorted_by_vfj_pt][mask_minjets]
+    
 
     # keep only top N_FJETS
     N_VFJETS = n_tops
@@ -631,11 +645,20 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     bot = np.concatenate([np.transpose(Jet_VFJet_mjj, (0, 2, 1)), np.transpose(FJet_VFJet_mjj, (0, 2, 1)), VFJet_VFJet_mjj], axis=2)
     mjj_attention_bias = np.concatenate([top, mid, bot], axis=1)
 
+    #----------------------------------------------------------------------------------
+    # matrix sanity checks 
+    #----------------------------------------------------------------------------------
     # check matrix shapes correct
     assert deltaR_attention_bias.shape[1] == N_ALL
     assert deltaR_attention_bias.shape[2] == N_ALL
     assert mjj_attention_bias.shape[1] == N_ALL
     assert mjj_attention_bias.shape[2] == N_ALL
+
+    # check zero diagonal and symmetry (bias = bias^T)
+    assert np.all(np.diag(deltaR_attention_bias) == 0)
+    assert np.all(deltaR_attention_bias == np.transpose(deltaR_attention_bias, (0, 2, 1)))
+    assert np.all(np.diag(mjj_attention_bias) == 0)
+    assert np.all(mjj_attention_bias == np.transpose(mjj_attention_bias, (0, 2, 1)))
 
 
     # add top pT info
