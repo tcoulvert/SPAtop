@@ -27,12 +27,12 @@ from src.data.delphes.matching import (
     match_top_to_fjet,
     match_top_to_vfjet,
     match_top_to_jet,
-    vfjet_to_jet_deltaR,
-    vfjet_to_fjet_deltaR,
-    fjet_to_jet_deltaR,
-    jets_to_jets_deltaR,
-    fjets_to_fjets_deltaR,
-    vfjets_to_vfjets_deltaR,
+    jets_to_jets_pair_values,
+    fjets_to_fjets_pair_values,
+    vfjets_to_vfjets_pair_values,
+    vfjet_to_fjet_pair_values,
+    vfjet_to_jet_pair_values,
+    fjet_to_jet_pair_values,
 )
 
 vector.register_awkward()
@@ -49,23 +49,29 @@ PLOTS = True
 
 # separate builder functions so that ak.ArrayBuilder is created inside the process to avoid memory issues
 # for multiprocessing block
-def _build_jet_jet_dr2(jets):
-    return jets_to_jets_deltaR(jets, ak.ArrayBuilder()).snapshot()
+def _build_jet_jet_pair_values(jets):
+    jets_to_jets_deltaR, jets_to_jets_mjj = jets_to_jets_pair_values(jets, ak.ArrayBuilder(), ak.ArrayBuilder())
+    return jets_to_jets_deltaR.snapshot(), jets_to_jets_mjj.snapshot()
 
-def _build_fjet_fjet_dr2(fjets):
-    return fjets_to_fjets_deltaR(fjets, ak.ArrayBuilder()).snapshot()
+def _build_fjet_fjet_pair_values(fjets):
+    fjets_to_fjets_deltaR, fjets_to_fjets_mjj = fjets_to_fjets_pair_values(fjets, ak.ArrayBuilder(), ak.ArrayBuilder())
+    return fjets_to_fjets_deltaR.snapshot(), fjets_to_fjets_mjj.snapshot()
 
-def _build_vfjet_vfjet_dr2(vfjets):
-    return vfjets_to_vfjets_deltaR(vfjets, ak.ArrayBuilder()).snapshot()
+def _build_vfjet_vfjet_pair_values(vfjets):
+    vfjets_to_vfjets_deltaR, vfjets_to_vfjets_mjj = vfjets_to_vfjets_pair_values(vfjets, ak.ArrayBuilder(), ak.ArrayBuilder())
+    return vfjets_to_vfjets_deltaR.snapshot(), vfjets_to_vfjets_mjj.snapshot()
 
-def _build_jet_fjet_dr2(fjets, jets):
-    return fjet_to_jet_deltaR(fjets, jets, ak.ArrayBuilder()).snapshot()
+def _build_jet_fjet_pair_values(fjets, jets):
+    fjet_to_jet_deltaR, fjet_to_jet_mjj = fjet_to_jet_pair_values(fjets, jets, ak.ArrayBuilder(), ak.ArrayBuilder())
+    return fjet_to_jet_deltaR.snapshot(), fjet_to_jet_mjj.snapshot()
 
-def _build_jet_vfjet_dr2(vfjets, jets):
-    return vfjet_to_jet_deltaR(vfjets, jets, ak.ArrayBuilder()).snapshot()
+def _build_jet_vfjet_pair_values(vfjets, jets):
+    vfjet_to_jet_deltaR, vfjet_to_jet_mjj = vfjet_to_jet_pair_values(vfjets, jets, ak.ArrayBuilder(), ak.ArrayBuilder())
+    return vfjet_to_jet_deltaR.snapshot(), vfjet_to_jet_mjj.snapshot()
 
-def _build_fjet_vfjet_dr2(vfjets, fjets):
-    return vfjet_to_fjet_deltaR(vfjets, fjets, ak.ArrayBuilder()).snapshot()
+def _build_fjet_vfjet_pair_values(vfjets, fjets):
+    vfjet_to_fjet_deltaR, vfjet_to_fjet_mjj = vfjet_to_fjet_pair_values(vfjets, fjets, ak.ArrayBuilder(), ak.ArrayBuilder())
+    return vfjet_to_fjet_deltaR.snapshot(), vfjet_to_fjet_mjj.snapshot()
 
 def to_np_array(ak_array, max_n=10, pad=0):
     return ak.fill_none(ak.pad_none(ak_array, max_n, clip=True, axis=-1), pad).to_numpy()
@@ -374,21 +380,21 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     # builder function wrappers used to facilitate multiprocessing
     with ProcessPoolExecutor(max_workers=6) as executor:
         futures = {
-            'jet_vfj_dr2': executor.submit(_build_jet_vfjet_dr2, vfjets, jets),
-            'fjet_vfj_dr2': executor.submit(_build_fjet_vfjet_dr2, vfjets, fjets),
-            'jet_fj_dr2': executor.submit(_build_jet_fjet_dr2, fjets, jets),
-            'jet_jet_dr2': executor.submit(_build_jet_jet_dr2, jets),
-            'fjet_fjet_dr2': executor.submit(_build_fjet_fjet_dr2, fjets),
-            'vfjet_vfjet_dr2': executor.submit(_build_vfjet_vfjet_dr2, vfjets),
+            'jet_vfj_pair_values': executor.submit(_build_jet_vfjet_pair_values, vfjets, jets),
+            'fjet_vfj_pair_values': executor.submit(_build_fjet_vfjet_pair_values, vfjets, fjets),
+            'jet_fj_pair_values': executor.submit(_build_jet_fjet_pair_values, fjets, jets),
+            'jet_jet_pair_values': executor.submit(_build_jet_jet_pair_values, jets),
+            'fjet_fjet_pair_values': executor.submit(_build_fjet_fjet_pair_values, fjets),
+            'vfjet_vfjet_pair_values': executor.submit(_build_vfjet_vfjet_pair_values, vfjets),
         }
         results = {k: f.result() for k, f in futures.items()}
 
-    jet_vfj_dr2 = results['jet_vfj_dr2']
-    fjet_vfj_dr2 = results['fjet_vfj_dr2']
-    jet_fj_dr2 = results['jet_fj_dr2']
-    jet_jet_dr2 = results['jet_jet_dr2']
-    fjet_fjet_dr2 = results['fjet_fjet_dr2']
-    vfjet_vfjet_dr2 = results['vfjet_vfjet_dr2']
+    jet_vfj_dr2, jet_vfj_mjj = results['jet_vfj_pair_values']
+    fjet_vfj_dr2, fjet_vfj_mjj = results['fjet_vfj_pair_values']
+    jet_fj_dr2, jet_fj_mjj = results['jet_fj_pair_values']
+    jet_jet_dr2, jet_jet_mjj = results['jet_jet_pair_values']
+    fjet_fjet_dr2, fjet_fjet_mjj = results['fjet_fjet_pair_values']
+    vfjet_vfjet_dr2, vfjet_vfjet_mjj = results['vfjet_vfjet_pair_values']
 
 
     ## Jets ##
@@ -410,6 +416,10 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     jet_fj_dr2 = jet_fj_dr2[sorted_by_pt][mask_minjets]    # sort first dim of jet,fj dR matrix
     jet_jet_dr2 = jet_jet_dr2[sorted_by_pt][mask_minjets]
     jet_jet_dr2 = jet_jet_dr2[..., sorted_by_pt][mask_minjets]
+    jet_vfj_mjj = jet_vfj_mjj[sorted_by_pt][mask_minjets]
+    jet_fj_mjj = jet_fj_mjj[sorted_by_pt][mask_minjets]    # sort first dim of jet,fj dR matrix
+    jet_jet_mjj = jet_jet_mjj[sorted_by_pt][mask_minjets]
+    jet_jet_mjj = jet_jet_mjj[..., sorted_by_pt][mask_minjets]
 
 
     if PLOTS:
@@ -505,6 +515,9 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     jet_fj_dr2 = jet_fj_dr2[..., sorted_by_fj_pt][mask_minjets]   # sort second dim of jet,fj dR matrix
     fjet_fjet_dr2 = fjet_fjet_dr2[sorted_by_fj_pt][mask_minjets]   
     fjet_fjet_dr2 = fjet_fjet_dr2[..., sorted_by_fj_pt][mask_minjets]
+    fjet_vfj_mjj = fjet_vfj_mjj[sorted_by_fj_pt][mask_minjets]
+    jet_fj_mjj = jet_fj_mjj[..., sorted_by_fj_pt][mask_minjets]
+    fjet_fjet_mjj = fjet_fjet_mjj[sorted_by_fj_pt][mask_minjets]
 
     # keep only top N_FJETS
     N_FJETS = n_tops
@@ -547,8 +560,12 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     vfj_top_bqq_idx = vfj_top_bqq_idx[sorted_by_vfj_pt][mask_minjets]
     jet_vfj_dr2 = jet_vfj_dr2[..., sorted_by_vfj_pt][mask_minjets]   # sort second dim of jet,vfj dR matrix
     fjet_vfj_dr2 = fjet_vfj_dr2[..., sorted_by_vfj_pt][mask_minjets] # sort second dim of fj,vfj dR matrix
-    fjet_fjet_dr2 = fjet_fjet_dr2[sorted_by_fj_pt][mask_minjets]
-    fjet_fjet_dr2 = fjet_fjet_dr2[..., sorted_by_fj_pt][mask_minjets]
+    vfjet_vfjet_dr2 = vfjet_vfjet_dr2[sorted_by_vfj_pt][mask_minjets]
+    vfjet_vfjet_dr2 = vfjet_vfjet_dr2[..., sorted_by_vfj_pt][mask_minjets]
+    jet_vfj_mjj = jet_vfj_mjj[..., sorted_by_vfj_pt][mask_minjets]
+    fjet_vfj_mjj = fjet_vfj_mjj[..., sorted_by_vfj_pt][mask_minjets]
+    vfjet_vfjet_mjj = vfjet_vfjet_mjj[sorted_by_vfj_pt][mask_minjets]
+    vfjet_vfjet_mjj = vfjet_vfjet_mjj[..., sorted_by_vfj_pt][mask_minjets]
 
     # keep only top N_FJETS
     N_VFJETS = n_tops
@@ -576,7 +593,15 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     fjet_fjet_dr2 = fjet_fjet_dr2[:, :N_FJETS, :N_FJETS]
     vfjet_vfjet_dr2 = vfjet_vfjet_dr2[:, :N_VFJETS, :N_VFJETS]
 
-    # create full attention bias matix 
+    jet_vfj_mjj  = jet_vfj_mjj[:, :N_JETS,  :N_VFJETS]
+    fjet_vfj_mjj = fjet_vfj_mjj[:, :N_FJETS, :N_VFJETS]
+    jet_fj_mjj   = jet_fj_mjj[:,  :N_JETS,  :N_FJETS]
+    jet_jet_mjj  = jet_jet_mjj[:, :N_JETS,  :N_JETS]
+    fjet_fjet_mjj = fjet_fjet_mjj[:, :N_FJETS, :N_FJETS]
+    vfjet_vfjet_mjj = vfjet_vfjet_mjj[:, :N_VFJETS, :N_VFJETS]
+
+    # create full attention bias matrices
+    # deltaR bias matrix 
     N_ALL = N_JETS + N_FJETS + N_VFJETS
     Jet_Jet_dr2      = to_np_matrix(jet_jet_dr2,     N_JETS,   N_JETS).astype(np.float32)
     FJet_FJet_dr2    = to_np_matrix(fjet_fjet_dr2,   N_FJETS,  N_FJETS).astype(np.float32)
@@ -589,11 +614,28 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     top = np.concatenate([Jet_Jet_dr2, Jet_FJet_dr2, Jet_VFJet_dr2], axis=2)
     mid = np.concatenate([np.transpose(Jet_FJet_dr2, (0, 2, 1)), FJet_FJet_dr2, FJet_VFJet_dr2], axis=2)
     bot = np.concatenate([np.transpose(Jet_VFJet_dr2, (0, 2, 1)), np.transpose(FJet_VFJet_dr2, (0, 2, 1)), VFJet_VFJet_dr2], axis=2)
-    full_attention_bias = np.concatenate([top, mid, bot], axis=1)
+    deltaR_attention_bias = np.concatenate([top, mid, bot], axis=1)
 
-    # check shapes correct
-    assert full_attention_bias.shape[1] == N_ALL
-    assert full_attention_bias.shape[2] == N_ALL
+    # mjj bias matrix
+    Jet_Jet_mjj      = to_np_matrix(jet_jet_mjj,     N_JETS,   N_JETS).astype(np.float32)
+    FJet_FJet_mjj    = to_np_matrix(fjet_fjet_mjj,   N_FJETS,  N_FJETS).astype(np.float32)
+    VFJet_VFJet_mjj  = to_np_matrix(vfjet_vfjet_mjj, N_VFJETS, N_VFJETS).astype(np.float32)
+
+    Jet_VFJet_mjj    = to_np_matrix(jet_vfj_mjj,     N_JETS,   N_VFJETS).astype(np.float32)
+    FJet_VFJet_mjj   = to_np_matrix(fjet_vfj_mjj,    N_FJETS,  N_VFJETS).astype(np.float32)
+    Jet_FJet_mjj     = to_np_matrix(jet_fj_mjj,      N_JETS,   N_FJETS).astype(np.float32)
+
+    top = np.concatenate([Jet_Jet_mjj, Jet_FJet_mjj, Jet_VFJet_mjj], axis=2)
+    mid = np.concatenate([np.transpose(Jet_FJet_mjj, (0, 2, 1)), FJet_FJet_mjj, FJet_VFJet_mjj], axis=2)
+    bot = np.concatenate([np.transpose(Jet_VFJet_mjj, (0, 2, 1)), np.transpose(FJet_VFJet_mjj, (0, 2, 1)), VFJet_VFJet_mjj], axis=2)
+    mjj_attention_bias = np.concatenate([top, mid, bot], axis=1)
+
+    # check matrix shapes correct
+    assert deltaR_attention_bias.shape[1] == N_ALL
+    assert deltaR_attention_bias.shape[2] == N_ALL
+    assert mjj_attention_bias.shape[1] == N_ALL
+    assert mjj_attention_bias.shape[2] == N_ALL
+
 
     # add top pT info
     top_pt = topquarks[mask_minjets].pt
@@ -856,7 +898,8 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     datasets["INPUTS/VeryBoostedJets/vfj_nneutral"] = to_np_array(vfj_nneutral, max_n=N_VFJETS)
     datasets["INPUTS/VeryBoostedJets/vfj_ncharged"] = to_np_array(vfj_ncharged, max_n=N_VFJETS)
 
-    datasets["INPUTS/deltaR_bias/deltaR_bias"] = full_attention_bias
+    datasets["INPUTS/attention_bias/deltaR_bias"] = deltaR_attention_bias.astype("float32")
+    datasets["INPUTS/attention_bias/mjj_bias"] = mjj_attention_bias.astype("float32")
 
     # Store the truth-level info
     for i in range(n_tops):

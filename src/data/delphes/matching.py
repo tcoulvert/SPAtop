@@ -239,82 +239,130 @@ def match_vfjet_to_fjet(vfjets, fjets, builder):
 # compute delta R matrices for all pairwise combinations of jets, fjets, vfjets
 #-------------------------------------------------------------------------------------------------
 @nb.njit(parallel=True)
-def jets_to_jets_deltaR(jets, builder):
+def jets_to_jets_pair_values(jets, dr_builder, mjj_builder):
     for jets_event in jets:
-        builder.begin_list()
-        for jet_i in jets_event:
-            builder.begin_list()
-            for jet_j in jets_event:
-                deltaR2 = (jet_i.deltaR(jet_j) / REF_DR)**2
-                builder.append(deltaR2)
-            builder.end_list()
-        builder.end_list()
-    return builder
+        dr_builder.begin_list()
+        mjj_builder.begin_list()
+        for i, jet_i in enumerate(jets_event):
+            dr_builder.begin_list()
+            mjj_builder.begin_list()
+            for j, jet_j in enumerate(jets_event):
+                if i != j:
+                    deltaR2 = (jet_i.deltaR(jet_j) / REF_DR)**2
+                    dr_builder.append(deltaR2)
+                    mjj = jet_i.mass + jet_j.mass
+                    mjj_builder.append(mjj)
+                
+                else:
+                    dr_builder.append(0)
+                    mjj_builder.append(0) # same jet, dijet mass undefined
+
+            dr_builder.end_list()
+            mjj_builder.end_list()
+        dr_builder.end_list()
+        mjj_builder.end_list()
+    return dr_builder, mjj_builder
 
 @nb.njit(parallel=True)
-def fjets_to_fjets_deltaR(fjets, builder):
+def fjets_to_fjets_pair_values(fjets, dr_builder, mjj_builder):
     for fjets_event in fjets:
-        builder.begin_list()
-        for fjet_i in fjets_event:
-            builder.begin_list()
-            for fjet_j in fjets_event:
-                deltaR2 = (fjet_i.deltaR(fjet_j) / REF_DR)**2
-                builder.append(deltaR2)
-            builder.end_list()
-        builder.end_list()
-    return builder
+        dr_builder.begin_list()
+        mjj_builder.begin_list()
+        for i, fjet_i in enumerate(fjets_event):
+            dr_builder.begin_list()
+            mjj_builder.begin_list()
+            for j, fjet_j in enumerate(fjets_event):
+                if i != j:
+                    deltaR2 = (fjet_i.deltaR(fjet_j) / REF_DR)**2
+                    dr_builder.append(deltaR2)
+                    mjj = fjet_i.mass + fjet_j.mass
+                    mjj_builder.append(mjj)
+                else: 
+                    dr_builder.append(0)
+                    mjj_builder.append(0) # same jet, dijet mass undefined
+            dr_builder.end_list()
+            mjj_builder.end_list()
+        dr_builder.end_list()
+        mjj_builder.end_list()
+    return dr_builder, mjj_builder
 
 @nb.njit(parallel=True)
-def vfjets_to_vfjets_deltaR(vfjets, builder):
+def vfjets_to_vfjets_pair_values(vfjets, dr_builder, mjj_builder):
     for vfjets_event in vfjets:
-        builder.begin_list()
-        for vfjet_i in vfjets_event:
-            builder.begin_list()
-            for vfjet_j in vfjets_event:
-                deltaR2 = (vfjet_i.deltaR(vfjet_j) / REF_DR)**2
-                builder.append(deltaR2)
-            builder.end_list()
-        builder.end_list()
-    return builder
+        dr_builder.begin_list()
+        mjj_builder.begin_list()
+        for i, vfjet_i in enumerate(vfjets_event):
+            dr_builder.begin_list()
+            mjj_builder.begin_list()
+            for j, vfjet_j in enumerate(vfjets_event):
+                if i != j:
+                    deltaR2 = (vfjet_i.deltaR(vfjet_j) / REF_DR)**2
+                    dr_builder.append(deltaR2)
+                    mjj = vfjet_i.mass + vfjet_j.mass
+                    mjj_builder.append(mjj)
+                else:
+                    dr_builder.append(0)
+                    mjj_builder.append(0) # same jet, dijet mass undefined
+            dr_builder.end_list()
+            mjj_builder.end_list()
+        dr_builder.end_list()
+        mjj_builder.end_list()
+    return dr_builder, mjj_builder
 
 @nb.njit(parallel=True)
-def vfjet_to_fjet_deltaR(vfjets, fjets, builder):
+def vfjet_to_fjet_pair_values(vfjets, fjets, dr_builder, mjj_builder):
     for vfjets_event, fjets_event in zip(vfjets, fjets):
-        builder.begin_list()
-        for fjet in fjets_event:
-            builder.begin_list()
-            for vfjet in vfjets_event:
+        dr_builder.begin_list()
+        mjj_builder.begin_list()
+        for i, fjet in enumerate(fjets_event):
+            dr_builder.begin_list()
+            mjj_builder.begin_list()
+            for j, vfjet in enumerate(vfjets_event):
                 deltaR2 = (fjet.deltaR(vfjet) / REF_DR)**2 # square to supress very large values in bias
-                builder.append(deltaR2)
-            builder.end_list()
-        builder.end_list()
+                dr_builder.append(deltaR2)
+                mjj = fjet.mass + vfjet.mass
+                mjj_builder.append(mjj)
+            dr_builder.end_list()
+            mjj_builder.end_list()
+        dr_builder.end_list()
+        mjj_builder.end_list()
+    return dr_builder, mjj_builder
 
-    return builder
 
 @nb.njit(parallel=True)
-def vfjet_to_jet_deltaR(vfjets, jets, builder):
+def vfjet_to_jet_pair_values(vfjets, jets, dr_builder, mjj_builder):
     for vfjets_event, jets_event in zip(vfjets, jets):
-        builder.begin_list()
-        for jet in jets_event:
-            builder.begin_list()
-            for vfjet in vfjets_event:
+        dr_builder.begin_list()
+        mjj_builder.begin_list()
+        for i, jet in enumerate(jets_event):
+            dr_builder.begin_list()
+            mjj_builder.begin_list()
+            for j, vfjet in enumerate(vfjets_event):
                 deltaR2 = (jet.deltaR(vfjet) / REF_DR)**2 # square to supress very large values in bias
-                builder.append(deltaR2)
-            builder.end_list()
-        builder.end_list()
-
-    return builder
+                dr_builder.append(deltaR2)
+                mjj = jet.mass + vfjet.mass
+                mjj_builder.append(mjj)
+            dr_builder.end_list()
+            mjj_builder.end_list()
+        dr_builder.end_list()
+        mjj_builder.end_list()
+    return dr_builder, mjj_builder
 
 @nb.njit(parallel=True)
-def fjet_to_jet_deltaR(fjets, jets, builder):
+def fjet_to_jet_pair_values(fjets, jets, dr_builder, mjj_builder):
     for fjets_event, jets_event in zip(fjets, jets):
-        builder.begin_list()
-        for jet in jets_event:
-            builder.begin_list()
-            for fjet in fjets_event:
+        dr_builder.begin_list()
+        mjj_builder.begin_list()
+        for i, jet in enumerate(jets_event):
+            dr_builder.begin_list()
+            mjj_builder.begin_list()
+            for j, fjet in enumerate(fjets_event):
                 deltaR2 = (jet.deltaR(fjet) / REF_DR)**2 # square to supress very large values in bias
-                builder.append(deltaR2)
-            builder.end_list()
-        builder.end_list()
-
-    return builder
+                dr_builder.append(deltaR2)
+                mjj = jet.mass + fjet.mass
+                mjj_builder.append(mjj)
+            dr_builder.end_list()
+            mjj_builder.end_list()
+        dr_builder.end_list()
+        mjj_builder.end_list()
+    return dr_builder, mjj_builder
