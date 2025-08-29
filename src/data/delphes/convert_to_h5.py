@@ -518,6 +518,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     fjet_vfj_mjj = fjet_vfj_mjj[sorted_by_fj_pt][mask_minjets]
     jet_fj_mjj = jet_fj_mjj[..., sorted_by_fj_pt][mask_minjets]
     fjet_fjet_mjj = fjet_fjet_mjj[sorted_by_fj_pt][mask_minjets]
+    fjet_fjet_mjj = fjet_fjet_mjj[..., sorted_by_fj_pt][mask_minjets]
 
     # keep only top N_FJETS
     N_FJETS = n_tops
