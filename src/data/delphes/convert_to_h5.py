@@ -938,7 +938,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     default=f"{PROJECT_DIR}/data/delphes/tt_training.h5",
     help="Output file.",
 )
-@click.option("--train-frac", default=0.50, help="Fraction for training.")
+@click.option("--train-frac", default=0.80, help="Fraction for training.")
 @click.option(
     "--n-tops",
     "n_tops",
