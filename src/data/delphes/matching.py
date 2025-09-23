@@ -193,43 +193,22 @@ def match_top_to_jet(
 
 
 @nb.njit
-def match_fjet_to_jet(fjets, jets, builder):
+def match_fjet_to_jet(fjets, jets, builder, deltaR_builder):
     for fjets_event, jets_event in zip(fjets, jets):
         builder.begin_list()
+        deltaR_builder.begin_list()
         for i, jet in enumerate(jets_event):
-            match_idx = -1
+            match_idx, default_DR = -1, 5
             for j, fjet in enumerate(fjets_event):
                 if jet.deltaR(fjet) < FJET_DR:
                     match_idx = j
+                    default_DR = jet.deltaR(fjet)
+                elif jet.deltaR(fjet) < default_DR:
+                    default_DR = jet.deltaR(fjet)
             builder.append(match_idx)
+            deltaR_builder.append(default_DR)
         builder.end_list()
+        deltaR_builder.end_list()
 
-    return builder
+    return builder, deltaR_builder
 
-@nb.njit
-def match_vfjet_to_jet(vfjets, jets, builder):
-    for vfjets_event, jets_event in zip(vfjets, jets):
-        builder.begin_list()
-        for i, jet in enumerate(jets_event):
-            match_idx = -1
-            for j, vfjet in enumerate(vfjets_event):
-                if jet.deltaR(vfjet) < VFJET_DR:
-                    match_idx = j
-            builder.append(match_idx)
-        builder.end_list()
-
-    return builder
-
-@nb.njit
-def match_vfjet_to_fjet(vfjets, fjets, builder):
-    for vfjets_event, fjets_event in zip(vfjets, fjets):
-        builder.begin_list()
-        for i, fjet in enumerate(fjets_event):
-            match_idx = -1
-            for j, vfjet in enumerate(vfjets_event):
-                if fjet.deltaR(vfjet) < VFJET_DR:
-                    match_idx = j
-            builder.append(match_idx)
-        builder.end_list()
-
-    return builder

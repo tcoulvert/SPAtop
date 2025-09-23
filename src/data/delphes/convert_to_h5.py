@@ -274,7 +274,8 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         ak.ArrayBuilder(), ak.ArrayBuilder(),
     )
     vfj_top_idx, vfj_top_bqq_idx = vfj_top_idx.snapshot(), vfj_top_bqq_idx.snapshot()
-    matched_fj_j_idx = match_fjet_to_jet(fjets, jets, ak.ArrayBuilder()).snapshot()
+    matched_fj_j_idx, matched_fj_j_DR  = match_fjet_to_jet(fjets, jets, ak.ArrayBuilder(), ak.ArrayBuilder())
+    matched_fj_j_idx, matched_fj_j_DR = matched_fj_j_idx.snapshot(), matched_fj_j_DR.snapshot()
 
     # keep events with >= min_jets -> what cuts we apply depends on what phase-space (and benchmark) we're targeting
     mask_minjets = ak.num(pt[pt > MIN_JET_PT]) >= 3*n_tops  # phase-space cuts for resolved-like training
@@ -321,7 +322,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         if not os.path.exists(plot_destdir):
             os.makedirs(plot_destdir)
 
-        for jet_type, gen_jet_arr, reco_jet_arr in [('ak5', gen_jets, jets), ('ak8', gen_fjets, fjets), ('ak15', gen_vfjets, vfjets)]:
+        for jet_type, gen_jet_arr, reco_jet_arr in [('ak5', gen_jets, jets), ('ak8', gen_fjets, fjets)]:
             
             jet_genjet_deltaR_axis = hist.axis.Regular(25, 0., 1.5 if int(jet_type[2:]) > 5 else 0.5, name='var', label=r'$\Delta R$', growth=False, underflow=False, overflow=False)
             min_deltaR = 998*np.ones(ak.num(gen_jet_arr, axis=0), dtype=float)
@@ -363,7 +364,6 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     top_q1_idx = top_q1_idx[:, :N_JETS]
     top_q2_idx = top_q2_idx[:, :N_JETS]
     matched_fj_j_idx = matched_fj_j_idx[:, :N_JETS]
-    matched_vfj_j_idx = matched_vfj_j_idx[:, :N_JETS]
 
     ## FatJets ##
     # sort by pt
@@ -385,7 +385,6 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     fj_top_bq1_idx = fj_top_bq1_idx[sorted_by_fj_pt][mask_minjets]
     fj_top_bq2_idx = fj_top_bq2_idx[sorted_by_fj_pt][mask_minjets]
     fj_top_qq_idx = fj_top_qq_idx[sorted_by_fj_pt][mask_minjets]
-    matched_vfj_fj_idx = matched_vfj_fj_idx[sorted_by_fj_pt][mask_minjets]
 
     # keep only top N_FJETS
     N_FJETS = n_tops
@@ -406,7 +405,6 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     fj_top_bq1_idx = fj_top_bq1_idx[:, :N_FJETS]
     fj_top_bq2_idx = fj_top_bq2_idx[:, :N_FJETS]
     fj_top_qq_idx = fj_top_qq_idx[:, :N_FJETS]
-    matched_vfj_fj_idx = matched_vfj_fj_idx[:, :N_FJETS]
 
     # add top pT info
     top_pt = topquarks[mask_minjets].pt
@@ -571,7 +569,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     datasets["INPUTS/Jets/btag"] = to_np_array(btag, max_n=N_JETS).astype("float32")
     datasets["INPUTS/Jets/flavor"] = to_np_array(flavor, max_n=N_JETS).astype("float32")
     datasets["INPUTS/Jets/matchedfj"] = to_np_array(matched_fj_j_idx, max_n=N_JETS).astype("int32")
-    datasets["INPUTS/Jets/matchedvfj"] = to_np_array(matched_vfj_j_idx, max_n=N_JETS).astype("int32")
+    datasets["INPUTS/Jets/deltaRfj"] = to_np_array(matched_fj_j_DR, max_n=N_JETS).astype("int32")
 
     datasets["INPUTS/BoostedJets/MASK"] = to_np_array(fj_mask, max_n=N_FJETS).astype("bool")
     datasets["INPUTS/BoostedJets/fj_pt"] = to_np_array(fj_pt, max_n=N_FJETS).astype("float32")
