@@ -25,6 +25,8 @@ SAVE_H5 = True
 
 RESOLVED_CHI2_CUT = 20  # taken by-eye from boosted chi2 plots
 
+SPANET_TTBAR_CHI2_METHOD = True
+
 file_path = os.path.join(DIRPATH, "../../data/delphes/v4/tt_hadronic_testing_SLIMMED.h5")
 # 1) Load arrays
 with h5py.File(file_path, "r") as f:
@@ -62,33 +64,68 @@ ljets = ak.drop_none(ak.mask(jets, ~bjets_mask))
 
 
 top_dict = {}
-for i in range(N_TOPS):
-    # 4) W jj combinations
-    w = ak.combinations(ljets, 2, axis=1, fields=["j1", "j2"])
-    w = ak.with_field(w, (w.j1 + w.j2).mass, "w_mass")
+if SPANET_TTBAR_CHI2_METHOD:
 
-    # 5) Top combinations
+    w = ak.combinations(ljets, 2, axis=1, fields=["j1", "j2"])
+    w = ak.with_field(w, (w.j1 + w.j2).mass, "mass")
+
     t = ak.cartesian({"w": w, "b": bjets}, axis=1)
     t = ak.with_field(t, (t.w.j1 + t.w.j2 + t.b).mass, "top_mass")
     t = ak.with_field(t, (t.w.j1 + t.w.j2 + t.b).pt, "top_pt")
 
-    # 6) Top χ²
-    chi2_all1 = ( (t.w.w_mass - W_MASS) / (0.1 * W_MASS) )**2 + ( (t.top_mass - TOP_MASS) / (0.1 * TOP_MASS) )**2
-    idx1 = ak.argmin(chi2_all1, axis=1)
-    best_t = ak.firsts(t[ak.local_index(t) == idx1])
+    tt = ak.combinations(t, 2, axis=1, fields=["t1", "t2"])
+    tt_mask = (
+        (tt.t1.b.index != tt.t2.b.index)
+        & (tt.t1.w.j1.index != tt.t2.w.j1.index) & (tt.t1.w.j1.index != tt.t2.w.j2.index)
+        & (tt.t1.w.j2.index != tt.t2.w.j1.index) & (tt.t1.w.j2.index != tt.t2.w.j2.index)
+    )
 
-    top_dict[f'FRt{i+1}_mask'] = ~ak.is_none(best_t)
-    top_dict[f'FRt{i+1}_b'] = best_t.b.index
-    top_dict[f'FRt{i+1}_q1'] = best_t.w.j1.index
-    top_dict[f'FRt{i+1}_q2'] = best_t.w.j2.index
-    top_dict[f'FRt{i+1}_pt'] = best_t.top_pt
-    top_dict[f'FRt{i+1}_chi2'] = ak.firsts(chi2_all1[ak.local_index(chi2_all1) == idx1])
+    chi2 = ( (tt.t1.mass - tt.t2.mass) / (0.15 * TOP_MASS) )**2 
+    + ( (tt.t1.w.mass - W_MASS) / (0.15 * W_MASS) )**2
+    + ( (tt.t2.w.mass - W_MASS) / (0.15 * W_MASS) )**2
+    chi2[tt_mask] = 1e5
+    
+    best_idx = ak.argmin(chi2, axis=1)
+    best_tt = ak.firsts(tt[ak.local_index(tt) == best_idx])
 
-    # 7) Build ak arrays of unused jets
-    bjets = bjets[bjets.index != best_t.b.index]
-    ljets = ljets[(ljets.index != best_t.w.j1.index) & (ljets.index != best_t.w.j2.index)]
+    for i in range(2):
+        top_dict[f'FRt{i+1}_mask'] = (~ak.is_none(best_tt) & ak.firsts(tt_mask[ak.local_index(tt_mask) == best_idx]))
+        top_dict[f'FRt{i+1}_b'] = best_tt[f"t{i+1}"].b.index
+        top_dict[f'FRt{i+1}_q1'] = best_tt[f"t{i+1}"].w.j1.index
+        top_dict[f'FRt{i+1}_q2'] = best_tt[f"t{i+1}"].w.j2.index
+        top_dict[f'FRt{i+1}_pt'] = best_tt[f"t{i+1}"].pt
+        top_dict[f'FRt{i+1}_chi2'] = ak.firsts(chi2[ak.local_index(chi2) == best_idx])
 
-    # 9) Repeat
+else:
+
+    for i in range(N_TOPS):
+        # 4) W jj combinations
+        w = ak.combinations(ljets, 2, axis=1, fields=["j1", "j2"])
+        w = ak.with_field(w, (w.j1 + w.j2).mass, "mass")
+
+        # 5) Top combinations
+        t = ak.cartesian({"w": w, "b": bjets}, axis=1)
+        t = ak.with_field(t, (t.w.j1 + t.w.j2 + t.b).mass, "mass")
+        t = ak.with_field(t, (t.w.j1 + t.w.j2 + t.b).pt, "pt")
+
+        # 6) Top χ²
+        chi2_all1 = ( (t.w.mass - W_MASS) / (0.1 * W_MASS) )**2 + ( (t.mass - TOP_MASS) / (0.1 * TOP_MASS) )**2
+        idx1 = ak.argmin(chi2_all1, axis=1)
+        best_t = ak.firsts(t[ak.local_index(t) == idx1])
+
+        top_dict[f'FRt{i+1}_mask'] = ~ak.is_none(best_t)
+        top_dict[f'FRt{i+1}_b'] = best_t.b.index
+        top_dict[f'FRt{i+1}_q1'] = best_t.w.j1.index
+        top_dict[f'FRt{i+1}_q2'] = best_t.w.j2.index
+        top_dict[f'FRt{i+1}_pt'] = best_t.pt
+        top_dict[f'FRt{i+1}_chi2'] = ak.firsts(chi2_all1[ak.local_index(chi2_all1) == idx1])
+
+        # 7) Build ak arrays of unused jets
+        bjets = bjets[bjets.index != best_t.b.index]
+        ljets = ljets[(ljets.index != best_t.w.j1.index) & (ljets.index != best_t.w.j2.index)]
+
+        # 9) Repeat
+    
 
 
 # Save out new h5 file
