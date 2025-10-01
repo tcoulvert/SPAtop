@@ -15,7 +15,7 @@ vector.register_awkward()
 
 CWD = os.getcwd()
 PLOT_DIR = os.path.join(CWD, "plots")
-if not os.pat.exists(PLOT_DIR):
+if not os.path.exists(PLOT_DIR):
     os.makedirs(PLOT_DIR)
 FATJET_DR = 0.8
 DENSITY = False
