@@ -141,7 +141,7 @@ def make_efficiency_plots(matched_fjs, plot_field, label_extra="tag_score"):
     fig, ax = plt.subplots()
     hep.cms.lumitext(f"2022" + r" (13.6 TeV)", ax=ax)
     hep.cms.text("Simulation", ax=ax)
-    hep.histplot(plot_hist, ax=ax, histtype="step", yerr=True, label=label_extra)
+    hep.histplot(plot_hist, ax=ax, histtype="step", yerr=True, density=True, label=label_extra)
     plt.legend()
     plt.savefig(os.path.join(PLOT_DIR, f"{plot_field}{'_'+label_extra if label_extra != '' else ''}.pdf"), bbox_inches='tight')
     plt.savefig(os.path.join(PLOT_DIR, f"{plot_field}{'_'+label_extra if label_extra != '' else ''}.png"), bbox_inches='tight')
