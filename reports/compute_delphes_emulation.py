@@ -19,11 +19,17 @@ if not os.path.exists(PLOT_DIR):
     os.makedirs(PLOT_DIR)
 FATJET_DR = 0.8
 DENSITY = False
+FILL_VALUE = -999
 
 ################################
 
 
-ttbar_file = uproot.open("/storage/cms/store/mc/Run3Summer22NanoAODv12/TTto4Q-2Jets_TuneCP5_13p6TeV_amcatnloFXFX-pythia8/NANOAODSIM/130X_mcRun3_2022_realistic_v5-v1/2550000/01268018-b8bd-4292-8e59-1b95904a1de8.root")
+ttbar_file = uproot.open(
+    # "/storage/cms/store/mc/Run3Summer22NanoAODv12/TTto4Q-2Jets_TuneCP5_13p6TeV_amcatnloFXFX-pythia8/NANOAODSIM/130X_mcRun3_2022_realistic_v5-v1/2550000/01268018-b8bd-4292-8e59-1b95904a1de8.root"  # 674k events
+    "/storage/cms/store/mc/Run3Summer22NanoAODv12/TTto4Q-2Jets_TuneCP5_13p6TeV_amcatnloFXFX-pythia8/NANOAODSIM/130X_mcRun3_2022_realistic_v5-v1/2550000/1248e4bd-ef5b-4a60-ab02-ca385991223d.root"  # 304k events
+    # "/storage/cms/store/mc/Run3Summer22NanoAODv12/TTto4Q-2Jets_TuneCP5_13p6TeV_amcatnloFXFX-pythia8/NANOAODSIM/130X_mcRun3_2022_realistic_v5-v1/2550000/03c75fc4-f6af-440b-aec6-871c7d27faaf.root"  # 54k events
+    # "/storage/cms/store/mc/Run3Summer22NanoAODv12/TTto4Q-2Jets_TuneCP5_13p6TeV_amcatnloFXFX-pythia8/NANOAODSIM/130X_mcRun3_2022_realistic_v5-v1/2550000/0ae47a9a-770e-41d2-aebd-5fe25d498ec8.root"  # 6.1k events
+)
 # print(ttbar_file["Events"].keys())
 events = ttbar_file["Events"].arrays()
 
@@ -57,18 +63,30 @@ gen_particles = ak.zip({
 
 
 # Finding gen-matched top fatjets
-ts_mask = ( (gen_particles.statusFlags == 13) & (np.abs(gen_particles.pdgId) == 6) )
+ts_mask = ( (gen_particles.status == 62) & (np.abs(gen_particles.pdgId) == 6) )  # status 62
 ts = gen_particles[ts_mask]
-bs_mask = ( (gen_particles.statusFlags == 13) & (np.abs(gen_particles.pdgId) == 5) & (np.abs(gen_particles.pdgId[gen_particles.genPartIdxMother]) == 6) )
+bs_mask = ( (np.abs(gen_particles.pdgId) == 5) & (np.abs(gen_particles.pdgId[gen_particles.genPartIdxMother]) == 6) )  # status 71
 bs = gen_particles[bs_mask]
-ws_mask = ( (gen_particles.statusFlags == 13) & (np.abs(gen_particles.pdgId) == 24) & (np.abs(gen_particles.pdgId[gen_particles.genPartIdxMother]) == 6) )
+ws_mask = ( (np.abs(gen_particles.pdgId) == 24) & (np.abs(gen_particles.pdgId[gen_particles.genPartIdxMother]) == 6) )  # status 52
 ws = gen_particles[ws_mask]
-wqs_mask = ( (gen_particles.statusFlags == 13) & (np.abs(gen_particles.pdgId) <= 5) & (np.abs(gen_particles.pdgId[gen_particles.genPartIdxMother]) == 24) )
+wqs_mask = ( (np.abs(gen_particles.pdgId) <= 5) & (np.abs(gen_particles.pdgId[gen_particles.genPartIdxMother]) == 24) )  # status 71
 wqs = gen_particles[wqs_mask]
-wq0s = wqs[ak.local_index(wqs) == 0]
-wq1s = wqs[ak.local_index(wqs) == 1]
-wq2s = wqs[ak.local_index(wqs) == 2]
-wq3s = wqs[ak.local_index(wqs) == 3]
+
+good_ttbar_events_mask = (
+    (ak.num(ts) == 2) & (ak.num(bs) == 2)
+    & (ak.num(ws) == 2) & (ak.num(wqs) == 4)
+)
+fatjets = fatjets[good_ttbar_events_mask]
+gen_particles = gen_particles[good_ttbar_events_mask]
+ts = ts[good_ttbar_events_mask]
+bs = bs[good_ttbar_events_mask]
+ws = ws[good_ttbar_events_mask]
+wqs = wqs[good_ttbar_events_mask]
+
+wq0s = ak.concatenate([wqs[ak.local_index(wqs) == 0], wqs[ak.local_index(wqs) == 0]], axis=1)
+wq1s = ak.concatenate([wqs[ak.local_index(wqs) == 1], wqs[ak.local_index(wqs) == 1]], axis=1)
+wq2s = ak.concatenate([wqs[ak.local_index(wqs) == 2], wqs[ak.local_index(wqs) == 2]], axis=1)
+wq3s = ak.concatenate([wqs[ak.local_index(wqs) == 3], wqs[ak.local_index(wqs) == 3]], axis=1)
 
 ################################
 
@@ -90,50 +108,49 @@ fjwq3 = make_fjp(fatjets, wq3s)
 ################################
 
 
-# Finding best fatjet for tops -- FB
-fj_matched_t_mask = (
-    (fjt.fj_p_DR < FATJET_DR) & (fjb.fj_p_DR < FATJET_DR)
-    & (fjw.fj_p_DR < FATJET_DR) & ( 
-        (fjwq0.fj_p_DR < FATJET_DR) + (fjwq1.fj_p_DR < FATJET_DR)
-        + (fjwq2.fj_p_DR < FATJET_DR) + (fjwq3.fj_p_DR < FATJET_DR) >= 2
-    )
+t_fj_mask = (fjt.fj_p_DR < FATJET_DR)
+b_fj_mask = (fjb.fj_p_DR < FATJET_DR)
+w_fj_mask = (fjw.fj_p_DR < FATJET_DR)
+wq_fj_mask = (
+    ( (fjwq0.fj_p_DR < FATJET_DR) & (fjwq1.fj_p_DR < FATJET_DR) )
+    | ( (fjwq0.fj_p_DR < FATJET_DR) & (fjwq2.fj_p_DR < FATJET_DR) )
+    | ( (fjwq0.fj_p_DR < FATJET_DR) & (fjwq3.fj_p_DR < FATJET_DR) )
+    | ( (fjwq1.fj_p_DR < FATJET_DR) & (fjwq2.fj_p_DR < FATJET_DR) )
+    | ( (fjwq1.fj_p_DR < FATJET_DR) & (fjwq3.fj_p_DR < FATJET_DR) )
+    | ( (fjwq2.fj_p_DR < FATJET_DR) & (fjwq3.fj_p_DR < FATJET_DR) )
 )
+
+# Finding best fatjet for tops -- FB
+fj_matched_t_mask = (t_fj_mask & b_fj_mask & w_fj_mask & wq_fj_mask)
 best_t_idx = ak.argmin(fjt.fj_p_DR[fj_matched_t_mask], axis=1)
-top_matched_fj = ak.firsts(fjt[fj_matched_t_mask][ak.local_index(fjt[fj_matched_t_mask]) == best_t_idx]).fj  # FB
+top_matched_fj = ak.firsts(fjt.fj[fj_matched_t_mask][ak.local_index(fjt.fj[fj_matched_t_mask]) == best_t_idx])  # FB
 
 # Finding best fatjet for ws (exclusive from tops) -- SRqq
-fj_matched_w_mask = (
-    ~(fjt.fj_p_DR < FATJET_DR) & ~(fjb.fj_p_DR < FATJET_DR)
-    & (fjw.fj_p_DR < FATJET_DR) & ( 
-        (fjwq0.fj_p_DR < FATJET_DR) + (fjwq1.fj_p_DR < FATJET_DR)
-        + (fjwq2.fj_p_DR < FATJET_DR) + (fjwq3.fj_p_DR < FATJET_DR) >= 2
-    )
-)
+fj_matched_w_mask = (~t_fj_mask & ~b_fj_mask & w_fj_mask & wq_fj_mask)
 best_w_idx = ak.argmin(fjw.fj_p_DR[fj_matched_w_mask], axis=1)
-w_matched_fj = ak.firsts(fjw[fj_matched_w_mask][ak.local_index(fjw[fj_matched_w_mask]) == best_t_idx]).fj  # SRqq
+w_matched_fj = ak.firsts(fjw.fj[fj_matched_w_mask][ak.local_index(fjw.fj[fj_matched_w_mask]) == best_w_idx])  # SRqq
 
 ################################
 
 
-def make_efficiency_plots(matched_fjs, plot_field, label_extra="tag_eff"):
+def make_efficiency_plots(matched_fjs, plot_field, label_extra="tag_score"):
     plot_hist = hist.Hist(
-        hist.axis.Regular(100, -1., 1., name="var", label=plot_field)
-    ).fill(var=matched_fjs[plot_field])
+        hist.axis.Regular(100, 0., 1., name="var", label=plot_field)
+    ).fill(var=ak.fill_none(matched_fjs[plot_field], FILL_VALUE))
 
-    for density in [False, True]:
-        fig, ax = plt.subplots()
-        hep.cms.lumitext(f"2022" + r" (13.6 TeV)", ax=ax)
-        hep.cms.text("Simulation", ax=ax)
-        hep.histplot(plot_hist, ax=ax, linewidth=3, histtype="step", yerr=True, density=density, label=label_extra)
-        plt.legend()
-        plt.savefig(os.path.join(PLOT_DIR, f"{plot_field}{'_'+label_extra+'_' if label_extra != '' else ''}{'_density' if density else ''}.pdf"), bbox_inches='tight')
-        plt.savefig(os.path.join(PLOT_DIR, f"{plot_field}{'_'+label_extra+'_' if label_extra != '' else ''}{'_density' if density else ''}.png"), bbox_inches='tight')
-        plt.close()
+    fig, ax = plt.subplots()
+    hep.cms.lumitext(f"2022" + r" (13.6 TeV)", ax=ax)
+    hep.cms.text("Simulation", ax=ax)
+    hep.histplot(plot_hist, ax=ax, histtype="step", yerr=True, label=label_extra)
+    plt.legend()
+    plt.savefig(os.path.join(PLOT_DIR, f"{plot_field}{'_'+label_extra if label_extra != '' else ''}.pdf"), bbox_inches='tight')
+    plt.savefig(os.path.join(PLOT_DIR, f"{plot_field}{'_'+label_extra if label_extra != '' else ''}.png"), bbox_inches='tight')
+    plt.close()
 
 # Making efficiency plots for T (tag) and W (mistag) for top fatjets
-make_efficiency_plots(fj_matched_t_mask, "PNet_TvsQCD")
-make_efficiency_plots(fj_matched_t_mask, "PNet_WvsQCD", label_extra="mistag_eff")
+make_efficiency_plots(top_matched_fj, "PNet_TvsQCD", label_extra="topfj_tag_score")
+make_efficiency_plots(top_matched_fj, "PNet_WvsQCD", label_extra="topfj_mistag_score")
 
 # Making efficiency plots for T (mistag) and W (tag) for w fatjets
-make_efficiency_plots(w_matched_fj, "PNet_WvsQCD")
-make_efficiency_plots(w_matched_fj, "PNet_TvsQCD", label_extra="mistag_eff")
+make_efficiency_plots(w_matched_fj, "PNet_WvsQCD", label_extra="wfj_tag_score")
+make_efficiency_plots(w_matched_fj, "PNet_TvsQCD", label_extra="wfj_mistag_score")
