@@ -21,6 +21,9 @@ FATJET_DR = 0.8
 DENSITY = False
 FILL_VALUE = -999
 
+PNet_TvsQCD_WP = 0.580  # 1.0% QCD bkg efficiency for 2018
+PNet_WvsQCD_WP = 0.940  # 1.0% QCD bkg efficiency for 2018
+
 ################################
 
 
@@ -133,24 +136,28 @@ w_matched_fj = ak.firsts(fjw.fj[fj_matched_w_mask][ak.local_index(fjw.fj[fj_matc
 ################################
 
 
-def make_efficiency_plots(matched_fjs, plot_field, label_extra="tag_score"):
+def make_efficiency_plots(matched_fjs, plot_field, nbins=100, plot_label="", file_postfix=""):
     plot_hist = hist.Hist(
-        hist.axis.Regular(100, 0., 1., name="var", label=plot_field)
+        hist.axis.Regular(nbins, 0., 1., name="var", label=plot_field)
     ).fill(var=ak.fill_none(matched_fjs[plot_field], FILL_VALUE))
 
     fig, ax = plt.subplots()
     hep.cms.lumitext(f"2022" + r" (13.6 TeV)", ax=ax)
     hep.cms.text("Simulation", ax=ax)
-    hep.histplot(plot_hist, ax=ax, histtype="step", yerr=True, density=True, label=label_extra)
+    hep.histplot(plot_hist, ax=ax, histtype="step", yerr=True, density=True, label=plot_label)
     plt.legend()
-    plt.savefig(os.path.join(PLOT_DIR, f"{plot_field}{'_'+label_extra if label_extra != '' else ''}.pdf"), bbox_inches='tight')
-    plt.savefig(os.path.join(PLOT_DIR, f"{plot_field}{'_'+label_extra if label_extra != '' else ''}.png"), bbox_inches='tight')
+    plt.savefig(os.path.join(PLOT_DIR, f"{plot_field}{file_postfix}.pdf"), bbox_inches='tight')
+    plt.savefig(os.path.join(PLOT_DIR, f"{plot_field}{file_postfix}.png"), bbox_inches='tight')
     plt.close()
 
 # Making efficiency plots for T (tag) and W (mistag) for top fatjets
-make_efficiency_plots(top_matched_fj, "PNet_TvsQCD", label_extra="topfj_tag_score")
-make_efficiency_plots(top_matched_fj, "PNet_WvsQCD", label_extra="topfj_mistag_score")
+topfj_eff = ak.sum(top_matched_fj["PNet_TvsQCD"] > PNet_TvsQCD_WP, axis=0) / ak.sum(top_matched_fj["PNet_TvsQCD"] > 0., axis=0)
+topfj_misseff = ak.sum(top_matched_fj["PNet_WvsQCD"] > PNet_WvsQCD_WP, axis=0) / ak.sum(top_matched_fj["PNet_WvsQCD"] > 0., axis=0)
+make_efficiency_plots(top_matched_fj, "PNet_TvsQCD", file_postfix="topfj_tag_score", label=f"top-matched-fatjet eff @ 1.0% QCD eff = {topfj_eff}")
+make_efficiency_plots(top_matched_fj, "PNet_WvsQCD", nbins=80, file_postfix="topfj_mistag_score", label=f"top-matched-fatjet mistag eff @ 1.0% QCD eff = {topfj_misseff}")
 
 # Making efficiency plots for T (mistag) and W (tag) for w fatjets
-make_efficiency_plots(w_matched_fj, "PNet_WvsQCD", label_extra="wfj_tag_score")
-make_efficiency_plots(w_matched_fj, "PNet_TvsQCD", label_extra="wfj_mistag_score")
+wfj_eff = ak.sum(w_matched_fj["PNet_WvsQCD"] > PNet_WvsQCD_WP, axis=0) / ak.sum(w_matched_fj["PNet_WvsQCD"] > 0., axis=0)
+wfj_misseff = ak.sum(w_matched_fj["PNet_TvsQCD"] > PNet_TvsQCD_WP, axis=0) / ak.sum(w_matched_fj["PNet_TvsQCD"] > 0., axis=0)
+make_efficiency_plots(w_matched_fj, "PNet_WvsQCD", nbins=80, file_postfix="wfj_tag_score", label=f"w-matched-fatjet eff @ 1.0% QCD eff = {wfj_eff}")
+make_efficiency_plots(w_matched_fj, "PNet_TvsQCD", file_postfix="wfj_mistag_score", label=f"w-matched-fatjet mistag eff @ 1.0% QCD eff = {wfj_misseff}")
