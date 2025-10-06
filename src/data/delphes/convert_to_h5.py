@@ -252,7 +252,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     )
 
     
-    # fully-resolved tops
+    # Fully-Resolved tops
     top_idx, top_b_idx, top_q1_idx, top_q2_idx = match_top_to_jet(
         bquarks, wquarks_d1, wquarks_d2, jets, 
         ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder()
@@ -260,20 +260,16 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     top_idx, top_b_idx, top_q1_idx, top_q2_idx = (
         top_idx.snapshot(), top_b_idx.snapshot(), top_q1_idx.snapshot(), top_q2_idx.snapshot()
     )
-    # semi-resolved tops
-    fj_top_idx, fj_top_bq1_idx, fj_top_bq2_idx, fj_top_qq_idx = match_top_to_fjet(
-        bquarks, wquarks_d1, wquarks_d2, fjets, 
-        ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder()
+    # Fully-Boosted and Semi-Resolved tops
+    fj_top_idx, fj_top_bqq_idx, fj_top_qq_idx, fj_top_bq1_idx, fj_top_bq2_idx = match_top_to_fjet(
+        topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2, fjets, 
+        ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder()
     )
-    fj_top_idx, fj_top_bq1_idx, fj_top_bq2_idx, fj_top_qq_idx = (
-        fj_top_idx.snapshot(), fj_top_bq1_idx.snapshot(), fj_top_bq2_idx.snapshot(), fj_top_qq_idx.snapshot()
+    fj_top_idx, fj_top_bqq_idx, fj_top_qq_idx, fj_top_bq1_idx, fj_top_bq2_idx = (
+        fj_top_idx.snapshot(), 
+        fj_top_bqq_idx.snapshot(), fj_top_qq_idx.snapshot(), 
+        fj_top_bq1_idx.snapshot(), fj_top_bq2_idx.snapshot()
     )
-    # fully-boosted tops
-    vfj_top_idx, vfj_top_bqq_idx = match_top_to_vfjet(
-        topquarks, bquarks, wquarks_d1, wquarks_d2, fjets, 
-        ak.ArrayBuilder(), ak.ArrayBuilder(),
-    )
-    vfj_top_idx, vfj_top_bqq_idx = vfj_top_idx.snapshot(), vfj_top_bqq_idx.snapshot()
     matched_fj_j_idx, matched_fj_j_DR  = match_fjet_to_jet(fjets, jets, ak.ArrayBuilder(), ak.ArrayBuilder())
     matched_fj_j_idx, matched_fj_j_DR = matched_fj_j_idx.snapshot(), matched_fj_j_DR.snapshot()
 
