@@ -14,6 +14,10 @@ import matplotlib.pyplot as plt
 import mplhep as hep
 import hist
 from cycler import cycler
+
+################################
+
+
 plt.style.use(hep.style.CMS)
 plt.rcParams.update({'font.size': 20})
 cmap_petroff10 = ["#3f90da", "#ffa90e", "#bd1f01", "#94a4a2", "#832db6", "#a96b59", "#e76300", "#b9ac70", "#717581", "#92dadd"]
@@ -22,7 +26,6 @@ plt.rcParams.update({"axes.prop_cycle": cycler("color", cmap_petroff10)})
 from src.data.delphes.matching import (
     match_fjet_to_jet,
     match_top_to_fjet,
-    match_top_to_vfjet,
     match_top_to_jet,
 )
 
@@ -32,11 +35,20 @@ ak.numba.register_and_check()
 
 logging.basicConfig(level=logging.INFO)
 
+################################
+
+
 MIN_JET_PT = 10  # 20
 MIN_FJET_PT = 100  # 200
-MIN_VFJET_PT = 50  # 100
 PROJECT_DIR = Path(__file__).resolve().parents[3]
+
 PLOTS = True
+RNG = np.random.default_rng(seed=21)
+
+TVSQCD_EFFS = {'t':83.21e-2, 'W':6.90e-2, 'bq': 1e-2, 'QCD': 1e-2}
+WVSQCD_EFFS = {'t':15.19e-2, 'W':56.15e-2, 'bq': 1e-2, 'QCD': 1e-2}
+
+################################
 
 
 def to_np_array(ak_array, max_n=10, pad=0):
@@ -92,6 +104,10 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     fj_eta = arrays["FatJet/FatJet.Eta"]
     fj_phi = arrays["FatJet/FatJet.Phi"]
     fj_mass = arrays["FatJet/FatJet.Mass"]
+    # fj_Ttag = arrays["Jet/Jet.TvsQCD"]
+    # fj_Wtag = arrays["Jet/Jet.WvsQCD"]
+    fj_Ttag = ak.zeros_like(fj_pt)
+    fj_Wtag = ak.zeros_like(fj_pt)
     fj_sdp4 = arrays["FatJet/FatJet.SoftDroppedP4[5]"]
     # first entry (i = 0) is the total SoftDropped Jet 4-momenta
     # from i = 1 to 4 are the pruned subjets 4-momenta
@@ -123,6 +139,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     gen_fj_phi = arrays["GenFatJet/GenFatJet.Phi"]
     gen_fj_mass = arrays["GenFatJet/GenFatJet.Mass"]
 
+
     particles = ak.zip(
         {
             "pt": part_pt,
@@ -138,6 +155,8 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         },
         with_name="Momentum4D",
     )
+
+
 
     tops_condition = np.logical_and(
         np.abs(particles.pid) == 6, np.logical_or(
@@ -185,6 +204,8 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     )
     print(f"2 wquarks_d2 in every event? = {ak.all(ak.num(wquarks_d2) == 2)}")
 
+
+
     def fid_mask(particle, pt_threshold=8, max_eta=2.3, barrel_endcap_gap=(1.4, 1.6)):
         pt_mask = ak.sum(particle['pt'] > pt_threshold, axis=1) == n_tops
         eta_mask = ak.sum(
@@ -226,6 +247,8 @@ def get_datasets(arrays, n_tops):  # noqa: C901
             "phi": fj_phi,
             "mass": fj_mass,
             "idx": ak.local_index(fj_pt),
+            "Ttag": fj_Ttag,
+            "Wtag": fj_Wtag
         },
         with_name="Momentum4D",
     )
@@ -250,6 +273,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         },
         with_name="Momentum4D",
     )
+
 
     
     # Fully-Resolved tops
@@ -278,6 +302,46 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     print(f"Num events with >=3 jets per top = {ak.sum(mask_minjets, axis=0)}")
     print(f"    -> Num events with >=3 jets per top & quark fiducial mask = {ak.sum(mask_minjets & quark_fid_mask, axis=0)}")
     print('-'*60)
+
+
+
+    top_fjets_mask = ( (fj_top_bqq_idx > 0) & (fj_top_bqq_idx == fjets.index) )
+    w_fjets_mask = ((fj_top_bqq_idx > 0) & (fj_top_qq_idx == fjets.index) & ~top_fjets_mask )
+    bq_fjets_mask = (  ( (fj_top_bq1_idx > 0) | (fj_top_bq2_idx > 0) )  &  (fj_top_qq_idx == fjets.index)  &  ~top_fjets_mask  &  ~w_fjets_mask  )
+    qcd_fjets_mask = ( ~top_fjets_mask & ~w_fjets_mask & ~bq_fjets_mask )
+
+    # gen-matched top-fatjets
+    fjets.Ttag[top_fjets_mask] = ak.where(
+        RNG.random(size=ak.sum(top_fjets_mask)) < TVSQCD_EFFS['t'], 1, 0
+    )
+    fjets.Wtag[top_fjets_mask] = ak.where(
+        RNG.random(size=ak.sum(top_fjets_mask)) < WVSQCD_EFFS['t'], 1, 0
+    )
+    # gen-matched w-fatjets (exclusive from tops)
+    fjets.Ttag[w_fjets_mask] = ak.where(
+        RNG.random(size=ak.sum(w_fjets_mask)) < TVSQCD_EFFS['W'], 1, 0
+    )
+    fjets.Wtag[w_fjets_mask] = ak.where(
+        RNG.random(size=ak.sum(w_fjets_mask)) < WVSQCD_EFFS['W'], 1, 0
+    )
+    # gen-matched bq-fatjets (exclusive from tops, Ws)
+    fjets.Ttag[bq_fjets_mask] = ak.where(
+        RNG.random(size=ak.sum(bq_fjets_mask)) < TVSQCD_EFFS['bq'], 1, 0
+    )
+    fjets.Wtag[bq_fjets_mask] = ak.where(
+        RNG.random(size=ak.sum(bq_fjets_mask)) < WVSQCD_EFFS['bq'], 1, 0
+    )
+    # every other fatjets (exclusive from tops, Ws, bqs)
+    fjets.Ttag[qcd_fjets_mask] = ak.where(
+        RNG.random(size=ak.sum(qcd_fjets_mask)) < TVSQCD_EFFS['QCD'], 1, 0
+    )
+    fjets.Wtag[qcd_fjets_mask] = ak.where(
+        RNG.random(size=ak.sum(qcd_fjets_mask)) < WVSQCD_EFFS['QCD'], 1, 0
+    )
+    fj_Ttag = fjets.Ttag
+    fj_Wtag = fjets.Wtag
+
+    
 
     ## Jets ##
     # sort by pt
@@ -369,6 +433,8 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     fj_phi = fj_phi[sorted_by_fj_pt][mask_minjets]
     fj_mass = fj_mass[sorted_by_fj_pt][mask_minjets]
     fj_sdmass = fj_sdmass[sorted_by_fj_pt][mask_minjets]
+    fj_Ttag = fj_Ttag[sorted_by_fj_pt][mask_minjets]
+    fj_Wtag = fj_Wtag[sorted_by_fj_pt][mask_minjets]
     fj_tau21 = fj_tau21[sorted_by_fj_pt][mask_minjets]
     fj_tau32 = fj_tau32[sorted_by_fj_pt][mask_minjets]
     fj_charge = fj_charge[sorted_by_fj_pt][mask_minjets]
@@ -378,9 +444,10 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     fj_nneutral = fj_nneutral[sorted_by_fj_pt][mask_minjets]
     fj_ncharged = fj_ncharged[sorted_by_fj_pt][mask_minjets]
     fj_top_idx = fj_top_idx[sorted_by_fj_pt][mask_minjets]
+    fj_top_bqq_idx = fj_top_bqq_idx[sorted_by_fj_pt][mask_minjets]
+    fj_top_qq_idx = fj_top_qq_idx[sorted_by_fj_pt][mask_minjets]
     fj_top_bq1_idx = fj_top_bq1_idx[sorted_by_fj_pt][mask_minjets]
     fj_top_bq2_idx = fj_top_bq2_idx[sorted_by_fj_pt][mask_minjets]
-    fj_top_qq_idx = fj_top_qq_idx[sorted_by_fj_pt][mask_minjets]
 
     # keep only top N_FJETS
     N_FJETS = n_tops
@@ -389,6 +456,8 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     fj_phi = fj_phi[:, :N_FJETS]
     fj_mass = fj_mass[:, :N_FJETS]
     fj_sdmass = fj_sdmass[:, :N_FJETS]
+    fj_Ttag = fj_Ttag[:, :N_FJETS]
+    fj_Wtag = fj_Wtag[:, :N_FJETS]
     fj_tau21 = fj_tau21[:, :N_FJETS]
     fj_tau32 = fj_tau32[:, :N_FJETS]
     fj_charge = fj_charge[:, :N_FJETS]
@@ -398,9 +467,10 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     fj_nneutral = fj_nneutral[:, :N_FJETS]
     fj_ncharged = fj_ncharged[:, :N_FJETS]
     fj_top_idx = fj_top_idx[:, :N_FJETS]
+    fj_top_bqq_idx = fj_top_bqq_idx[:, :N_FJETS]
+    fj_top_qq_idx = fj_top_qq_idx[:, :N_FJETS]
     fj_top_bq1_idx = fj_top_bq1_idx[:, :N_FJETS]
     fj_top_bq2_idx = fj_top_bq2_idx[:, :N_FJETS]
-    fj_top_qq_idx = fj_top_qq_idx[:, :N_FJETS]
 
     # add top pT info
     top_pt = topquarks[mask_minjets].pt
@@ -475,9 +545,9 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     top_fullyBoosted = {}
     for i in range(n_tops):
         top_fullyBoosted[f"top{i+1}_mask"] = (
-            ak.sum(vfj_top_bqq_idx == i+1, axis=1) >= 1
+            ak.sum(fj_top_bqq_idx == i+1, axis=1) >= 1
         )
-        top_fullyBoosted[f"top{i+1}_bqq"] = ak.local_index(vfj_top_bqq_idx)[vfj_top_bqq_idx == i+1]
+        top_fullyBoosted[f"top{i+1}_bqq"] = ak.local_index(fj_top_bqq_idx)[fj_top_bqq_idx == i+1]
         print(f'top {i+1} - num bqq tops = {ak.sum(top_fullyBoosted[f"top{i+1}_mask"])}')
     print(f'num bqq tops = {sum([ak.sum(top_fullyBoosted[f"top{i+1}_mask"]) for i in range(n_tops)])}')
     print(f'num reco tops = {sum([ak.sum(top_fullyResolved[f"top{i+1}_mask"]) for i in range(n_tops)]+[ak.sum(top_semiResolved_qq[f"top{i+1}_mask"]) for i in range(n_tops)]+[ak.sum(top_semiResolved_bq[f"top{i+1}_mask"]) for i in range(n_tops)]+[ak.sum(top_fullyBoosted[f"top{i+1}_mask"]) for i in range(n_tops)])}')
@@ -562,7 +632,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     datasets["INPUTS/Jets/sinphi"] = to_np_array(np.sin(phi), max_n=N_JETS).astype("float32")
     datasets["INPUTS/Jets/cosphi"] = to_np_array(np.cos(phi), max_n=N_JETS).astype("float32")
     datasets["INPUTS/Jets/mass"] = to_np_array(mass, max_n=N_JETS).astype("float32")
-    datasets["INPUTS/Jets/btag"] = to_np_array(btag, max_n=N_JETS).astype("float32")
+    datasets["INPUTS/Jets/btag"] = to_np_array(btag, max_n=N_JETS).astype("bool")
     datasets["INPUTS/Jets/flavor"] = to_np_array(flavor, max_n=N_JETS).astype("float32")
     datasets["INPUTS/Jets/matchedfj"] = to_np_array(matched_fj_j_idx, max_n=N_JETS).astype("int32")
     datasets["INPUTS/Jets/deltaRfj"] = to_np_array(matched_fj_j_DR, max_n=N_JETS).astype("int32")
@@ -575,14 +645,16 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     datasets["INPUTS/BoostedJets/fj_cosphi"] = to_np_array(np.cos(fj_phi), max_n=N_FJETS).astype("float32")
     datasets["INPUTS/BoostedJets/fj_mass"] = to_np_array(fj_mass, max_n=N_FJETS).astype("float32")
     datasets["INPUTS/BoostedJets/fj_sdmass"] = to_np_array(fj_sdmass, max_n=N_FJETS).astype("float32")
+    datasets["INPUTS/BoostedJets/fj_Ttag"] = to_np_array(fj_Ttag, max_n=N_FJETS).astype("bool")
+    datasets["INPUTS/BoostedJets/fj_Wtag"] = to_np_array(fj_Wtag, max_n=N_FJETS).astype("bool")
     datasets["INPUTS/BoostedJets/fj_tau21"] = to_np_array(fj_tau21, max_n=N_FJETS).astype("float32")
     datasets["INPUTS/BoostedJets/fj_tau32"] = to_np_array(fj_tau32, max_n=N_FJETS).astype("float32")
-    datasets["INPUTS/BoostedJets/fj_charge"] = to_np_array(fj_charge, max_n=N_FJETS)
-    datasets["INPUTS/BoostedJets/fj_ehadovereem"] = to_np_array(fj_ehadovereem, max_n=N_FJETS)
-    datasets["INPUTS/BoostedJets/fj_neutralenergyfrac"] = to_np_array(fj_neutralenergyfrac, max_n=N_FJETS)
-    datasets["INPUTS/BoostedJets/fj_chargedenergyfrac"] = to_np_array(fj_chargedenergyfrac, max_n=N_FJETS)
-    datasets["INPUTS/BoostedJets/fj_nneutral"] = to_np_array(fj_nneutral, max_n=N_FJETS)
-    datasets["INPUTS/BoostedJets/fj_ncharged"] = to_np_array(fj_ncharged, max_n=N_FJETS)
+    datasets["INPUTS/BoostedJets/fj_charge"] = to_np_array(fj_charge, max_n=N_FJETS).astype("float32")
+    datasets["INPUTS/BoostedJets/fj_ehadovereem"] = to_np_array(fj_ehadovereem, max_n=N_FJETS).astype("float32")
+    datasets["INPUTS/BoostedJets/fj_neutralenergyfrac"] = to_np_array(fj_neutralenergyfrac, max_n=N_FJETS).astype("float32")
+    datasets["INPUTS/BoostedJets/fj_chargedenergyfrac"] = to_np_array(fj_chargedenergyfrac, max_n=N_FJETS).astype("float32")
+    datasets["INPUTS/BoostedJets/fj_nneutral"] = to_np_array(fj_nneutral, max_n=N_FJETS).astype("float32")
+    datasets["INPUTS/BoostedJets/fj_ncharged"] = to_np_array(fj_ncharged, max_n=N_FJETS).astype("float32")
 
     # Store the truth-level info
     for i in range(n_tops):

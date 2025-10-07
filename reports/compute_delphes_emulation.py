@@ -122,21 +122,32 @@ wq_fj_mask = (
     | ( (fjwq1.fj_p_DR < FATJET_DR) & (fjwq3.fj_p_DR < FATJET_DR) )
     | ( (fjwq2.fj_p_DR < FATJET_DR) & (fjwq3.fj_p_DR < FATJET_DR) )
 )
+bq_fj_mask = (
+    ( (fjb.fj_p_DR < FATJET_DR) & (fjwq0.fj_p_DR < FATJET_DR) )
+    | ( (fjb.fj_p_DR < FATJET_DR) & (fjwq1.fj_p_DR < FATJET_DR) )
+    | ( (fjb.fj_p_DR < FATJET_DR) & (fjwq2.fj_p_DR < FATJET_DR) )
+    | ( (fjb.fj_p_DR < FATJET_DR) & (fjwq3.fj_p_DR < FATJET_DR) )
+)
 
 # Finding best fatjet for tops -- FB
 fj_matched_t_mask = (t_fj_mask & b_fj_mask & w_fj_mask & wq_fj_mask)
 best_t_idx = ak.argmin(fjt.fj_p_DR[fj_matched_t_mask], axis=1)
 top_matched_fj = ak.firsts(fjt.fj[fj_matched_t_mask][ak.local_index(fjt.fj[fj_matched_t_mask]) == best_t_idx])  # FB
 
-# Finding best fatjet for ws
-fj_matched_w_mask = (w_fj_mask & wq_fj_mask)
-best_w_idx = ak.argmin(fjw.fj_p_DR[fj_matched_w_mask], axis=1)
-w_matched_fj = ak.firsts(fjw.fj[fj_matched_w_mask][ak.local_index(fjw.fj[fj_matched_w_mask]) == best_w_idx])  # SRqq
+# # Finding best fatjet for ws
+# fj_matched_w_mask = (w_fj_mask & wq_fj_mask)
+# best_w_idx = ak.argmin(fjw.fj_p_DR[fj_matched_w_mask], axis=1)
+# w_matched_fj = ak.firsts(fjw.fj[fj_matched_w_mask][ak.local_index(fjw.fj[fj_matched_w_mask]) == best_w_idx])  # SRqq
 
 # Finding best fatjet for ws (exclusive from tops) -- SRqq
 fj_exclusive_matched_w_mask = (~(t_fj_mask & b_fj_mask) & w_fj_mask & wq_fj_mask)
 best_exclw_idx = ak.argmin(fjw.fj_p_DR[fj_exclusive_matched_w_mask], axis=1)
 exclw_matched_fj = ak.firsts(fjw.fj[fj_exclusive_matched_w_mask][ak.local_index(fjw.fj[fj_exclusive_matched_w_mask]) == best_exclw_idx])  # SRqq
+
+# Finding best fatjet for bq (exclusive from tops) -- SRbq
+fj_exclusive_matched_bq_mask = (~(t_fj_mask & w_fj_mask & wq_fj_mask) & bq_fj_mask)
+best_exclbq_idx = ak.argmin(fjb.fj_p_DR[fj_exclusive_matched_bq_mask], axis=1)
+exclbq_matched_fj = ak.firsts(fjb.fj[fj_exclusive_matched_bq_mask][ak.local_index(fjb.fj[fj_exclusive_matched_bq_mask]) == best_exclbq_idx])  # SRbq
 
 ################################
 
@@ -161,14 +172,21 @@ topfj_misseff = ak.sum(top_matched_fj["PNet_WvsQCD"] > PNet_WvsQCD_WP, axis=0) /
 make_efficiency_plots(top_matched_fj, "PNet_TvsQCD", file_postfix="topfj_tag_score", plot_label=f"top-matched-fatjet eff @ 1.0% QCD eff = {topfj_eff*100:.2f}%")
 make_efficiency_plots(top_matched_fj, "PNet_WvsQCD", nbins=80, file_postfix="topfj_mistag_score", plot_label=f"top-matched-fatjet mistag eff @ 1.0% QCD eff = {topfj_misseff*100:.2f}%")
 
-# Making efficiency plots for T (mistag) and W (tag) for w fatjets
-wfj_eff = ak.sum(w_matched_fj["PNet_WvsQCD"] > PNet_WvsQCD_WP, axis=0) / ak.sum(w_matched_fj["PNet_WvsQCD"] > 0., axis=0)
-wfj_misseff = ak.sum(w_matched_fj["PNet_TvsQCD"] > PNet_TvsQCD_WP, axis=0) / ak.sum(w_matched_fj["PNet_TvsQCD"] > 0., axis=0)
-make_efficiency_plots(w_matched_fj, "PNet_WvsQCD", nbins=80, file_postfix="wfj_tag_score", plot_label=f"w-matched-fatjet eff @ 1.0% QCD eff = {wfj_eff*100:.2f}%")
-make_efficiency_plots(w_matched_fj, "PNet_TvsQCD", file_postfix="wfj_mistag_score", plot_label=f"w-matched-fatjet mistag eff @ 1.0% QCD eff = {wfj_misseff*100:.2f}%")
+# # Making efficiency plots for T (mistag) and W (tag) for w fatjets
+# wfj_eff = ak.sum(w_matched_fj["PNet_WvsQCD"] > PNet_WvsQCD_WP, axis=0) / ak.sum(w_matched_fj["PNet_WvsQCD"] > 0., axis=0)
+# wfj_misseff = ak.sum(w_matched_fj["PNet_TvsQCD"] > PNet_TvsQCD_WP, axis=0) / ak.sum(w_matched_fj["PNet_TvsQCD"] > 0., axis=0)
+# make_efficiency_plots(w_matched_fj, "PNet_WvsQCD", nbins=80, file_postfix="wfj_tag_score", plot_label=f"w-matched-fatjet eff @ 1.0% QCD eff = {wfj_eff*100:.2f}%")
+# make_efficiency_plots(w_matched_fj, "PNet_TvsQCD", file_postfix="wfj_mistag_score", plot_label=f"w-matched-fatjet mistag eff @ 1.0% QCD eff = {wfj_misseff*100:.2f}%")
 
 # Making efficiency plots for T (mistag) and W (tag) for w fatjets
 exclwfj_eff = ak.sum(exclw_matched_fj["PNet_WvsQCD"] > PNet_WvsQCD_WP, axis=0) / ak.sum(exclw_matched_fj["PNet_WvsQCD"] > 0., axis=0)
 exclwfj_misseff = ak.sum(exclw_matched_fj["PNet_TvsQCD"] > PNet_TvsQCD_WP, axis=0) / ak.sum(exclw_matched_fj["PNet_TvsQCD"] > 0., axis=0)
 make_efficiency_plots(exclw_matched_fj, "PNet_WvsQCD", nbins=80, file_postfix="exclwfj_tag_score", plot_label=f"exclusive-w-matched-fatjet eff @ 1.0% QCD eff = {exclwfj_eff*100:.2f}%")
 make_efficiency_plots(exclw_matched_fj, "PNet_TvsQCD", file_postfix="exclwfj_mistag_score", plot_label=f"exclusive-w-matched-fatjet mistag eff @ 1.0% QCD eff = {exclwfj_misseff*100:.2f}%")
+
+# Making efficiency plots for T (mistag) and W (mistag) for bq fatjets
+bqfj_Wmisseff = ak.sum(exclbq_matched_fj["PNet_WvsQCD"] > PNet_WvsQCD_WP, axis=0) / ak.sum(exclbq_matched_fj["PNet_WvsQCD"] > 0., axis=0)
+bqfj_Tmisseff = ak.sum(exclbq_matched_fj["PNet_TvsQCD"] > PNet_TvsQCD_WP, axis=0) / ak.sum(exclbq_matched_fj["PNet_TvsQCD"] > 0., axis=0)
+make_efficiency_plots(exclbq_matched_fj, "PNet_WvsQCD", nbins=80, file_postfix="exclbqfj_tag_score", plot_label=f"exclusivebq-matched-fatjet mistag eff @ 1.0% QCD eff = {bqfj_Wmisseff*100:.2f}%")
+make_efficiency_plots(exclbq_matched_fj, "PNet_TvsQCD", file_postfix="exclbqfj_mistag_score", plot_label=f"exclusivebq-matched-fatjet mistag eff @ 1.0% QCD eff = {bqfj_Tmisseff*100:.2f}%")
+

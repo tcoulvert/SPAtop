@@ -139,7 +139,7 @@ def match_top_to_jet(
             for j, (bquark, wquark1, wquark2) in enumerate(zip(
                 bquarks_event, wquarks1_event, wquarks2_event
             )):  # dont need to check b and w mother index b/c made them match by construction
-                bquark_deltaR = jet.deltaR(bquark) if jet.deltaR(bquark) < JET_DR and jet_btag and f'b_{j+1}' not in matched_set else FILL_VALUE
+                bquark_deltaR = jet.deltaR(bquark) if jet.deltaR(bquark) < JET_DR and f'b_{j+1}' not in matched_set else FILL_VALUE
                 wquark1_deltaR = jet.deltaR(wquark1) if jet.deltaR(wquark1) < JET_DR and f'w1_{j+1}' not in matched_set else FILL_VALUE
                 wquark2_deltaR = jet.deltaR(wquark2) if jet.deltaR(wquark2) < JET_DR and f'w2_{j+1}' not in matched_set else FILL_VALUE
 
