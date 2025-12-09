@@ -19,7 +19,7 @@ spec:
             - "-m"
             - "spanet.train"
             - -of
-            - "/spatopvol/options_files/spatop_v1.json"
+            - "/spatopvol/options_files/spatop_v5.json"
             - -l
             - "/spatopvol/logs/"
             - -n

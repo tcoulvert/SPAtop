@@ -7,6 +7,7 @@ import awkward as ak
 import click
 import h5py
 import numpy as np
+import numba as nb
 import uproot
 import vector
 
@@ -45,14 +46,25 @@ PROJECT_DIR = Path(__file__).resolve().parents[3]
 PLOTS = True
 RNG = np.random.default_rng(seed=21)
 
-TVSQCD_EFFS = {'t':83.21e-2, 'W':6.90e-2, 'bq': 1e-2, 'QCD': 1e-2}
-WVSQCD_EFFS = {'t':15.19e-2, 'W':56.15e-2, 'bq': 1e-2, 'QCD': 1e-2}
+TVSQCD_EFFS = {'t':83.21e-2, 'W':6.90e-2, 'bq': 19.65e-2, 'QCD': 1e-2}
+WVSQCD_EFFS = {'t':15.19e-2, 'W':56.15e-2, 'bq': 9.92e-2, 'QCD': 1e-2}
 
 ################################
 
 
 def to_np_array(ak_array, max_n=10, pad=0):
     return ak.fill_none(ak.pad_none(ak_array, max_n, clip=True, axis=-1), pad).to_numpy()
+
+@nb.njit
+def random2D(layout_array, RN_array, RN_builder):
+    RN_idx = 0
+    for dim_1 in layout_array:
+        RN_builder.begin_list()
+        for dim_2 in dim_1:
+            RN_builder.append(RN_array[RN_idx])
+            RN_idx += 1
+        RN_builder.end_list()
+    return RN_builder
 
 def final_particle(particle_pdgid, mother_pdgid, particles, final_status=-1, intermediate_particles=None):
     if intermediate_particles is None:
@@ -79,6 +91,7 @@ def final_particle(particle_pdgid, mother_pdgid, particles, final_status=-1, int
 
 
 def get_datasets(arrays, n_tops):  # noqa: C901
+    print('='*60+'\n'+'='*60+'\n'+'='*60)
     print(f'num events = {len(arrays["Particle/Particle.PID"])}')
 
     part_pid = arrays["Particle/Particle.PID"]  # PDG ID
@@ -106,8 +119,8 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     fj_mass = arrays["FatJet/FatJet.Mass"]
     # fj_Ttag = arrays["Jet/Jet.TvsQCD"]
     # fj_Wtag = arrays["Jet/Jet.WvsQCD"]
-    fj_Ttag = ak.zeros_like(fj_pt)
-    fj_Wtag = ak.zeros_like(fj_pt)
+    fj_TtagRN = random2D(fj_pt, RNG.random(size=ak.sum(ak.num(fj_pt))), ak.ArrayBuilder()).snapshot()
+    fj_WtagRN = random2D(fj_pt, RNG.random(size=ak.sum(ak.num(fj_pt))), ak.ArrayBuilder()).snapshot()
     fj_sdp4 = arrays["FatJet/FatJet.SoftDroppedP4[5]"]
     # first entry (i = 0) is the total SoftDropped Jet 4-momenta
     # from i = 1 to 4 are the pruned subjets 4-momenta
@@ -247,8 +260,8 @@ def get_datasets(arrays, n_tops):  # noqa: C901
             "phi": fj_phi,
             "mass": fj_mass,
             "idx": ak.local_index(fj_pt),
-            "Ttag": fj_Ttag,
-            "Wtag": fj_Wtag
+            "TtagRN": fj_TtagRN,
+            "WtagRN": fj_WtagRN
         },
         with_name="Momentum4D",
     )
@@ -303,43 +316,41 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     print(f"    -> Num events with >=3 jets per top & quark fiducial mask = {ak.sum(mask_minjets & quark_fid_mask, axis=0)}")
     print('-'*60)
 
+    excl_FBandSR_bool = (
+        ~ak.all( (fj_top_bqq_idx > 0) & (fj_top_qq_idx > 0) )  # FB and SRqq
+        & ~ak.all( (fj_top_bqq_idx > 0) & (fj_top_bq1_idx > 0) )  # FB and SRbq1
+        & ~ak.all( (fj_top_bqq_idx > 0) & (fj_top_bq2_idx > 0) )  # FB and SRbq2
+        & ~ak.all( (fj_top_qq_idx > 0) & (fj_top_bq1_idx > 0) )  # SRqq and SRbq1
+        & ~ak.all( (fj_top_qq_idx > 0) & (fj_top_bq2_idx > 0) )  # SRqq and SRbq2
+        & ~ak.all( (fj_top_bq1_idx > 0) & (fj_top_bq2_idx > 0) )  # SRbq1 and SRbq2
+    )
+    print(f"Exclusive FB and SRs? {excl_FBandSR_bool}")
+    
 
-
-    top_fjets_mask = ( (fj_top_bqq_idx > 0) & (fj_top_bqq_idx == fjets.index) )
-    w_fjets_mask = ((fj_top_bqq_idx > 0) & (fj_top_qq_idx == fjets.index) & ~top_fjets_mask )
-    bq_fjets_mask = (  ( (fj_top_bq1_idx > 0) | (fj_top_bq2_idx > 0) )  &  (fj_top_qq_idx == fjets.index)  &  ~top_fjets_mask  &  ~w_fjets_mask  )
+    top_fjets_mask = (fj_top_bqq_idx > 0)
+    w_fjets_mask = (fj_top_qq_idx > 0)
+    bq_fjets_mask = ( (fj_top_bq1_idx > 0) | (fj_top_bq2_idx > 0) )
     qcd_fjets_mask = ( ~top_fjets_mask & ~w_fjets_mask & ~bq_fjets_mask )
 
-    # gen-matched top-fatjets
-    fjets.Ttag[top_fjets_mask] = ak.where(
-        RNG.random(size=ak.sum(top_fjets_mask)) < TVSQCD_EFFS['t'], 1, 0
+    # apply emulated TvsQCD and WvsQCD bools @ 1.0% QCD eff WPs
+    fjets["Ttag"] = ak.where(
+        (
+            ( top_fjets_mask & (fjets["TtagRN"] < TVSQCD_EFFS['t']) )
+            | ( w_fjets_mask & (fjets["TtagRN"] < TVSQCD_EFFS['W']) )
+            | ( bq_fjets_mask & (fjets["TtagRN"] < TVSQCD_EFFS['bq']) )
+            | ( qcd_fjets_mask & (fjets["TtagRN"] < TVSQCD_EFFS['QCD']) )
+        ), 1, 0
     )
-    fjets.Wtag[top_fjets_mask] = ak.where(
-        RNG.random(size=ak.sum(top_fjets_mask)) < WVSQCD_EFFS['t'], 1, 0
+    fjets["Wtag"] = ak.where(
+        (
+            ( top_fjets_mask & (fjets["WtagRN"] < WVSQCD_EFFS['t']) )
+            | ( w_fjets_mask & (fjets["WtagRN"] < WVSQCD_EFFS['W']) )
+            | ( bq_fjets_mask & (fjets["WtagRN"] < WVSQCD_EFFS['bq']) )
+            | ( qcd_fjets_mask & (fjets["WtagRN"] < WVSQCD_EFFS['QCD']) )
+        ), 1, 0
     )
-    # gen-matched w-fatjets (exclusive from tops)
-    fjets.Ttag[w_fjets_mask] = ak.where(
-        RNG.random(size=ak.sum(w_fjets_mask)) < TVSQCD_EFFS['W'], 1, 0
-    )
-    fjets.Wtag[w_fjets_mask] = ak.where(
-        RNG.random(size=ak.sum(w_fjets_mask)) < WVSQCD_EFFS['W'], 1, 0
-    )
-    # gen-matched bq-fatjets (exclusive from tops, Ws)
-    fjets.Ttag[bq_fjets_mask] = ak.where(
-        RNG.random(size=ak.sum(bq_fjets_mask)) < TVSQCD_EFFS['bq'], 1, 0
-    )
-    fjets.Wtag[bq_fjets_mask] = ak.where(
-        RNG.random(size=ak.sum(bq_fjets_mask)) < WVSQCD_EFFS['bq'], 1, 0
-    )
-    # every other fatjets (exclusive from tops, Ws, bqs)
-    fjets.Ttag[qcd_fjets_mask] = ak.where(
-        RNG.random(size=ak.sum(qcd_fjets_mask)) < TVSQCD_EFFS['QCD'], 1, 0
-    )
-    fjets.Wtag[qcd_fjets_mask] = ak.where(
-        RNG.random(size=ak.sum(qcd_fjets_mask)) < WVSQCD_EFFS['QCD'], 1, 0
-    )
-    fj_Ttag = fjets.Ttag
-    fj_Wtag = fjets.Wtag
+    fj_Ttag = fjets["Ttag"]
+    fj_Wtag = fjets["Wtag"]
 
     
 
