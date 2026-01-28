@@ -726,18 +726,17 @@ def main(in_files, out_file, train_frac, n_tops, plots):
     expanded_in_files = []
     print(f"starting in_files = {in_files}")
 
-    if re.match('root://', in_files):
-        subprocess.run(['xrdfs', '//'.join(in_files.split('//')[:2])+'/', 'ls', '/'+in_files.split('//')[2], '>', 'xrdfs_output.txt'])
-        with open('xrdfs_output.txt', 'r') as f:
-            expanded_in_files = ['//'.join(in_files.split('//')[:2])+line.strip() for line in f]
-    else:
-        for file_name in in_files:
-            if os.path.isdir(file_name):
-                print(f"found directory: {file_name}")
-                for root_file in glob.glob(os.path.join(file_name, '*.root')):
-                    expanded_in_files.append(os.path.join(file_name, root_file))
-            else:
-                expanded_in_files.append(file_name)
+    for file_name in in_files:
+        if re.match('root://', in_files):
+            subprocess.run(['xrdfs', '//'.join(in_files.split('//')[:2])+'/', 'ls', '/'+in_files.split('//')[2], '>', 'xrdfs_output.txt'])
+            with open('xrdfs_output.txt', 'r') as f:
+                expanded_in_files = ['//'.join(in_files.split('//')[:2])+line.strip() for line in f]
+        elif os.path.isdir(file_name):
+            print(f"found directory: {file_name}")
+            for root_file in glob.glob(os.path.join(file_name, '*.root')):
+                expanded_in_files.append(os.path.join(file_name, root_file))
+        else:
+            expanded_in_files.append(file_name)
     in_files = expanded_in_files
     print(f"ending in_files = {in_files}")
     for file_name in in_files:
