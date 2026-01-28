@@ -1,6 +1,8 @@
 import glob
 import logging
 import os
+import re
+import subprocess
 from pathlib import Path
 
 import awkward as ak
@@ -310,11 +312,11 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     matched_fj_j_idx, matched_fj_j_DR  = match_fjet_to_jet(fjets, jets, ak.ArrayBuilder(), ak.ArrayBuilder())
     matched_fj_j_idx, matched_fj_j_DR = matched_fj_j_idx.snapshot(), matched_fj_j_DR.snapshot()
 
-    # keep events with >= min_jets -> what cuts we apply depends on what phase-space (and benchmark) we're targeting
-    mask_minjets = ak.num(pt[pt > MIN_JET_PT]) >= 3*n_tops  # phase-space cuts for resolved-like training
-    print(f"Num events with >=3 jets per top = {ak.sum(mask_minjets, axis=0)}")
-    print(f"    -> Num events with >=3 jets per top & quark fiducial mask = {ak.sum(mask_minjets & quark_fid_mask, axis=0)}")
-    print('-'*60)
+    # # keep events with >= min_jets -> what cuts we apply depends on what phase-space (and benchmark) we're targeting
+    # event_mask = ak.num(pt[pt > MIN_JET_PT]) >= 3*n_tops  # phase-space cuts for resolved-like training
+    # print(f"Num events with >=3 jets per top = {ak.sum(event_mask, axis=0)}")
+    # print(f"    -> Num events with >=3 jets per top & quark fiducial mask = {ak.sum(event_mask & quark_fid_mask, axis=0)}")
+    # print('-'*60)
 
     excl_FBandSR_bool = (
         ~ak.all( (fj_top_bqq_idx > 0) & (fj_top_qq_idx > 0) )  # FB and SRqq
@@ -357,17 +359,17 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     ## Jets ##
     # sort by pt
     sorted_by_pt = ak.argsort(pt, ascending=False, axis=-1)
-    btag = btag[sorted_by_pt][mask_minjets]
-    pt = pt[sorted_by_pt][mask_minjets]
-    eta = eta[sorted_by_pt][mask_minjets]
-    phi = phi[sorted_by_pt][mask_minjets]
-    mass = mass[sorted_by_pt][mask_minjets]
-    flavor = flavor[sorted_by_pt][mask_minjets]
-    top_idx = top_idx[sorted_by_pt][mask_minjets]
-    top_b_idx = top_b_idx[sorted_by_pt][mask_minjets]
-    top_q1_idx = top_q1_idx[sorted_by_pt][mask_minjets]
-    top_q2_idx = top_q2_idx[sorted_by_pt][mask_minjets]
-    matched_fj_j_idx = matched_fj_j_idx[sorted_by_pt][mask_minjets]
+    btag = btag[sorted_by_pt][event_mask]
+    pt = pt[sorted_by_pt][event_mask]
+    eta = eta[sorted_by_pt][event_mask]
+    phi = phi[sorted_by_pt][event_mask]
+    mass = mass[sorted_by_pt][event_mask]
+    flavor = flavor[sorted_by_pt][event_mask]
+    top_idx = top_idx[sorted_by_pt][event_mask]
+    top_b_idx = top_b_idx[sorted_by_pt][event_mask]
+    top_q1_idx = top_q1_idx[sorted_by_pt][event_mask]
+    top_q2_idx = top_q2_idx[sorted_by_pt][event_mask]
+    matched_fj_j_idx = matched_fj_j_idx[sorted_by_pt][event_mask]
 
     if PLOTS:
         # jet pt
@@ -439,26 +441,26 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     ## FatJets ##
     # sort by pt
     sorted_by_fj_pt = ak.argsort(fj_pt, ascending=False, axis=-1)
-    fj_pt = fj_pt[sorted_by_fj_pt][mask_minjets]
-    fj_eta = fj_eta[sorted_by_fj_pt][mask_minjets]
-    fj_phi = fj_phi[sorted_by_fj_pt][mask_minjets]
-    fj_mass = fj_mass[sorted_by_fj_pt][mask_minjets]
-    fj_sdmass = fj_sdmass[sorted_by_fj_pt][mask_minjets]
-    fj_Ttag = fj_Ttag[sorted_by_fj_pt][mask_minjets]
-    fj_Wtag = fj_Wtag[sorted_by_fj_pt][mask_minjets]
-    fj_tau21 = fj_tau21[sorted_by_fj_pt][mask_minjets]
-    fj_tau32 = fj_tau32[sorted_by_fj_pt][mask_minjets]
-    fj_charge = fj_charge[sorted_by_fj_pt][mask_minjets]
-    fj_ehadovereem = fj_ehadovereem[sorted_by_fj_pt][mask_minjets]
-    fj_neutralenergyfrac = fj_neutralenergyfrac[sorted_by_fj_pt][mask_minjets]
-    fj_chargedenergyfrac = fj_chargedenergyfrac[sorted_by_fj_pt][mask_minjets]
-    fj_nneutral = fj_nneutral[sorted_by_fj_pt][mask_minjets]
-    fj_ncharged = fj_ncharged[sorted_by_fj_pt][mask_minjets]
-    fj_top_idx = fj_top_idx[sorted_by_fj_pt][mask_minjets]
-    fj_top_bqq_idx = fj_top_bqq_idx[sorted_by_fj_pt][mask_minjets]
-    fj_top_qq_idx = fj_top_qq_idx[sorted_by_fj_pt][mask_minjets]
-    fj_top_bq1_idx = fj_top_bq1_idx[sorted_by_fj_pt][mask_minjets]
-    fj_top_bq2_idx = fj_top_bq2_idx[sorted_by_fj_pt][mask_minjets]
+    fj_pt = fj_pt[sorted_by_fj_pt][event_mask]
+    fj_eta = fj_eta[sorted_by_fj_pt][event_mask]
+    fj_phi = fj_phi[sorted_by_fj_pt][event_mask]
+    fj_mass = fj_mass[sorted_by_fj_pt][event_mask]
+    fj_sdmass = fj_sdmass[sorted_by_fj_pt][event_mask]
+    fj_Ttag = fj_Ttag[sorted_by_fj_pt][event_mask]
+    fj_Wtag = fj_Wtag[sorted_by_fj_pt][event_mask]
+    fj_tau21 = fj_tau21[sorted_by_fj_pt][event_mask]
+    fj_tau32 = fj_tau32[sorted_by_fj_pt][event_mask]
+    fj_charge = fj_charge[sorted_by_fj_pt][event_mask]
+    fj_ehadovereem = fj_ehadovereem[sorted_by_fj_pt][event_mask]
+    fj_neutralenergyfrac = fj_neutralenergyfrac[sorted_by_fj_pt][event_mask]
+    fj_chargedenergyfrac = fj_chargedenergyfrac[sorted_by_fj_pt][event_mask]
+    fj_nneutral = fj_nneutral[sorted_by_fj_pt][event_mask]
+    fj_ncharged = fj_ncharged[sorted_by_fj_pt][event_mask]
+    fj_top_idx = fj_top_idx[sorted_by_fj_pt][event_mask]
+    fj_top_bqq_idx = fj_top_bqq_idx[sorted_by_fj_pt][event_mask]
+    fj_top_qq_idx = fj_top_qq_idx[sorted_by_fj_pt][event_mask]
+    fj_top_bq1_idx = fj_top_bq1_idx[sorted_by_fj_pt][event_mask]
+    fj_top_bq2_idx = fj_top_bq2_idx[sorted_by_fj_pt][event_mask]
 
     # keep only top N_FJETS
     N_FJETS = n_tops
@@ -484,7 +486,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     fj_top_bq2_idx = fj_top_bq2_idx[:, :N_FJETS]
 
     # add top pT info
-    top_pt = topquarks[mask_minjets].pt
+    top_pt = topquarks[event_mask].pt
     top_pt = ak.fill_none(ak.pad_none(top_pt, target=n_tops, axis=1, clip=True), -1)
     top_pt_dict = {}
     for i in range(n_tops):
@@ -498,38 +500,34 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     # fully-resolved
     top_fullyResolved = {}
     for i in range(n_tops):
-        top_fullyResolved[f"top{i+1}_mask"] = (
-            ak.sum(top_idx == i+1, axis=1) >= 3
-        )
         top_fullyResolved[f"top{i+1}_b"] = ak.local_index(top_b_idx)[top_b_idx == i+1]
         top_fullyResolved[f"top{i+1}_q1"] = ak.local_index(top_q1_idx)[top_q1_idx == i+1]
         top_fullyResolved[f"top{i+1}_q2"] = ak.local_index(top_q2_idx)[top_q2_idx == i+1]
+        top_fullyResolved[f"top{i+1}_mask"] = ak.fill_none(
+            ( ak.sum(top_idx == i+1, axis=1) == 3 )
+            & ( top_fullyResolved[f"top{i+1}_b"] != top_fullyResolved[f"top{i+1}_q1"] )
+            & ( top_fullyResolved[f"top{i+1}_b"] != top_fullyResolved[f"top{i+1}_q2"] )
+            & ( top_fullyResolved[f"top{i+1}_q1"] != top_fullyResolved[f"top{i+1}_q2"] ),
+            False
+        )
         print(f'top {i+1} - num fully-resolved tops = {ak.sum(top_fullyResolved[f"top{i+1}_mask"])}')
     print(f'num fully-resolved tops = {sum([ak.sum(top_fullyResolved[f"top{i+1}_mask"]) for i in range(n_tops)])}')
     
     # semi-resolved (qq fatjet)
     top_semiResolved_qq = {}
     for i in range(n_tops):
-        top_semiResolved_qq[f"top{i+1}_mask"] = (
-            (ak.sum(top_b_idx == i+1, axis=1) >= 1) 
-            & (ak.sum(fj_top_qq_idx == i+1, axis=1) >= 1)
-        )
         top_semiResolved_qq[f"top{i+1}_b"] = ak.local_index(top_b_idx)[top_b_idx == i+1]
         top_semiResolved_qq[f"top{i+1}_qq"] = ak.local_index(fj_top_qq_idx)[fj_top_qq_idx == i+1]
+        top_semiResolved_qq[f"top{i+1}_mask"] = (
+            (ak.sum(top_b_idx == i+1, axis=1) == 1) 
+            & (ak.sum(fj_top_qq_idx == i+1, axis=1) == 1)
+        )
         print(f'top {i+1} - num qq tops = {ak.sum(top_semiResolved_qq[f"top{i+1}_mask"])}')
     print(f'num qq tops = {sum([ak.sum(top_semiResolved_qq[f"top{i+1}_mask"]) for i in range(n_tops)])}')
     
     # semi-resolved (bq fatjet)
     top_semiResolved_bq = {}
     for i in range(n_tops):
-        bq2_mask = (
-            (ak.sum(top_q1_idx == i+1, axis=1) >= 1) 
-            & (ak.sum(fj_top_bq2_idx == i+1, axis=1) >= 1)
-        )
-        bq1_mask = (
-            (ak.sum(top_q2_idx == i+1, axis=1) >= 1) 
-            & (ak.sum(fj_top_bq1_idx == i+1, axis=1) >= 1)
-        )
         top_semiResolved_bq[f"top{i+1}_mask"] = (bq2_mask | bq1_mask)
         top_semiResolved_bq[f"top{i+1}_q"] = ak.where(
             bq2_mask, 
@@ -549,16 +547,24 @@ def get_datasets(arrays, n_tops):  # noqa: C901
                 ak.local_index(fj_top_bq2_idx)[fj_top_bq2_idx == i+1]
             )
         )
+        bq2_mask = (
+            (ak.sum(top_q1_idx == i+1, axis=1) == 1) 
+            & (ak.sum(fj_top_bq2_idx == i+1, axis=1) == 1)
+        )
+        bq1_mask = (
+            (ak.sum(top_q2_idx == i+1, axis=1) == 1) 
+            & (ak.sum(fj_top_bq1_idx == i+1, axis=1) == 1)
+        )
         print(f'top {i+1} - num bq tops = {ak.sum(top_semiResolved_bq[f"top{i+1}_mask"])}')
     print(f'num bq tops = {sum([ak.sum(top_semiResolved_bq[f"top{i+1}_mask"]) for i in range(n_tops)])}')
 
     # fully-boosted
     top_fullyBoosted = {}
     for i in range(n_tops):
-        top_fullyBoosted[f"top{i+1}_mask"] = (
-            ak.sum(fj_top_bqq_idx == i+1, axis=1) >= 1
-        )
         top_fullyBoosted[f"top{i+1}_bqq"] = ak.local_index(fj_top_bqq_idx)[fj_top_bqq_idx == i+1]
+        top_fullyBoosted[f"top{i+1}_mask"] = (
+            ak.sum(fj_top_bqq_idx == i+1, axis=1) == 1
+        )
         print(f'top {i+1} - num bqq tops = {ak.sum(top_fullyBoosted[f"top{i+1}_mask"])}')
     print(f'num bqq tops = {sum([ak.sum(top_fullyBoosted[f"top{i+1}_mask"]) for i in range(n_tops)])}')
     print(f'num reco tops = {sum([ak.sum(top_fullyResolved[f"top{i+1}_mask"]) for i in range(n_tops)]+[ak.sum(top_semiResolved_qq[f"top{i+1}_mask"]) for i in range(n_tops)]+[ak.sum(top_semiResolved_bq[f"top{i+1}_mask"]) for i in range(n_tops)]+[ak.sum(top_fullyBoosted[f"top{i+1}_mask"]) for i in range(n_tops)])}')
@@ -719,40 +725,55 @@ def main(in_files, out_file, train_frac, n_tops, plots):
     all_datasets = {}
     expanded_in_files = []
     print(f"starting in_files = {in_files}")
-    for file_name in in_files:
-        if os.path.isdir(file_name):
-            print(f"found directory: {file_name}")
-            for root_file in glob.glob(os.path.join(file_name, '*.root')):
-                expanded_in_files.append(os.path.join(file_name, root_file))
-        else:
-            expanded_in_files.append(file_name)
+
+    if re.match('root://', in_files):
+        subprocess.run(['xrdfs', '//'.join(in_files.split('//')[:2])+'/', 'ls', '/'+in_files.split('//')[2], '>', 'xrdfs_output.txt'])
+        with open('xrdfs_output.txt', 'r') as f:
+            expanded_in_files = ['//'.join(in_files.split('//')[:2])+line.strip() for line in f]
+    else:
+        for file_name in in_files:
+            if os.path.isdir(file_name):
+                print(f"found directory: {file_name}")
+                for root_file in glob.glob(os.path.join(file_name, '*.root')):
+                    expanded_in_files.append(os.path.join(file_name, root_file))
+            else:
+                expanded_in_files.append(file_name)
     in_files = expanded_in_files
     print(f"ending in_files = {in_files}")
     for file_name in in_files:
-        with uproot.open(file_name) as in_file:
-            events = in_file["Delphes"]
-            num_entries = events.num_entries
-            if "training" in out_file:
-                entry_start = None
-                entry_stop = int(train_frac * num_entries)
+        try:
+            if re.match('root://', file_name):
+                subprocess.run(['xrdcp', '-f', file_name, 'tmp.root'])
+                current_file_name = 'tmp.root'
             else:
-                entry_start = int(train_frac * num_entries)
-                entry_stop = None
+                current_file_name = file_name
+            with uproot.open(current_file_name) as in_file:
+                events = in_file["Delphes"]
+                num_entries = events.num_entries
+                if "training" in out_file:
+                    entry_start = None
+                    entry_stop = int(train_frac * num_entries)
+                else:
+                    entry_start = int(train_frac * num_entries)
+                    entry_stop = None
 
-            keys = (
-                [key for key in events.keys() if "Particle/Particle." in key and "fBits" not in key]
-                + [key for key in events.keys() if "Jet/Jet." in key]
-                + [key for key in events.keys() if "FatJet/FatJet." in key and "fBits" not in key]
-                + [key for key in events.keys() if "GenJet/GenJet." in key and "fBits" not in key]
-                + [key for key in events.keys() if "GenFatJet/GenFatJet." in key and "fBits" not in key]
-            )
-            
-            arrays = events.arrays(keys, entry_start=entry_start, entry_stop=entry_stop)
-            datasets = get_datasets(arrays, n_tops)
-            for dataset_name, data in datasets.items():
-                if dataset_name not in all_datasets:
-                    all_datasets[dataset_name] = []
-                all_datasets[dataset_name].append(data)
+                keys = (
+                    [key for key in events.keys() if "Particle/Particle." in key and "fBits" not in key]
+                    + [key for key in events.keys() if "Jet/Jet." in key]
+                    + [key for key in events.keys() if "FatJet/FatJet." in key and "fBits" not in key]
+                    + [key for key in events.keys() if "GenJet/GenJet." in key and "fBits" not in key]
+                    + [key for key in events.keys() if "GenFatJet/GenFatJet." in key and "fBits" not in key]
+                )
+                
+                arrays = events.arrays(keys, entry_start=entry_start, entry_stop=entry_stop)
+                datasets = get_datasets(arrays, n_tops)
+                for dataset_name, data in datasets.items():
+                    if dataset_name not in all_datasets:
+                        all_datasets[dataset_name] = []
+                    all_datasets[dataset_name].append(data)
+            if re.match('root://', file_name): subprocess.run(['rm', '-rf', 'tmp.root'])
+        except:
+            logging.info(f"Preprocessing failed for file:\n{file_name}\n\n   ...continuing with other files")
 
     with h5py.File(out_file, "w") as output:
         for dataset_name, all_data in all_datasets.items():

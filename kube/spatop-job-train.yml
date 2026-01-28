@@ -23,7 +23,7 @@ spec:
             - -l
             - "/spatopvol/logs/"
             - -n
-            - "v1_output"
+            - "v5_output"
             - --epochs
             - "2000"
           volumeMounts:
