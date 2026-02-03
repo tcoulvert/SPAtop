@@ -313,7 +313,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     matched_fj_j_idx, matched_fj_j_DR = matched_fj_j_idx.snapshot(), matched_fj_j_DR.snapshot()
 
     # # keep events with >= min_jets -> what cuts we apply depends on what phase-space (and benchmark) we're targeting
-    # event_mask = ak.num(pt[pt > MIN_JET_PT]) >= 3*n_tops  # phase-space cuts for resolved-like training
+    event_mask = ak.num(pt[pt > MIN_JET_PT]) >= 3*n_tops  # phase-space cuts for resolved-like training
     # print(f"Num events with >=3 jets per top = {ak.sum(event_mask, axis=0)}")
     # print(f"    -> Num events with >=3 jets per top & quark fiducial mask = {ak.sum(event_mask & quark_fid_mask, axis=0)}")
     # print('-'*60)
@@ -505,9 +505,9 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         top_fullyResolved[f"top{i+1}_q2"] = ak.local_index(top_q2_idx)[top_q2_idx == i+1]
         top_fullyResolved[f"top{i+1}_mask"] = ak.fill_none(
             ( ak.sum(top_idx == i+1, axis=1) == 3 )
-            & ( top_fullyResolved[f"top{i+1}_b"] != top_fullyResolved[f"top{i+1}_q1"] )
-            & ( top_fullyResolved[f"top{i+1}_b"] != top_fullyResolved[f"top{i+1}_q2"] )
-            & ( top_fullyResolved[f"top{i+1}_q1"] != top_fullyResolved[f"top{i+1}_q2"] ),
+            & ( ak.fill_none(ak.firsts(top_fullyResolved[f"top{i+1}_b"]), -1).to_numpy() != ak.fill_none(ak.firsts(top_fullyResolved[f"top{i+1}_q1"]), -2).to_numpy() )
+            & ( ak.fill_none(ak.firsts(top_fullyResolved[f"top{i+1}_b"]), -1).to_numpy() != ak.fill_none(ak.firsts(top_fullyResolved[f"top{i+1}_q2"]), -2).to_numpy() )
+            & ( ak.fill_none(ak.firsts(top_fullyResolved[f"top{i+1}_q1"]), -1).to_numpy() != ak.fill_none(ak.firsts(top_fullyResolved[f"top{i+1}_q2"]), -2).to_numpy() ),
             False
         )
         print(f'top {i+1} - num fully-resolved tops = {ak.sum(top_fullyResolved[f"top{i+1}_mask"])}')
@@ -528,6 +528,14 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     # semi-resolved (bq fatjet)
     top_semiResolved_bq = {}
     for i in range(n_tops):
+        bq2_mask = (
+            (ak.sum(top_q1_idx == i+1, axis=1) == 1) 
+            & (ak.sum(fj_top_bq2_idx == i+1, axis=1) == 1)
+        )
+        bq1_mask = (
+            (ak.sum(top_q2_idx == i+1, axis=1) == 1) 
+            & (ak.sum(fj_top_bq1_idx == i+1, axis=1) == 1)
+        )
         top_semiResolved_bq[f"top{i+1}_mask"] = (bq2_mask | bq1_mask)
         top_semiResolved_bq[f"top{i+1}_q"] = ak.where(
             bq2_mask, 
@@ -546,14 +554,6 @@ def get_datasets(arrays, n_tops):  # noqa: C901
                 ak.local_index(fj_top_bq1_idx)[fj_top_bq1_idx == i+1],
                 ak.local_index(fj_top_bq2_idx)[fj_top_bq2_idx == i+1]
             )
-        )
-        bq2_mask = (
-            (ak.sum(top_q1_idx == i+1, axis=1) == 1) 
-            & (ak.sum(fj_top_bq2_idx == i+1, axis=1) == 1)
-        )
-        bq1_mask = (
-            (ak.sum(top_q2_idx == i+1, axis=1) == 1) 
-            & (ak.sum(fj_top_bq1_idx == i+1, axis=1) == 1)
         )
         print(f'top {i+1} - num bq tops = {ak.sum(top_semiResolved_bq[f"top{i+1}_mask"])}')
     print(f'num bq tops = {sum([ak.sum(top_semiResolved_bq[f"top{i+1}_mask"]) for i in range(n_tops)])}')
@@ -730,7 +730,7 @@ def main(in_files, out_file, train_frac, n_tops, plots):
         if re.match('root://', file_name):
             print(' '.join(['xrdfs', '//'.join(file_name.split('//')[:2])+'/', 'ls', '-R', '/'+file_name.split('//')[2]]))
             xrdfs_files = subprocess.run(['xrdfs', '//'.join(file_name.split('//')[:2])+'/', 'ls', '-R', '/'+file_name.split('//')[2]], capture_output=True, text=True)
-            expanded_in_files.extend(['//'.join(file_name.split('//')[:2])+xrdfs_file for xrdfs_file in xrdfs_files.stdout.split() if xrdfs_file.endswith('.root')])
+            expanded_in_files.extend(['//'.join(file_name.split('//')[:2])+'/'+xrdfs_file for xrdfs_file in xrdfs_files.stdout.split() if xrdfs_file.endswith('.root')])
         elif os.path.isdir(file_name):
             print(f"found directory: {file_name}")
             for root_file in glob.glob(os.path.join(file_name, '*.root')):
@@ -738,12 +738,12 @@ def main(in_files, out_file, train_frac, n_tops, plots):
         else:
             expanded_in_files.append(file_name)
     in_files = expanded_in_files
-    print(f"ending in_files = {in_files}")
+    # print(f"ending in_files = {in_files}")
     for file_name in in_files:
         try:
             if re.match('root://', file_name):
-                subprocess.run(['xrdcp', '-f', file_name, 'tmp.root'])
-                current_file_name = 'tmp.root'
+                current_file_name = 'tmp_'+('train_' if 'training' in out_file else 'test_')+file_name.split('/')[-1]
+                subprocess.run(['xrdcp', '-f', file_name, current_file_name])
             else:
                 current_file_name = file_name
             with uproot.open(current_file_name) as in_file:
@@ -770,9 +770,11 @@ def main(in_files, out_file, train_frac, n_tops, plots):
                     if dataset_name not in all_datasets:
                         all_datasets[dataset_name] = []
                     all_datasets[dataset_name].append(data)
-            if re.match('root://', file_name): subprocess.run(['rm', '-rf', 'tmp.root'])
-        except:
-            logging.info(f"Preprocessing failed for file:\n{file_name}\n\n   ...continuing with other files")
+                print(len(all_datasets[dataset_name]))
+        except Exception as e:
+            if e is KeyboardInterrupt: break
+            logging.info(f"Preprocessing failed for file:\n{file_name}\n\nwith error:\n{e}\n\n...continuing with other files")
+        if re.match('root://', file_name): subprocess.run(['rm', '-rf', current_file_name])
 
     with h5py.File(out_file, "w") as output:
         for dataset_name, all_data in all_datasets.items():
