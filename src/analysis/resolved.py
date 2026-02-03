@@ -1,195 +1,299 @@
 import awkward as ak
-import click
-import h5py as h5
 import numba as nb
 import numpy as np
 import vector
-
 vector.register_awkward()
 
-from src.analysis.utils import dp_to_HiggsNumProb, reset_collision_dp
+from src.analysis.utils import dp_to_TopNumProb, reset_collision_dp
+
+N_AK4_JETS = 10
+N_AK8_JETS = 2
+N_AK15_JETS = 2
+N_TOPS = 2
+
+RESOLVED_CHI2_CUT = 20  # taken by-eye from boosted chi2 plots
 
 
 def get_unoverlapped_jet_index(fjs, js, dR_min=0.5):
-    overlapped = ak.sum(js[:, np.newaxis].deltaR(fjs) < dR_min, axis=-2) > 0
+    if type(fjs) is not list:
+        fjs = [fjs]
+
+    overlapped = ak.sum(js[:, np.newaxis].deltaR(fjs[0]) < dR_min, axis=-2) > 0
+    for i in range(1, len(fjs)):
+        overlapped = overlapped | ak.sum(js[:, np.newaxis].deltaR(fjs[i]) < dR_min, axis=-2) > 0
+
     jet_index_passed = ak.local_index(js).mask[~overlapped]
     jet_index_passed = ak.drop_none(jet_index_passed)
     return jet_index_passed
 
 
-def sel_pred_h_by_dp_ap(dps, aps, b1_ps, b2_ps):
-    # get most possible number of H_reco by dps
-    HiggsNumProb = dp_to_HiggsNumProb(dps)
-    HiggsNum = np.argmax(HiggsNumProb, axis=-1)
+def sel_pred_FRt_by_dp_ap(dps, aps, b_ps, q1_ps, q2_ps):
+    # get most possible number of Top_reco by dps
+    TopNumProb = dp_to_TopNumProb(dps)
+    TopNum = np.argmax(TopNumProb, axis=-1)
 
     # get the top N (dp x ap) jet assignment indices
     ps = dps * aps
     idx_descend = np.flip(np.argsort(ps, axis=-1), axis=-1)
 
-    idx_sel = [idx_e[:N_e] for idx_e, N_e in zip(idx_descend, HiggsNum)]
+    idx_sel = [idx_e[:N_e] for idx_e, N_e in zip(idx_descend, TopNum)]
 
     # select the predicted b assignment via the indices
-    b1_ps_sel = b1_ps[idx_sel]
-    b2_ps_sel = b2_ps[idx_sel]
+    b_ps_sel = b_ps[idx_sel]
+    q1_ps_sel = q1_ps[idx_sel]
+    q2_ps_sel = q2_ps[idx_sel]
 
-    # require b1 b2 assignment are AK4 jet
-    b1_ak4_filter = b1_ps_sel < 10
-    b2_ak4_filter = b2_ps_sel < 10
-    filter = b1_ak4_filter & b2_ak4_filter
+    # require b, q1, q2 assignment are AK4 jet
+    b_ak4_filter = b_ps_sel < N_AK4_JETS
+    q1_ak4_filter = q1_ps_sel < N_AK4_JETS
+    q2_ak4_filter = q2_ps_sel < N_AK4_JETS
+    filter = b_ak4_filter & q1_ak4_filter & q2_ak4_filter
 
-    b1_ps_passed = b1_ps_sel.mask[filter]
-    b1_ps_passed = ak.drop_none(b1_ps_passed)
+    b_ps_passed = b_ps_sel.mask[filter]
+    b_ps_passed = ak.drop_none(b_ps_passed)
 
-    b2_ps_passed = b2_ps_sel.mask[filter]
-    b2_ps_passed = ak.drop_none(b2_ps_passed)
+    q1_ps_passed = q1_ps_sel.mask[filter]
+    q1_ps_passed = ak.drop_none(q1_ps_passed)
 
-    return b1_ps_passed, b2_ps_passed
+    q2_ps_passed = q2_ps_sel.mask[filter]
+    q2_ps_passed = ak.drop_none(q2_ps_passed)
 
+    return b_ps_passed, q1_ps_passed, q2_ps_passed
 
-def sel_target_h_by_mask(b1_ts, b2_ts, h_pts, bi_cat_H, h_masks):
-    b1_ts_selected = b1_ts.mask[h_masks]
-    b1_ts_selected = ak.drop_none(b1_ts_selected)
+def sel_target_FRt_by_mask(b_ts, q1_ts, q2_ts, FRt_pts, FRt_overlap, FRt_masks):
+    b_ts_selected = b_ts.mask[FRt_masks]
+    b_ts_selected = ak.drop_none(b_ts_selected)
 
-    b2_ts_selected = b2_ts.mask[h_masks]
-    b2_ts_selected = ak.drop_none(b2_ts_selected)
+    q1_ts_selected = q1_ts.mask[FRt_masks]
+    q1_ts_selected = ak.drop_none(q1_ts_selected)
 
-    h_selected_pts = h_pts.mask[h_masks]
-    h_selected_pts = ak.drop_none(h_selected_pts)
+    q2_ts_selected = q2_ts.mask[FRt_masks]
+    q2_ts_selected = ak.drop_none(q2_ts_selected)
 
-    bi_cat_H_passed = bi_cat_H.mask[h_masks]
-    bi_cat_H_passed = ak.drop_none(bi_cat_H_passed)
+    FRt_selected_pts = FRt_pts.mask[FRt_masks]
+    FRt_selected_pts = ak.drop_none(FRt_selected_pts)
 
-    return b1_ts_selected, b2_ts_selected, h_selected_pts, bi_cat_H_passed
+    FRt_overlap_passed = FRt_overlap.mask[FRt_masks]
+    FRt_overlap_passed = ak.drop_none(FRt_overlap_passed)
+
+    return b_ts_selected, q1_ts_selected, q2_ts_selected, FRt_selected_pts, FRt_overlap_passed
 
 
 # A pred look up table is in shape
 # [event,
-#    pred_H,
-#       [correct_or_not, pt, overlap_w_H_reco, has_boost_H_target, which_H_target]]
+#    pred_FRt,
+#       [correct_or_not, pred_pt, overlap_w_FRt_reco, has_boost_FBt_target, which_FRt_target]]
 @nb.njit
-def gen_pred_h_LUT(b1_ps_passed, b2_ps_passed, b1_ts_selected, b2_ts_selected, js, goodJetIdx, bi_cat_H_selected, builder):
+def gen_pred_FRt_LUT(
+    b_ps_passed, q1_ps_passed, q2_ps_passed, 
+    b_ts_selected, q1_ts_selected, q2_ts_selected, 
+    js, goodJetIdx, FBt_overlap_selected, 
+    builder
+):
     # for each event
-    for b1_ps_e, b2_ps_e, b1_ts_e, b2_ts_e, jets_e, goodJetIdx_e, bi_cat_H_e in zip(
-        b1_ps_passed, b2_ps_passed, b1_ts_selected, b2_ts_selected, js, goodJetIdx, bi_cat_H_selected
+    for b_ps_e, q1_ps_e, q2_ps_e, b_ts_e, q1_ts_e, q2_ts_e, jets_e, goodJetIdx_e, FBt_overlap_e in zip(
+        b_ps_passed, q1_ps_passed, q2_ps_passed, 
+        b_ts_selected, q1_ts_selected, q2_ts_selected, 
+        js, goodJetIdx, FBt_overlap_selected
     ):
-        # for each predicted bb assignment, check if any target H have a same bb assignment
+        # for each predicted FRt assignment, check if any target t have a same FBt assignment
         builder.begin_list()
-        for b1_p, b2_p in zip(b1_ps_e, b2_ps_e):
-            if (b1_p in goodJetIdx_e) and (b2_p in goodJetIdx_e):
+
+        for b_p, q1_p, q2_p in zip(b_ps_e, q1_ps_e, q2_ps_e):
+
+            if (b_p in goodJetIdx_e) and (q1_p in goodJetIdx_e) and (q2_p in goodJetIdx_e):
                 overlap = 0
             else:
                 overlap = 1
             correct = 0
-            has_t_bH = -1
-            bH = -1
+            has_t_FBt = -1
+            FBt = -1
 
-            predH_pt = (jets_e[b1_p] + jets_e[b2_p]).pt
+            predFRt_pt = (jets_e[b_p] + jets_e[q1_p] + jets_e[q2_p]).pt
 
-            for i, (b1_t, b2_t, bi_cat_H) in enumerate(zip(b1_ts_e, b2_ts_e, bi_cat_H_e)):
-                if set((b1_p, b2_p)) == set((b1_t, b2_t)):
+            for i, (b_t, q1_t, q2_t, FBt_overlap) in enumerate(zip(b_ts_e, q1_ts_e, q2_ts_e, FBt_overlap_e)):
+                if set((b_p, q1_p, q2_p)) == set((b_t, q1_t, q2_t)):
                     correct = 1
-                    has_t_bH = bi_cat_H
-                    bH = i
+                    has_t_FBt = FBt_overlap
+                    FBt = i
 
             builder.begin_list()
             builder.append(correct)
-            builder.append(predH_pt)
+            builder.append(predFRt_pt)
             builder.append(overlap)
-            builder.append(has_t_bH)
-            builder.append(bH)
-            builder.append(b1_p)
-            builder.append(b2_p)
+            builder.append(has_t_FBt)
+            builder.append(FBt)
+            builder.append(b_p)
+            builder.append(q1_p)
+            builder.append(q2_p)
             builder.end_list()
 
         builder.end_list()
+
     return builder
 
 
 # A target look up table is in shape
 # [event,
-#    target_H,
-#        target_bb_assign,
-#           [retrieved, targetH_pt, can_boost_reco]]
+#    target_top,
+#        target_FBt_assign,
+#           [retrieved, targetFRt_pt, can_boost_reco]]
 @nb.njit
-def gen_target_h_LUT(b1_ps_passed, b2_ps_passed, b1_ts_selected, b2_ts_selected, targetH_pts, bi_cat_H_selected, builder):
+def gen_target_FRt_LUT(
+    b_ps_passed, q1_ps_passed, q2_ps_passed, 
+    b_ts_selected, q1_ts_selected, q2_ts_selected, 
+    FRt_pts, FBt_overlap_selected, 
+    builder
+):
     # for each event
-    for b1_ps_e, b2_ps_e, b1_ts_e, b2_ts_e, tH_pts_e, bi_cat_H_e in zip(
-        b1_ps_passed, b2_ps_passed, b1_ts_selected, b2_ts_selected, targetH_pts, bi_cat_H_selected
+    for b_ps_e, q1_ps_e, q2_ps_e, b_ts_e, q1_ts_e, q2_ts_e, FRt_pts_e, FBt_overlap_e in zip(
+        b_ps_passed, q1_ps_passed, q2_ps_passed, 
+        b_ts_selected, q1_ts_selected, q2_ts_selected, 
+        FRt_pts, FBt_overlap_selected
     ):
         # for each target fatjet, check if the predictions have a p fatject same with the t fatjet
         builder.begin_list()
-        for b1_t, b2_t, tH_pt, bi_cat_H in zip(b1_ts_e, b2_ts_e, tH_pts_e, bi_cat_H_e):
+
+        for b_t, q1_t, q2_t, FRt_pt, FBt_overlap in zip(b_ts_e, q1_ts_e, q2_ts_e, FRt_pts_e, FBt_overlap_e):
+            
             retrieved = 0
-            can_boost_reco = bi_cat_H
-            for b1_p, b2_p in zip(b1_ps_e, b2_ps_e):
-                if set((b1_p, b2_p)) == set((b1_t, b2_t)):
+            can_boost_reco = FBt_overlap
+            for b_p, q1_p, q2_p in zip(b_ps_e, q1_ps_e, q2_ps_e):
+                if set((b_p, q1_p, q2_p)) == set((b_t, q1_t, q2_t)):
                     retrieved = 1
+
             builder.begin_list()
             builder.append(retrieved)
-            builder.append(tH_pt)
+            builder.append(FRt_pt)
             builder.append(can_boost_reco)
             builder.end_list()
 
         builder.end_list()
+
     return builder
 
+# Calculate the most probable number of resonant particles
 
-def parse_resolved_w_target(testfile, predfile, fjs_reco=None):
-    # h pt
-    h1_pt = np.array(testfile["TARGETS"]["h1"]["pt"])
-    h2_pt = np.array(testfile["TARGETS"]["h2"]["pt"])
-    h3_pt = np.array(testfile["TARGETS"]["h3"]["pt"])
+def parse_resolved_w_target(
+    testfile, predfile, 
+    fjs_reco=None, chi2_cut=RESOLVED_CHI2_CUT
+):
+    # FRt pt
+    FRt1_pt = np.array(testfile["TARGETS"]["FRt1"]["pt"])
+    FRt2_pt = np.array(testfile["TARGETS"]["FRt2"]["pt"])
+    FRt_pts = np.concatenate((FRt1_pt.reshape(-1, 1), FRt2_pt.reshape(-1, 1)), axis=1)
+    FRt_pts = ak.Array(FRt_pts)
+
 
     # resolved mask
-    h1_mask = np.array(testfile["TARGETS"]["h1"]["mask"])
-    h2_mask = np.array(testfile["TARGETS"]["h2"]["mask"])
-    h3_mask = np.array(testfile["TARGETS"]["h3"]["mask"])
+    FRt1_mask = np.array(testfile["TARGETS"]["FRt1"]["mask"])
+    FRt2_mask = np.array(testfile["TARGETS"]["FRt2"]["mask"])
+    FRt_masks = np.concatenate((FRt1_mask.reshape(-1, 1), FRt2_mask.reshape(-1, 1)), axis=1)
+    FRt_masks = ak.Array(FRt_masks)
 
-    h_masks = np.concatenate((h1_mask.reshape(-1, 1), h2_mask.reshape(-1, 1), h3_mask.reshape(-1, 1)), axis=1)
-    # h_masks = h_masks.astype(float)
-    # h_masks = ak.Array(h_masks)
 
     # boosted mask
-    bh1_mask = np.array(testfile["TARGETS"]["bh1"]["mask"])
-    bh2_mask = np.array(testfile["TARGETS"]["bh2"]["mask"])
-    bh3_mask = np.array(testfile["TARGETS"]["bh3"]["mask"])
+    # FB
+    FBt1_mask = np.array(testfile["TARGETS"]["FBt1"]["mask"])
+    FBt2_mask = np.array(testfile["TARGETS"]["FBt2"]["mask"])
+    FBt_masks = np.concatenate((FBt1_mask.reshape(-1, 1), FBt2_mask.reshape(-1, 1)), axis=1)
+    FBt_masks = ak.Array(FBt_masks)
+    # SRqq
+    SRqqt1_mask = np.array(testfile["TARGETS"]["SRqqt1"]["mask"])
+    SRqqt2_mask = np.array(testfile["TARGETS"]["SRqqt2"]["mask"])
+    SRqqt_masks = np.concatenate((SRqqt1_mask.reshape(-1, 1), SRqqt2_mask.reshape(-1, 1)), axis=1)
+    SRqqt_masks = ak.Array(SRqqt_masks)
+    # SRbq
+    SRbqt1_mask = np.array(testfile["TARGETS"]["SRbqt1"]["mask"])
+    SRbqt2_mask = np.array(testfile["TARGETS"]["SRbqt2"]["mask"])
+    SRbqt_masks = np.concatenate((SRbqt1_mask.reshape(-1, 1), SRbqt2_mask.reshape(-1, 1)), axis=1)
+    SRbqt_masks = ak.Array(SRbqt_masks)
 
-    bh_masks = np.concatenate((bh1_mask.reshape(-1, 1), bh2_mask.reshape(-1, 1), bh3_mask.reshape(-1, 1)), axis=1)
-    # bh_masks = bh_masks.astype(float)
-    # bh_masks = ak.Array(bh_masks)
+    FRt_overlap = FRt_masks & (SRqqt_masks | SRbqt_masks | FBt_masks)  # FR / all overlap
+    FRt_overlap = ak.Array(ak.to_numpy(FRt_overlap).astype(float))  # necessary for downstream analysis, b/c NumPy requires uniform typing
 
-    # findout which resolved higgs also have boosted reco
-    bi_cat_H = h_masks & bh_masks
-    bi_cat_H = bi_cat_H.astype(float)
-    bi_cat_H = ak.Array(bi_cat_H)
 
-    # target assignments
-    b1_h1_t = np.array(testfile["TARGETS"]["h1"]["b1"]).astype("int")
-    b1_h2_t = np.array(testfile["TARGETS"]["h2"]["b1"]).astype("int")
-    b1_h3_t = np.array(testfile["TARGETS"]["h3"]["b1"]).astype("int")
+    # target jets
+    b_FRt1_t = np.array(testfile["TARGETS"]["FRt1"]["b"])
+    b_FRt2_t = np.array(testfile["TARGETS"]["FRt2"]["b"])
 
-    b2_h1_t = np.array(testfile["TARGETS"]["h1"]["b2"]).astype("int")
-    b2_h2_t = np.array(testfile["TARGETS"]["h2"]["b2"]).astype("int")
-    b2_h3_t = np.array(testfile["TARGETS"]["h3"]["b2"]).astype("int")
+    q1_FRt1_t = np.array(testfile["TARGETS"]["FRt1"]["q1"])
+    q1_FRt2_t = np.array(testfile["TARGETS"]["FRt2"]["q1"])
 
-    # predict assignments
-    b1_h1_p = np.array(predfile["TARGETS"]["h1"]["b1"]).astype("int")
-    b1_h2_p = np.array(predfile["TARGETS"]["h2"]["b1"]).astype("int")
-    b1_h3_p = np.array(predfile["TARGETS"]["h3"]["b1"]).astype("int")
+    q2_FRt1_t = np.array(testfile["TARGETS"]["FRt1"]["q2"])
+    q2_FRt2_t = np.array(testfile["TARGETS"]["FRt2"]["q2"])
 
-    b2_h1_p = np.array(predfile["TARGETS"]["h1"]["b2"]).astype("int")
-    b2_h2_p = np.array(predfile["TARGETS"]["h2"]["b2"]).astype("int")
-    b2_h3_p = np.array(predfile["TARGETS"]["h3"]["b2"]).astype("int")
+    b_ts = np.concatenate(
+        (b_FRt1_t.reshape(-1, 1), b_FRt2_t.reshape(-1, 1)), axis=1
+    )
+    b_ts = ak.Array(b_ts)
+    q1_ts = np.concatenate(
+        (q1_FRt1_t.reshape(-1, 1), q1_FRt2_t.reshape(-1, 1)), axis=1
+    )
+    q1_ts = ak.Array(q1_ts)
+    q2_ts = np.concatenate(
+        (q2_FRt1_t.reshape(-1, 1), q2_FRt2_t.reshape(-1, 1)), axis=1
+    )
+    q2_ts = ak.Array(q2_ts)
 
-    # resolved Higgs detection probability
-    dp_h1 = np.array(predfile["TARGETS"]["h1"]["detection_probability"])
-    dp_h2 = np.array(predfile["TARGETS"]["h2"]["detection_probability"])
-    dp_h3 = np.array(predfile["TARGETS"]["h3"]["detection_probability"])
 
-    # ak4 jets assignment probability
-    ap_h1 = np.array(predfile["TARGETS"]["h1"]["assignment_probability"])
-    ap_h2 = np.array(predfile["TARGETS"]["h2"]["assignment_probability"])
-    ap_h3 = np.array(predfile["TARGETS"]["h3"]["assignment_probability"])
+    # pred jets
+    b_FRt1_p = np.array(predfile["TARGETS"]["FRt1"]["b"])
+    b_FRt2_p = np.array(predfile["TARGETS"]["FRt2"]["b"])
+
+    q1_FRt1_p = np.array(predfile["TARGETS"]["FRt1"]["q1"])
+    q1_FRt2_p = np.array(predfile["TARGETS"]["FRt2"]["q1"])
+
+    q2_FRt1_p = np.array(predfile["TARGETS"]["FRt1"]["q2"])
+    q2_FRt2_p = np.array(predfile["TARGETS"]["FRt2"]["q2"])
+
+    b_ps = np.concatenate(
+        (b_FRt1_p.reshape(-1, 1), b_FRt2_p.reshape(-1, 1)), axis=1
+    )
+    b_ps = ak.Array(b_ps)
+    q1_ps = np.concatenate(
+        (q1_FRt1_p.reshape(-1, 1), q1_FRt2_p.reshape(-1, 1)), axis=1
+    )
+    q1_ps = ak.Array(q1_ps)
+    q2_ps = np.concatenate(
+        (q2_FRt1_p.reshape(-1, 1), q2_FRt2_p.reshape(-1, 1)), axis=1
+    )
+    q2_ps = ak.Array(q2_ps)
+
+
+    try:
+        # jet detection probability
+        dp_FRt1 = np.array(predfile["TARGETS"]["FRt1"]["detection_probability"])
+        dp_FRt2 = np.array(predfile["TARGETS"]["FRt2"]["detection_probability"])
+        # jet assignment probability
+        ap_FRt1 = np.array(predfile["TARGETS"]["FRt1"]["assignment_probability"])
+        ap_FRt2 = np.array(predfile["TARGETS"]["FRt2"]["assignment_probability"])
+    except:
+        # resolved top detection probability
+        dp_FRt1 = np.logical_and(
+            np.array(predfile["TARGETS"]["FRt1"]["mask"]),
+            np.array(predfile["TARGETS"]["FRt1"]["chi2"]) < chi2_cut
+        ).astype("float")
+        dp_FRt2 = np.logical_and(
+            np.array(predfile["TARGETS"]["FRt2"]["mask"]),
+            np.array(predfile["TARGETS"]["FRt2"]["chi2"]) < chi2_cut
+        ).astype("float")
+
+        # jet assignment probability
+        ap_FRt1 = np.logical_and(
+            np.array(predfile["TARGETS"]["FRt1"]["mask"]),
+            np.array(predfile["TARGETS"]["FRt1"]["chi2"]) < chi2_cut
+        ).astype("float")
+        ap_FRt2 = np.logical_and(
+            np.array(predfile["TARGETS"]["FRt2"]["mask"]),
+            np.array(predfile["TARGETS"]["FRt2"]["chi2"]) < chi2_cut
+        ).astype("float")
+
+    dps = np.concatenate((dp_FRt1.reshape(-1, 1), dp_FRt2.reshape(-1, 1)), axis=1)
+    aps = np.concatenate((ap_FRt1.reshape(-1, 1), ap_FRt2.reshape(-1, 1)), axis=1)
+    # convert some numpy arrays to ak arrays
+    dps = reset_collision_dp(dps, aps)
+
 
     # reconstruct jet 4-momentum objects
     j_pt = np.array(testfile["INPUTS"]["Jets"]["pt"])
@@ -206,50 +310,36 @@ def parse_resolved_w_target(testfile, predfile, fjs_reco=None):
         with_name="Momentum4D",
     )
 
-    # convert some numpy arrays to ak arrays
-    dps = np.concatenate((dp_h1.reshape(-1, 1), dp_h2.reshape(-1, 1), dp_h3.reshape(-1, 1)), axis=1)
-    # dps = ak.Array(dps)
-    aps = np.concatenate((ap_h1.reshape(-1, 1), ap_h2.reshape(-1, 1), ap_h3.reshape(-1, 1)), axis=1)
-    # aps = ak.Array(aps)
-
-    dps = reset_collision_dp(dps, aps)
-
-    b1_ps = np.concatenate((b1_h1_p.reshape(-1, 1), b1_h2_p.reshape(-1, 1), b1_h3_p.reshape(-1, 1)), axis=1)
-    b1_ps = ak.Array(b1_ps)
-    b1_ts = np.concatenate((b1_h1_t.reshape(-1, 1), b1_h2_t.reshape(-1, 1), b1_h3_t.reshape(-1, 1)), axis=1)
-    b1_ts = ak.Array(b1_ts)
-    b2_ps = np.concatenate((b2_h1_p.reshape(-1, 1), b2_h2_p.reshape(-1, 1), b2_h3_p.reshape(-1, 1)), axis=1)
-    b2_ps = ak.Array(b2_ps)
-    b2_ts = np.concatenate((b2_h1_t.reshape(-1, 1), b2_h2_t.reshape(-1, 1), b2_h3_t.reshape(-1, 1)), axis=1)
-    b2_ts = ak.Array(b2_ts)
-
-    h_pts = np.concatenate((h1_pt.reshape(-1, 1), h2_pt.reshape(-1, 1), h3_pt.reshape(-1, 1)), axis=1)
-    h_pts = ak.Array(h_pts)
 
     # select predictions and targets
-    b1_ts_selected, b2_ts_selected, targetH_selected_pts, bi_cat_H_selected = sel_target_h_by_mask(
-        b1_ts, b2_ts, h_pts, bi_cat_H, h_masks
+    b_ts_selected, q1_ts_selected, q2_ts_selected, FRt_selected_pts, overlap_selected = sel_target_FRt_by_mask(
+        b_ts, q1_ts, q2_ts, FRt_pts, FRt_overlap, FRt_masks
     )
-    b1_ps_selected, b2_ps_selected = sel_pred_h_by_dp_ap(dps, aps, b1_ps, b2_ps)
+    b_ps_selected, q1_ps_selected, q2_ps_selected = sel_pred_FRt_by_dp_ap(dps, aps, b_ps, q1_ps, q2_ps)
 
-    # find jets that are overlapped with reco boosted Higgs
+
+    # find jets that are overlapped with reco boosted top
     if fjs_reco is None:
         goodJetIdx = ak.local_index(js)
     else:
         goodJetIdx = get_unoverlapped_jet_index(fjs_reco, js, dR_min=0.4)
 
+
     # generate look up tables
-    LUT_pred = gen_pred_h_LUT(
-        b1_ps_selected, b2_ps_selected, b1_ts_selected, b2_ts_selected, js, goodJetIdx, bi_cat_H_selected, ak.ArrayBuilder()
+    LUT_pred = gen_pred_FRt_LUT(
+        b_ps_selected, q1_ps_selected, q2_ps_selected, 
+        b_ts_selected, q1_ts_selected, q2_ts_selected, 
+        js, goodJetIdx, 
+        overlap_selected, 
+        ak.ArrayBuilder()
     ).snapshot()
-    LUT_target = gen_target_h_LUT(
-        b1_ps_selected,
-        b2_ps_selected,
-        b1_ts_selected,
-        b2_ts_selected,
-        targetH_selected_pts,
-        bi_cat_H_selected,
+    LUT_target = gen_target_FRt_LUT(
+        b_ps_selected, q1_ps_selected, q2_ps_selected,
+        b_ts_selected, q1_ts_selected, q2_ts_selected, 
+        FRt_selected_pts, 
+        overlap_selected,
         ak.ArrayBuilder(),
     ).snapshot()
+
 
     return LUT_pred, LUT_target, goodJetIdx

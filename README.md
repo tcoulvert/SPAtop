@@ -1,42 +1,124 @@
-# hhh
+# SPANet for up to 4 tops
 
-## 1. Pull and start the Docker container
-```bash
-docker pull jmduarte/hhh
-docker run -it jmduarte/hhh bash
-```
-
-## 2. Check out the GitHub repository
+## 1. Check out the GitHub repository
 ```bash
 cd work
-git clone https://github.com/ucsd-hep-ex/hhh
+git clone https://github.com/tcoulvert/SPAtop/tree/topnet_dev
 ```
 
-## 3. Install the Python package(s)
+## 2. Install the Python venv (Ensure you have installed python 3.9 or greater)
 ```bash
-cd hhh
-pip install -e .
-cd ..
+python -m venv
+pip install -e ./SPAtop
+```
+If for some reason the code does not run properly, it could be because packages may have changed and broken things. If that is the case, you can install your environment as follows:
+```bash
+python -m venv
+pip install -r requirements.txt
 ```
 
-## 4. Copy and convert the dataset(s)
+## 3. Copy and convert the dataset(s)
 Copy the Delphes ROOT TTree datasets from:
-- CERN EOS: `/eos/user/m/mstamenk/CxAOD31run/hhh-6b/delphes-samples/GF_HHH_SM_c3_0_d4_0_14TeV/sample_*.root`, or
-- UCSD UAF: `/ceph/cms/store/user/woodson/GF_HHH_SM_c3_0_d4_0_14TeV/sample_*.root`
+- LPC EOS: `/eos/uscms/store/user/tsievert/ttbar_hadronic/ttbar_hadronic_*.root`, or
+- non-LPC EOS: `root://cmseos.fnal.gov//store/user/tsievert/ttbar_hadronic/ttbar_hadronic_*.root`
 
-to the `data/delphes/v2/GF_HHH_SM_c3_0_d4_0_14TeV` directory
+to the `data/delphes/v1/ttbar_hadronic` directory
 
 Convert to training and testing HDF5 files.
 ```bash
-python -m src.data.delphes.convert_to_h5 data/delphes/v2/GF_HHH_SM_c3_0_d4_0_14TeV/sample_*.root --out-file data/delphes/v2/hhh_training.h5
-python -m src.data.delphes.convert_to_h5 data/delphes/v2/GF_HHH_SM_c3_0_d4_0_14TeV/sample_*.root --out-file data/delphes/v2/hhh_testing.h5
+python -m src.data.delphes.convert_to_h5 data/delphes/v1/ttbar_hadronic/sample_*.root --out-file data/delphes/v1/ttbar_hadronic_training.h5
+python -m src.data.delphes.convert_to_h5 data/delphes/v1/ttbar_hadronic/sample_*.root --out-file data/delphes/v1/ttbar_hadronic_testing.h5
 ```
+
+### !!! WARNING !!! : From this step on, this repo hasn't been updated, so don't expect things to work. When the repo is updated, this README will change to reflect that.
 
 ## 5. Run the SPANet training
 Override options file with `--gpus 0` if no GPUs are available.
 ```bash
 python -m spanet.train -of options_files/delphes/hhh_v2.json [--gpus 0]
 ```
+# SPAtop Training via Kubernetes
+
+## Prerequisites
+
+Training via kubernetes on the cms-ml namespace requires the following:
+
+* `kubectl` configured to target the `cms-ml` namespace
+* PersistentVolumeClaim named `spatopvol` containing training data (already created)
+* Docker image `gitlab-registry.nrp-nautilus.io/jmduarte/hhh:latest` (to be updated)
+
+---
+
+## Data Organization
+
+Data should be placed under the PVC at:
+
+```
+spatopvol/data/delphes/v1/tt_training.h5
+```
+---
+
+## Configuration Files
+
+SPAtop training requires the following files, each located within the PVC:
+
+| File              | Description              | Location                                  |
+| ----------------- | ------------------------ | ----------------------------------------- |
+| `tt_hadronic.yml` | Physics process settings | `/spatopvol/event_files/tt_hadronic.yml`  |
+| `spatop_v1.json`  | SPANet model parameters  | `/spatopvol/options_files/spatop_v1.json` |
+
+Additionally, the Kubernetes job manifest is required:
+
+* **`spatop-job-train.yml`**: Defines the Job spec for launching the SPAtop training container. Place this file in your local working directory where you run `kubectl` commands.
+
+---
+
+## Launching Training
+
+To start the SPAtop training job, apply the Kubernetes manifest:
+
+```bash
+kubectl apply -f spatop-job-train.yml -n cms-ml
+```
+
+This command creates a Kubernetes Job that spawns one or more pods to perform the training.
+
+---
+
+## Monitoring Jobs
+
+1. **List Jobs and Pods**
+
+   ```bash
+   kubectl get jobs -n cms-ml
+   kubectl get pods -l job-name=spatop-job-train -n cms-ml
+   ```
+
+2. **Describe a Pod**
+
+   ```bash
+   kubectl describe pod <pod-name> -n cms-ml
+   ```
+
+3. **Stream Logs**
+
+   ```bash
+   kubectl logs -f <pod-name> -n cms-ml
+   ```
+
+Repeat these commands to track pod status, resource usage, and training progress.
+
+---
+
+## Cleanup
+
+Once training completes successfully,remove the job and its pods:
+
+```bash
+kubectl delete job spatop-job-train -n cms-ml
+```
+
+---
 
 ## 6. Evaluate the SPANet training
 Assuming the output log directory is `spanet_output/version_0`.

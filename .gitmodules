@@ -1,0 +1,3 @@
+[submodule "simulation/MaPyDe_production"]
+	path = simulation/MaPyDe_production
+	url = https://github.com/tcoulvert/MaPyDe_production
