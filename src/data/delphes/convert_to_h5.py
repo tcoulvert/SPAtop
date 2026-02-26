@@ -523,11 +523,12 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     for i in range(n_tops):
         top_semiResolved_qq[f"top{i+1}_b"] = ak.local_index(top_b_idx)[top_b_idx == i+1]
         top_semiResolved_qq[f"top{i+1}_qq"] = ak.local_index(fj_top_qq_idx)[fj_top_qq_idx == i+1]
-        top_semiResolved_qq[f"top{i+1}_mask"] = (
+        top_semiResolved_qq[f"top{i+1}_mask"] = ak.fill_none(
             (ak.sum(top_b_idx == i+1, axis=1) == 1) 
             & (ak.sum(fj_top_qq_idx == i+1, axis=1) == 1)
             & ak.firsts(mask[ak.local_index(mask) == ak.fill_none(ak.firsts(top_semiResolved_qq[f"top{i+1}_b"]), -1)]) 
-            & ak.firsts(fj_mask[ak.local_index(fj_mask) == ak.fill_none(ak.firsts(top_semiResolved_qq[f"top{i+1}_qq"]), -1)])
+            & ak.firsts(fj_mask[ak.local_index(fj_mask) == ak.fill_none(ak.firsts(top_semiResolved_qq[f"top{i+1}_qq"]), -1)]),
+            False
         )
         print(f"SRqqt{i+1} - any None ak5? {ak.any(ak.is_none(ak.firsts(mask[ak.local_index(mask) == ak.fill_none(ak.firsts(top_semiResolved_qq[f"top{i+1}_b"]), -1)])))}")
         print(f"SRqqt{i+1} - any None ak8? {ak.any(ak.is_none(ak.firsts(fj_mask[ak.local_index(fj_mask) == ak.fill_none(ak.firsts(top_semiResolved_qq[f"top{i+1}_qq"]), -1)])))}")
@@ -564,10 +565,11 @@ def get_datasets(arrays, n_tops):  # noqa: C901
                 ak.local_index(fj_top_bq2_idx)[fj_top_bq2_idx == i+1]
             )
         )
-        top_semiResolved_bq[f"top{i+1}_mask"] = (
+        top_semiResolved_bq[f"top{i+1}_mask"] = ak.fill_none(
             top_semiResolved_bq[f"top{i+1}_mask"]
             & ak.firsts(mask[ak.local_index(mask) == ak.fill_none(ak.firsts(top_semiResolved_bq[f"top{i+1}_q"]), -1)]) 
-            & ak.firsts(fj_mask[ak.local_index(fj_mask) == ak.fill_none(ak.firsts(top_semiResolved_bq[f"top{i+1}_bq"]), -1)])
+            & ak.firsts(fj_mask[ak.local_index(fj_mask) == ak.fill_none(ak.firsts(top_semiResolved_bq[f"top{i+1}_bq"]), -1)]),
+            False
         )
         print(f"SRbqt{i+1} - any None ak5? {ak.any(ak.is_none(ak.firsts(mask[ak.local_index(mask) == ak.fill_none(ak.firsts(top_semiResolved_bq[f"top{i+1}_q"]), -1)])))}")
         print(f"SRbqt{i+1} - any None ak8? {ak.any(ak.is_none(ak.firsts(fj_mask[ak.local_index(fj_mask) == ak.fill_none(ak.firsts(top_semiResolved_bq[f"top{i+1}_bq"]), -1)])))}")
@@ -578,11 +580,12 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     top_fullyBoosted = {}
     for i in range(n_tops):
         top_fullyBoosted[f"top{i+1}_bqq"] = ak.local_index(fj_top_bqq_idx)[fj_top_bqq_idx == i+1]
-        top_fullyBoosted[f"top{i+1}_mask"] = (
+        top_fullyBoosted[f"top{i+1}_mask"] = ak.fill_none(
             ak.sum(fj_top_bqq_idx == i+1, axis=1) == 1
-            & ak.firsts(fj_mask[ak.local_index(fj_mask) == ak.fill_none(ak.firsts(top_fullyBoosted[f"top{i+1}_bqq"]), -1)])
+            & ak.firsts(fj_mask[ak.local_index(fj_mask) == ak.fill_none(ak.firsts(top_fullyBoosted[f"top{i+1}_bqq"]), -1)]),
+            False
         )
-        print(f"FRt{i+1} - any None ak8? {ak.any(ak.is_none(ak.firsts(fj_mask[ak.local_index(fj_mask) == ak.fill_none(ak.firsts(top_fullyBoosted[f"top{i+1}_bqq"]), -1)])))}")
+        print(f"FBt{i+1} - any None ak8? {ak.any(ak.is_none(ak.firsts(fj_mask[ak.local_index(fj_mask) == ak.fill_none(ak.firsts(top_fullyBoosted[f"top{i+1}_bqq"]), -1)])))}")
         print(f'top {i+1} - num bqq tops = {ak.sum(top_fullyBoosted[f"top{i+1}_mask"])}')
     print(f'num bqq tops = {sum([ak.sum(top_fullyBoosted[f"top{i+1}_mask"]) for i in range(n_tops)])}')
     print(f'num reco tops = {sum([ak.sum(top_fullyResolved[f"top{i+1}_mask"]) for i in range(n_tops)]+[ak.sum(top_semiResolved_qq[f"top{i+1}_mask"]) for i in range(n_tops)]+[ak.sum(top_semiResolved_bq[f"top{i+1}_mask"]) for i in range(n_tops)]+[ak.sum(top_fullyBoosted[f"top{i+1}_mask"]) for i in range(n_tops)])}')
@@ -595,15 +598,13 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         print(f"SRqqt{i+1} - \n  {top_semiResolved_qq[f"top{i+1}_mask"]}")
         print(f"SRbqt{i+1} - \n  {top_semiResolved_bq[f"top{i+1}_mask"]}")
         print(f"FBt{i+1} - \n  {top_fullyBoosted[f"top{i+1}_mask"]}")
-        at_least_one_target_mask = np.logical_or(
-            at_least_one_target_mask,
-            ak.to_numpy(
-                top_fullyResolved[f"top{i+1}_mask"]
-                | top_semiResolved_qq[f"top{i+1}_mask"]
-                | top_semiResolved_bq[f"top{i+1}_mask"]
-                | top_fullyBoosted[f"top{i+1}_mask"]
-            )
+        at_least_one_target_mask += ak.to_numpy(
+            top_fullyResolved[f"top{i+1}_mask"]
+            | top_semiResolved_qq[f"top{i+1}_mask"]
+            | top_semiResolved_bq[f"top{i+1}_mask"]
+            | top_fullyBoosted[f"top{i+1}_mask"]
         )
+    print(f"Viable tops = {np.sum(at_least_one_target_mask)}")
 
     ## Check data ##
     # check fully-resolved tops
