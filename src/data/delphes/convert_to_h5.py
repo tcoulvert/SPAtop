@@ -509,7 +509,10 @@ def get_datasets(arrays, n_tops):  # noqa: C901
             ( ak.sum(top_idx == i+1, axis=1) == 3 )
             & ( ak.fill_none(ak.firsts(top_fullyResolved[f"top{i+1}_b"]), -1).to_numpy() != ak.fill_none(ak.firsts(top_fullyResolved[f"top{i+1}_q1"]), -2).to_numpy() )
             & ( ak.fill_none(ak.firsts(top_fullyResolved[f"top{i+1}_b"]), -1).to_numpy() != ak.fill_none(ak.firsts(top_fullyResolved[f"top{i+1}_q2"]), -2).to_numpy() )
-            & ( ak.fill_none(ak.firsts(top_fullyResolved[f"top{i+1}_q1"]), -1).to_numpy() != ak.fill_none(ak.firsts(top_fullyResolved[f"top{i+1}_q2"]), -2).to_numpy() ),
+            & ( ak.fill_none(ak.firsts(top_fullyResolved[f"top{i+1}_q1"]), -1).to_numpy() != ak.fill_none(ak.firsts(top_fullyResolved[f"top{i+1}_q2"]), -2).to_numpy() )
+            & ak.firsts(mask[ak.local_index(mask) == ak.fill_none(ak.firsts(top_fullyResolved[f"top{i+1}_b"]), -1)]) 
+            & ak.firsts(mask[ak.local_index(mask) == ak.fill_none(ak.firsts(top_fullyResolved[f"top{i+1}_q1"]), -1)]) 
+            & ak.firsts(mask[ak.local_index(mask) == ak.fill_none(ak.firsts(top_fullyResolved[f"top{i+1}_q1"]), -1)]),
             False
         )
         print(f'top {i+1} - num fully-resolved tops = {ak.sum(top_fullyResolved[f"top{i+1}_mask"])}')
@@ -523,6 +526,8 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         top_semiResolved_qq[f"top{i+1}_mask"] = (
             (ak.sum(top_b_idx == i+1, axis=1) == 1) 
             & (ak.sum(fj_top_qq_idx == i+1, axis=1) == 1)
+            & ak.firsts(mask[ak.local_index(mask) == ak.fill_none(ak.firsts(top_semiResolved_qq[f"top{i+1}_b"]), -1)]) 
+            & ak.firsts(fj_mask[ak.local_index(fj_mask) == ak.fill_none(ak.firsts(top_semiResolved_qq[f"top{i+1}_qq"]), -1)])
         )
         print(f'top {i+1} - num qq tops = {ak.sum(top_semiResolved_qq[f"top{i+1}_mask"])}')
     print(f'num qq tops = {sum([ak.sum(top_semiResolved_qq[f"top{i+1}_mask"]) for i in range(n_tops)])}')
@@ -557,6 +562,11 @@ def get_datasets(arrays, n_tops):  # noqa: C901
                 ak.local_index(fj_top_bq2_idx)[fj_top_bq2_idx == i+1]
             )
         )
+        top_semiResolved_bq[f"top{i+1}_mask"] = (
+            top_semiResolved_bq[f"top{i+1}_mask"]
+            & ak.firsts(mask[ak.local_index(mask) == ak.fill_none(ak.firsts(top_semiResolved_bq[f"top{i+1}_q"]), -1)]) 
+            & ak.firsts(fj_mask[ak.local_index(fj_mask) == ak.fill_none(ak.firsts(top_semiResolved_bq[f"top{i+1}_bq"]), -1)])
+        )
         print(f'top {i+1} - num bq tops = {ak.sum(top_semiResolved_bq[f"top{i+1}_mask"])}')
     print(f'num bq tops = {sum([ak.sum(top_semiResolved_bq[f"top{i+1}_mask"]) for i in range(n_tops)])}')
 
@@ -566,6 +576,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         top_fullyBoosted[f"top{i+1}_bqq"] = ak.local_index(fj_top_bqq_idx)[fj_top_bqq_idx == i+1]
         top_fullyBoosted[f"top{i+1}_mask"] = (
             ak.sum(fj_top_bqq_idx == i+1, axis=1) == 1
+            & ak.firsts(fj_mask[ak.local_index(fj_mask) == ak.fill_none(ak.firsts(top_fullyBoosted[f"top{i+1}_bqq"]), -1)])
         )
         print(f'top {i+1} - num bqq tops = {ak.sum(top_fullyBoosted[f"top{i+1}_mask"])}')
     print(f'num bqq tops = {sum([ak.sum(top_fullyBoosted[f"top{i+1}_mask"]) for i in range(n_tops)])}')
@@ -573,6 +584,16 @@ def get_datasets(arrays, n_tops):  # noqa: C901
 
     print('-='*60)
 
+    at_least_one_target_mask = np.zeros_like(pt)
+    for i in range(n_tops):
+        at_least_one_target_mask = (
+            at_least_one_target_mask | (
+                top_fullyResolved[f"top{i+1}_mask"]
+                | top_semiResolved_qq[f"top{i+1}_mask"]
+                | top_semiResolved_bq[f"top{i+1}_mask"]
+                | top_fullyBoosted[f"top{i+1}_mask"]
+            )
+        )
 
     ## Check data ##
     # check fully-resolved tops
@@ -644,62 +665,62 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     ## Store processed data in dataset for training/testing ##
     # Store the model inputs
     datasets = {}
-    datasets["INPUTS/Jets/MASK"] = to_np_array(mask, max_n=N_JETS).astype("bool")
-    datasets["INPUTS/Jets/pt"] = to_np_array(pt, max_n=N_JETS).astype("float32")
-    datasets["INPUTS/Jets/eta"] = to_np_array(eta, max_n=N_JETS).astype("float32")
-    datasets["INPUTS/Jets/phi"] = to_np_array(phi, max_n=N_JETS).astype("float32")
-    datasets["INPUTS/Jets/sinphi"] = to_np_array(np.sin(phi), max_n=N_JETS).astype("float32")
-    datasets["INPUTS/Jets/cosphi"] = to_np_array(np.cos(phi), max_n=N_JETS).astype("float32")
-    datasets["INPUTS/Jets/mass"] = to_np_array(mass, max_n=N_JETS).astype("float32")
-    datasets["INPUTS/Jets/btag"] = to_np_array(btag, max_n=N_JETS).astype("bool")
-    datasets["INPUTS/Jets/flavor"] = to_np_array(flavor, max_n=N_JETS).astype("float32")
-    datasets["INPUTS/Jets/matchedfj"] = to_np_array(matched_fj_j_idx, max_n=N_JETS).astype("int32")
-    datasets["INPUTS/Jets/deltaRfj"] = to_np_array(matched_fj_j_DR, max_n=N_JETS).astype("int32")
+    datasets["INPUTS/Jets/MASK"] = to_np_array(mask, max_n=N_JETS).astype("bool")[at_least_one_target_mask]
+    datasets["INPUTS/Jets/pt"] = to_np_array(pt, max_n=N_JETS).astype("float32")[at_least_one_target_mask]
+    datasets["INPUTS/Jets/eta"] = to_np_array(eta, max_n=N_JETS).astype("float32")[at_least_one_target_mask]
+    datasets["INPUTS/Jets/phi"] = to_np_array(phi, max_n=N_JETS).astype("float32")[at_least_one_target_mask]
+    datasets["INPUTS/Jets/sinphi"] = to_np_array(np.sin(phi), max_n=N_JETS).astype("float32")[at_least_one_target_mask]
+    datasets["INPUTS/Jets/cosphi"] = to_np_array(np.cos(phi), max_n=N_JETS).astype("float32")[at_least_one_target_mask]
+    datasets["INPUTS/Jets/mass"] = to_np_array(mass, max_n=N_JETS).astype("float32")[at_least_one_target_mask]
+    datasets["INPUTS/Jets/btag"] = to_np_array(btag, max_n=N_JETS).astype("bool")[at_least_one_target_mask]
+    datasets["INPUTS/Jets/flavor"] = to_np_array(flavor, max_n=N_JETS).astype("float32")[at_least_one_target_mask]
+    datasets["INPUTS/Jets/matchedfj"] = to_np_array(matched_fj_j_idx, max_n=N_JETS).astype("int32")[at_least_one_target_mask]
+    datasets["INPUTS/Jets/deltaRfj"] = to_np_array(matched_fj_j_DR, max_n=N_JETS).astype("int32")[at_least_one_target_mask]
 
-    datasets["INPUTS/BoostedJets/MASK"] = to_np_array(fj_mask, max_n=N_FJETS).astype("bool")
-    datasets["INPUTS/BoostedJets/fj_pt"] = to_np_array(fj_pt, max_n=N_FJETS).astype("float32")
-    datasets["INPUTS/BoostedJets/fj_eta"] = to_np_array(fj_eta, max_n=N_FJETS).astype("float32")
-    datasets["INPUTS/BoostedJets/fj_phi"] = to_np_array(fj_phi, max_n=N_FJETS).astype("float32")
-    datasets["INPUTS/BoostedJets/fj_sinphi"] = to_np_array(np.sin(fj_phi), max_n=N_FJETS).astype("float32")
-    datasets["INPUTS/BoostedJets/fj_cosphi"] = to_np_array(np.cos(fj_phi), max_n=N_FJETS).astype("float32")
-    datasets["INPUTS/BoostedJets/fj_mass"] = to_np_array(fj_mass, max_n=N_FJETS).astype("float32")
-    datasets["INPUTS/BoostedJets/fj_sdmass"] = to_np_array(fj_sdmass, max_n=N_FJETS).astype("float32")
-    datasets["INPUTS/BoostedJets/fj_Ttag"] = to_np_array(fj_Ttag, max_n=N_FJETS).astype("bool")
-    datasets["INPUTS/BoostedJets/fj_Wtag"] = to_np_array(fj_Wtag, max_n=N_FJETS).astype("bool")
-    datasets["INPUTS/BoostedJets/fj_tau21"] = to_np_array(fj_tau21, max_n=N_FJETS).astype("float32")
-    datasets["INPUTS/BoostedJets/fj_tau32"] = to_np_array(fj_tau32, max_n=N_FJETS).astype("float32")
-    datasets["INPUTS/BoostedJets/fj_charge"] = to_np_array(fj_charge, max_n=N_FJETS).astype("float32")
-    datasets["INPUTS/BoostedJets/fj_ehadovereem"] = to_np_array(fj_ehadovereem, max_n=N_FJETS).astype("float32")
-    datasets["INPUTS/BoostedJets/fj_neutralenergyfrac"] = to_np_array(fj_neutralenergyfrac, max_n=N_FJETS).astype("float32")
-    datasets["INPUTS/BoostedJets/fj_chargedenergyfrac"] = to_np_array(fj_chargedenergyfrac, max_n=N_FJETS).astype("float32")
-    datasets["INPUTS/BoostedJets/fj_nneutral"] = to_np_array(fj_nneutral, max_n=N_FJETS).astype("float32")
-    datasets["INPUTS/BoostedJets/fj_ncharged"] = to_np_array(fj_ncharged, max_n=N_FJETS).astype("float32")
+    datasets["INPUTS/BoostedJets/MASK"] = to_np_array(fj_mask, max_n=N_FJETS).astype("bool")[at_least_one_target_mask]
+    datasets["INPUTS/BoostedJets/fj_pt"] = to_np_array(fj_pt, max_n=N_FJETS).astype("float32")[at_least_one_target_mask]
+    datasets["INPUTS/BoostedJets/fj_eta"] = to_np_array(fj_eta, max_n=N_FJETS).astype("float32")[at_least_one_target_mask]
+    datasets["INPUTS/BoostedJets/fj_phi"] = to_np_array(fj_phi, max_n=N_FJETS).astype("float32")[at_least_one_target_mask]
+    datasets["INPUTS/BoostedJets/fj_sinphi"] = to_np_array(np.sin(fj_phi), max_n=N_FJETS).astype("float32")[at_least_one_target_mask]
+    datasets["INPUTS/BoostedJets/fj_cosphi"] = to_np_array(np.cos(fj_phi), max_n=N_FJETS).astype("float32")[at_least_one_target_mask]
+    datasets["INPUTS/BoostedJets/fj_mass"] = to_np_array(fj_mass, max_n=N_FJETS).astype("float32")[at_least_one_target_mask]
+    datasets["INPUTS/BoostedJets/fj_sdmass"] = to_np_array(fj_sdmass, max_n=N_FJETS).astype("float32")[at_least_one_target_mask]
+    datasets["INPUTS/BoostedJets/fj_Ttag"] = to_np_array(fj_Ttag, max_n=N_FJETS).astype("bool")[at_least_one_target_mask]
+    datasets["INPUTS/BoostedJets/fj_Wtag"] = to_np_array(fj_Wtag, max_n=N_FJETS).astype("bool")[at_least_one_target_mask]
+    datasets["INPUTS/BoostedJets/fj_tau21"] = to_np_array(fj_tau21, max_n=N_FJETS).astype("float32")[at_least_one_target_mask]
+    datasets["INPUTS/BoostedJets/fj_tau32"] = to_np_array(fj_tau32, max_n=N_FJETS).astype("float32")[at_least_one_target_mask]
+    datasets["INPUTS/BoostedJets/fj_charge"] = to_np_array(fj_charge, max_n=N_FJETS).astype("float32")[at_least_one_target_mask]
+    datasets["INPUTS/BoostedJets/fj_ehadovereem"] = to_np_array(fj_ehadovereem, max_n=N_FJETS).astype("float32")[at_least_one_target_mask]
+    datasets["INPUTS/BoostedJets/fj_neutralenergyfrac"] = to_np_array(fj_neutralenergyfrac, max_n=N_FJETS).astype("float32")[at_least_one_target_mask]
+    datasets["INPUTS/BoostedJets/fj_chargedenergyfrac"] = to_np_array(fj_chargedenergyfrac, max_n=N_FJETS).astype("float32")[at_least_one_target_mask]
+    datasets["INPUTS/BoostedJets/fj_nneutral"] = to_np_array(fj_nneutral, max_n=N_FJETS).astype("float32")[at_least_one_target_mask]
+    datasets["INPUTS/BoostedJets/fj_ncharged"] = to_np_array(fj_ncharged, max_n=N_FJETS).astype("float32")[at_least_one_target_mask]
 
     # Store the truth-level info
     for i in range(n_tops):
         # fully-resolved tops
-        datasets[f"TARGETS/FRt{i+1}/MASK"] = top_fullyResolved[f"top{i+1}_mask"]
-        datasets[f"TARGETS/FRt{i+1}/b"] = top_fullyResolved[f"top{i+1}_b"]
-        datasets[f"TARGETS/FRt{i+1}/q1"] = top_fullyResolved[f"top{i+1}_q1"]
-        datasets[f"TARGETS/FRt{i+1}/q2"] = top_fullyResolved[f"top{i+1}_q2"]
-        datasets[f"TARGETS/FRt{i+1}/pt"] = top_pt_dict[f"top{i+1}_pt"]
+        datasets[f"TARGETS/FRt{i+1}/MASK"] = top_fullyResolved[f"top{i+1}_mask"][at_least_one_target_mask]
+        datasets[f"TARGETS/FRt{i+1}/b"] = top_fullyResolved[f"top{i+1}_b"][at_least_one_target_mask]
+        datasets[f"TARGETS/FRt{i+1}/q1"] = top_fullyResolved[f"top{i+1}_q1"][at_least_one_target_mask]
+        datasets[f"TARGETS/FRt{i+1}/q2"] = top_fullyResolved[f"top{i+1}_q2"][at_least_one_target_mask]
+        datasets[f"TARGETS/FRt{i+1}/pt"] = top_pt_dict[f"top{i+1}_pt"][at_least_one_target_mask]
 
         # semi-resolved (qq fatjet) tops
-        datasets[f"TARGETS/SRqqt{i+1}/MASK"] = top_semiResolved_qq[f"top{i+1}_mask"]
-        datasets[f"TARGETS/SRqqt{i+1}/b"] = top_semiResolved_qq[f"top{i+1}_b"]
-        datasets[f"TARGETS/SRqqt{i+1}/qq"] = top_semiResolved_qq[f"top{i+1}_qq"]
-        datasets[f"TARGETS/SRqqt{i+1}/pt"] = top_pt_dict[f"top{i+1}_pt"]
+        datasets[f"TARGETS/SRqqt{i+1}/MASK"] = top_semiResolved_qq[f"top{i+1}_mask"][at_least_one_target_mask]
+        datasets[f"TARGETS/SRqqt{i+1}/b"] = top_semiResolved_qq[f"top{i+1}_b"][at_least_one_target_mask]
+        datasets[f"TARGETS/SRqqt{i+1}/qq"] = top_semiResolved_qq[f"top{i+1}_qq"][at_least_one_target_mask]
+        datasets[f"TARGETS/SRqqt{i+1}/pt"] = top_pt_dict[f"top{i+1}_pt"][at_least_one_target_mask]
 
         # semi-resolved (bq fatjet) tops
-        datasets[f"TARGETS/SRbqt{i+1}/MASK"] = top_semiResolved_bq[f"top{i+1}_mask"]
-        datasets[f"TARGETS/SRbqt{i+1}/q"] = top_semiResolved_bq[f"top{i+1}_q"]
-        datasets[f"TARGETS/SRbqt{i+1}/bq"] = top_semiResolved_bq[f"top{i+1}_bq"]
-        datasets[f"TARGETS/SRbqt{i+1}/pt"] = top_pt_dict[f"top{i+1}_pt"]
+        datasets[f"TARGETS/SRbqt{i+1}/MASK"] = top_semiResolved_bq[f"top{i+1}_mask"][at_least_one_target_mask]
+        datasets[f"TARGETS/SRbqt{i+1}/q"] = top_semiResolved_bq[f"top{i+1}_q"][at_least_one_target_mask]
+        datasets[f"TARGETS/SRbqt{i+1}/bq"] = top_semiResolved_bq[f"top{i+1}_bq"][at_least_one_target_mask]
+        datasets[f"TARGETS/SRbqt{i+1}/pt"] = top_pt_dict[f"top{i+1}_pt"][at_least_one_target_mask]
 
         # fully-boosted tops
-        datasets[f"TARGETS/FBt{i+1}/MASK"] = top_fullyBoosted[f"top{i+1}_mask"]
-        datasets[f"TARGETS/FBt{i+1}/bqq"] = top_fullyBoosted[f"top{i+1}_bqq"]
-        datasets[f"TARGETS/FBt{i+1}/pt"] = top_pt_dict[f"top{i+1}_pt"]
+        datasets[f"TARGETS/FBt{i+1}/MASK"] = top_fullyBoosted[f"top{i+1}_mask"][at_least_one_target_mask]
+        datasets[f"TARGETS/FBt{i+1}/bqq"] = top_fullyBoosted[f"top{i+1}_bqq"][at_least_one_target_mask]
+        datasets[f"TARGETS/FBt{i+1}/pt"] = top_pt_dict[f"top{i+1}_pt"][at_least_one_target_mask]
 
     return datasets
 
