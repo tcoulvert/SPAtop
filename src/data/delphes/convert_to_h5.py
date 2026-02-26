@@ -3,6 +3,7 @@ import logging
 import os
 import re
 import subprocess
+from multiprocessing import Pool
 from pathlib import Path
 
 import awkward as ak
@@ -732,6 +733,41 @@ def get_datasets(arrays, n_tops):  # noqa: C901
 
     return datasets
 
+def process_file(file_name, out_file, train_frac, n_tops):
+    try:
+        if re.match('root://', file_name):
+            current_file_name = 'tmp_'+('train_' if 'training' in out_file else 'test_')+file_name.split('/')[-1]
+            subprocess.run(['xrdcp', '-f', file_name, current_file_name])
+        else:
+            current_file_name = file_name
+        with uproot.open(current_file_name) as in_file:
+            events = in_file["Delphes"]
+            num_entries = events.num_entries
+            if "training" in out_file:
+                entry_start = None
+                entry_stop = int(train_frac * num_entries)
+            else:
+                entry_start = int(train_frac * num_entries)
+                entry_stop = None
+
+            keys = (
+                [key for key in events.keys() if "Particle/Particle." in key and "fBits" not in key]
+                + [key for key in events.keys() if "Jet/Jet." in key]
+                + [key for key in events.keys() if "FatJet/FatJet." in key and "fBits" not in key]
+                + [key for key in events.keys() if "GenJet/GenJet." in key and "fBits" not in key]
+                + [key for key in events.keys() if "GenFatJet/GenFatJet." in key and "fBits" not in key]
+            )
+            
+            arrays = events.arrays(keys, entry_start=entry_start, entry_stop=entry_stop)
+            datasets = get_datasets(arrays, n_tops)
+
+        if re.match('root://', file_name): subprocess.run(['rm', '-rf', current_file_name])
+        return datasets
+    except Exception as e:
+        if e is KeyboardInterrupt: return 999
+        logging.info(f"Preprocessing failed for file:\n{file_name}\n\nwith error:\n{e}\n\n...continuing with other files")
+        return 400
+
 
 @click.command()
 @click.argument("in-files", nargs=-1)
@@ -749,7 +785,8 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     help="Number of top quarks per event",
 )
 @click.option("--plots", is_flag=True, help="Boolean to make plots.")
-def main(in_files, out_file, train_frac, n_tops, plots):
+@click.option("--multip", is_flag=True, help="Boolean to use multiprocessing.")
+def main(in_files, out_file, train_frac, n_tops, plots, multip):
     if plots:
         PLOTS = True
     
@@ -769,44 +806,23 @@ def main(in_files, out_file, train_frac, n_tops, plots):
         else:
             expanded_in_files.append(file_name)
     in_files = expanded_in_files
-    # print(f"ending in_files = {in_files}")
-    for file_name in in_files:
-        try:
-            if re.match('root://', file_name):
-                current_file_name = 'tmp_'+('train_' if 'training' in out_file else 'test_')+file_name.split('/')[-1]
-                subprocess.run(['xrdcp', '-f', file_name, current_file_name])
-            else:
-                current_file_name = file_name
-            with uproot.open(current_file_name) as in_file:
-                events = in_file["Delphes"]
-                num_entries = events.num_entries
-                if "training" in out_file:
-                    entry_start = None
-                    entry_stop = int(train_frac * num_entries)
-                else:
-                    entry_start = int(train_frac * num_entries)
-                    entry_stop = None
+    in_files = in_files[:2000]
+    if not multip:
+        for file_name in in_files:
+            datasets = process_file(file_name, out_file, train_frac, n_tops)
+            if type(datasets) is int: 
+                if datasets == 999: break
+                else: continue
+            for dataset_name, data in datasets.items():
+                if dataset_name not in all_datasets:
+                    all_datasets[dataset_name] = []
+                all_datasets[dataset_name].append(data)
+            print(f"Num events = {sum(len(all_datasets[dataset_name][i]) for i in all_datasets[dataset_name])}")
+    else:
+        with Pool(10) as p:
+            out_files, train_fracs, n_topses = [out_file]*len(in_files), [train_frac]*len(in_files), [n_tops]*len(in_files)
+            results = p.imap_unordered(process_file, zip(in_files, out_files, train_fracs, n_topses))
 
-                keys = (
-                    [key for key in events.keys() if "Particle/Particle." in key and "fBits" not in key]
-                    + [key for key in events.keys() if "Jet/Jet." in key]
-                    + [key for key in events.keys() if "FatJet/FatJet." in key and "fBits" not in key]
-                    + [key for key in events.keys() if "GenJet/GenJet." in key and "fBits" not in key]
-                    + [key for key in events.keys() if "GenFatJet/GenFatJet." in key and "fBits" not in key]
-                )
-                
-                arrays = events.arrays(keys, entry_start=entry_start, entry_stop=entry_stop)
-                datasets = get_datasets(arrays, n_tops)
-                for dataset_name, data in datasets.items():
-                    if dataset_name not in all_datasets:
-                        all_datasets[dataset_name] = []
-                    all_datasets[dataset_name].append(data)
-                print(len(all_datasets[dataset_name]))
-                # if len(all_datasets[dataset_name]) > 2000: break
-        except Exception as e:
-            if e is KeyboardInterrupt: break
-            logging.info(f"Preprocessing failed for file:\n{file_name}\n\nwith error:\n{e}\n\n...continuing with other files")
-        if re.match('root://', file_name): subprocess.run(['rm', '-rf', current_file_name])
 
     with h5py.File(out_file, "w") as output:
         for dataset_name, all_data in all_datasets.items():
