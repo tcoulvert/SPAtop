@@ -42,7 +42,7 @@ logging.basicConfig(level=logging.INFO)
 
 
 MIN_JET_PT = 30  # 20
-MIN_FJET_PT = 100  # 200
+MIN_FJET_PT = 200  # 200
 PROJECT_DIR = Path(__file__).resolve().parents[3]
 
 PLOTS = True
