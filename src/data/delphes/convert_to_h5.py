@@ -802,7 +802,7 @@ def main(in_files, out_file, train_frac, n_tops, plots):
                         all_datasets[dataset_name] = []
                     all_datasets[dataset_name].append(data)
                 print(len(all_datasets[dataset_name]))
-                if len(all_datasets[dataset_name]) > 2000: break
+                # if len(all_datasets[dataset_name]) > 2000: break
         except Exception as e:
             if e is KeyboardInterrupt: break
             logging.info(f"Preprocessing failed for file:\n{file_name}\n\nwith error:\n{e}\n\n...continuing with other files")
