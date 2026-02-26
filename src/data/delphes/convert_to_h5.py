@@ -529,6 +529,8 @@ def get_datasets(arrays, n_tops):  # noqa: C901
             & ak.firsts(mask[ak.local_index(mask) == ak.fill_none(ak.firsts(top_semiResolved_qq[f"top{i+1}_b"]), -1)]) 
             & ak.firsts(fj_mask[ak.local_index(fj_mask) == ak.fill_none(ak.firsts(top_semiResolved_qq[f"top{i+1}_qq"]), -1)])
         )
+        print(f"SRqqt{i+1} - any None ak5? {ak.any(ak.is_none(ak.firsts(mask[ak.local_index(mask) == ak.fill_none(ak.firsts(top_semiResolved_qq[f"top{i+1}_b"]), -1)])))}")
+        print(f"SRqqt{i+1} - any None ak8? {ak.any(ak.is_none(ak.firsts(fj_mask[ak.local_index(fj_mask) == ak.fill_none(ak.firsts(top_semiResolved_qq[f"top{i+1}_qq"]), -1)])))}")
         print(f'top {i+1} - num qq tops = {ak.sum(top_semiResolved_qq[f"top{i+1}_mask"])}')
     print(f'num qq tops = {sum([ak.sum(top_semiResolved_qq[f"top{i+1}_mask"]) for i in range(n_tops)])}')
     
@@ -567,6 +569,8 @@ def get_datasets(arrays, n_tops):  # noqa: C901
             & ak.firsts(mask[ak.local_index(mask) == ak.fill_none(ak.firsts(top_semiResolved_bq[f"top{i+1}_q"]), -1)]) 
             & ak.firsts(fj_mask[ak.local_index(fj_mask) == ak.fill_none(ak.firsts(top_semiResolved_bq[f"top{i+1}_bq"]), -1)])
         )
+        print(f"SRbqt{i+1} - any None ak5? {ak.any(ak.is_none(ak.firsts(mask[ak.local_index(mask) == ak.fill_none(ak.firsts(top_semiResolved_bq[f"top{i+1}_q"]), -1)])))}")
+        print(f"SRbqt{i+1} - any None ak8? {ak.any(ak.is_none(ak.firsts(fj_mask[ak.local_index(fj_mask) == ak.fill_none(ak.firsts(top_semiResolved_bq[f"top{i+1}_bq"]), -1)])))}")
         print(f'top {i+1} - num bq tops = {ak.sum(top_semiResolved_bq[f"top{i+1}_mask"])}')
     print(f'num bq tops = {sum([ak.sum(top_semiResolved_bq[f"top{i+1}_mask"]) for i in range(n_tops)])}')
 
@@ -578,6 +582,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
             ak.sum(fj_top_bqq_idx == i+1, axis=1) == 1
             & ak.firsts(fj_mask[ak.local_index(fj_mask) == ak.fill_none(ak.firsts(top_fullyBoosted[f"top{i+1}_bqq"]), -1)])
         )
+        print(f"FRt{i+1} - any None ak8? {ak.any(ak.is_none(ak.firsts(fj_mask[ak.local_index(fj_mask) == ak.fill_none(ak.firsts(top_fullyBoosted[f"top{i+1}_bqq"]), -1)])))}")
         print(f'top {i+1} - num bqq tops = {ak.sum(top_fullyBoosted[f"top{i+1}_mask"])}')
     print(f'num bqq tops = {sum([ak.sum(top_fullyBoosted[f"top{i+1}_mask"]) for i in range(n_tops)])}')
     print(f'num reco tops = {sum([ak.sum(top_fullyResolved[f"top{i+1}_mask"]) for i in range(n_tops)]+[ak.sum(top_semiResolved_qq[f"top{i+1}_mask"]) for i in range(n_tops)]+[ak.sum(top_semiResolved_bq[f"top{i+1}_mask"]) for i in range(n_tops)]+[ak.sum(top_fullyBoosted[f"top{i+1}_mask"]) for i in range(n_tops)])}')
