@@ -592,7 +592,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
 
     print('-='*60)
 
-    at_least_one_target_mask = np.zeros_like(ak.firsts(pt))
+    at_least_one_target_mask = np.zeros_like(ak.to_numpy(ak.firsts(pt)))
     for i in range(n_tops):
         at_least_one_target_mask += ak.to_numpy(
             top_fullyResolved[f"top{i+1}_mask"]
