@@ -41,15 +41,15 @@ logging.basicConfig(level=logging.INFO)
 ################################
 
 
-MIN_JET_PT = 10  # 20
+MIN_JET_PT = 30  # 20
 MIN_FJET_PT = 100  # 200
 PROJECT_DIR = Path(__file__).resolve().parents[3]
 
 PLOTS = True
 RNG = np.random.default_rng(seed=21)
 
-TVSQCD_EFFS = {'t':83.21e-2, 'W':6.90e-2, 'bq': 19.65e-2, 'QCD': 1e-2}
-WVSQCD_EFFS = {'t':15.19e-2, 'W':56.15e-2, 'bq': 9.92e-2, 'QCD': 1e-2}
+TVSQCD_EFFS = {'t': 83.21e-2, 'W': 6.90e-2, 'bq': 19.65e-2, 'QCD': 1e-2}
+WVSQCD_EFFS = {'t': 15.19e-2, 'W': 56.15e-2, 'bq': 9.92e-2, 'QCD': 1e-2}
 
 ################################
 
@@ -370,6 +370,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     top_q1_idx = top_q1_idx[sorted_by_pt][event_mask]
     top_q2_idx = top_q2_idx[sorted_by_pt][event_mask]
     matched_fj_j_idx = matched_fj_j_idx[sorted_by_pt][event_mask]
+    matched_fj_j_DR = matched_fj_j_DR[sorted_by_pt][event_mask]
 
     if PLOTS:
         # jet pt
@@ -437,6 +438,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     top_q1_idx = top_q1_idx[:, :N_JETS]
     top_q2_idx = top_q2_idx[:, :N_JETS]
     matched_fj_j_idx = matched_fj_j_idx[:, :N_JETS]
+    matched_fj_j_DR = matched_fj_j_DR[:, :N_JETS]
 
     ## FatJets ##
     # sort by pt
@@ -676,26 +678,26 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     # Store the truth-level info
     for i in range(n_tops):
         # fully-resolved tops
-        datasets[f"TARGETS/FRt{i+1}/mask"] = top_fullyResolved[f"top{i+1}_mask"]
+        datasets[f"TARGETS/FRt{i+1}/MASK"] = top_fullyResolved[f"top{i+1}_mask"]
         datasets[f"TARGETS/FRt{i+1}/b"] = top_fullyResolved[f"top{i+1}_b"]
         datasets[f"TARGETS/FRt{i+1}/q1"] = top_fullyResolved[f"top{i+1}_q1"]
         datasets[f"TARGETS/FRt{i+1}/q2"] = top_fullyResolved[f"top{i+1}_q2"]
         datasets[f"TARGETS/FRt{i+1}/pt"] = top_pt_dict[f"top{i+1}_pt"]
 
         # semi-resolved (qq fatjet) tops
-        datasets[f"TARGETS/SRqqt{i+1}/mask"] = top_semiResolved_qq[f"top{i+1}_mask"]
+        datasets[f"TARGETS/SRqqt{i+1}/MASK"] = top_semiResolved_qq[f"top{i+1}_mask"]
         datasets[f"TARGETS/SRqqt{i+1}/b"] = top_semiResolved_qq[f"top{i+1}_b"]
         datasets[f"TARGETS/SRqqt{i+1}/qq"] = top_semiResolved_qq[f"top{i+1}_qq"]
         datasets[f"TARGETS/SRqqt{i+1}/pt"] = top_pt_dict[f"top{i+1}_pt"]
 
         # semi-resolved (bq fatjet) tops
-        datasets[f"TARGETS/SRbqt{i+1}/mask"] = top_semiResolved_bq[f"top{i+1}_mask"]
+        datasets[f"TARGETS/SRbqt{i+1}/MASK"] = top_semiResolved_bq[f"top{i+1}_mask"]
         datasets[f"TARGETS/SRbqt{i+1}/q"] = top_semiResolved_bq[f"top{i+1}_q"]
         datasets[f"TARGETS/SRbqt{i+1}/bq"] = top_semiResolved_bq[f"top{i+1}_bq"]
         datasets[f"TARGETS/SRbqt{i+1}/pt"] = top_pt_dict[f"top{i+1}_pt"]
 
         # fully-boosted tops
-        datasets[f"TARGETS/FBt{i+1}/mask"] = top_fullyBoosted[f"top{i+1}_mask"]
+        datasets[f"TARGETS/FBt{i+1}/MASK"] = top_fullyBoosted[f"top{i+1}_mask"]
         datasets[f"TARGETS/FBt{i+1}/bqq"] = top_fullyBoosted[f"top{i+1}_bqq"]
         datasets[f"TARGETS/FBt{i+1}/pt"] = top_pt_dict[f"top{i+1}_pt"]
 
@@ -771,6 +773,7 @@ def main(in_files, out_file, train_frac, n_tops, plots):
                         all_datasets[dataset_name] = []
                     all_datasets[dataset_name].append(data)
                 print(len(all_datasets[dataset_name]))
+                if len(all_datasets[dataset_name]) == 10: break
         except Exception as e:
             if e is KeyboardInterrupt: break
             logging.info(f"Preprocessing failed for file:\n{file_name}\n\nwith error:\n{e}\n\n...continuing with other files")

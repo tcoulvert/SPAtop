@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: dp-spatop-train-v6-fr
+  name: ts-spatop-train-v6-fr
   labels:
     jobgroup: spatop-job-train
 spec:
@@ -20,7 +20,7 @@ spec:
               set -e  # exit on error
 
               echo "Installing SPANet v2.3, tensorboard and rich..."
-              pip install git+https://github.com/Alexanders101/SPANet.git@v2.3
+              pip install git+https://github.com/tcoulvert/SPANet
               pip install tensorboard rich
 
               echo "Starting training job..."
