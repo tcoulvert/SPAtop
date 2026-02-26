@@ -586,8 +586,9 @@ def get_datasets(arrays, n_tops):  # noqa: C901
 
     at_least_one_target_mask = np.zeros_like(pt)
     for i in range(n_tops):
-        at_least_one_target_mask = (
-            at_least_one_target_mask | (
+        at_least_one_target_mask = np.logical_or(
+            at_least_one_target_mask,
+            ak.to_numpy(
                 top_fullyResolved[f"top{i+1}_mask"]
                 | top_semiResolved_qq[f"top{i+1}_mask"]
                 | top_semiResolved_bq[f"top{i+1}_mask"]
