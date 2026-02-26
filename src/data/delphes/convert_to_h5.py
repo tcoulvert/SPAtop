@@ -817,7 +817,7 @@ def main(in_files, out_file, train_frac, n_tops, plots, multip):
                 if dataset_name not in all_datasets:
                     all_datasets[dataset_name] = []
                 all_datasets[dataset_name].append(data)
-            print(f"Num events = {sum(len(all_datasets[dataset_name][i]) for i in all_datasets[dataset_name])}")
+            print(f"Num events = {sum(len(all_datasets[dataset_name][i]) for i in range(len(all_datasets[dataset_name])))}")
     else:
         with Pool(10) as p:
             out_files, train_fracs, n_topses = [out_file]*len(in_files), [train_frac]*len(in_files), [n_tops]*len(in_files)
