@@ -601,6 +601,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
             | top_fullyBoosted[f"top{i+1}_mask"]
         ).astype("float32")
     print(f"Viable tops = {np.sum(at_least_one_target_mask)}")
+    at_least_one_target_mask = np.flatnonzero(at_least_one_target_mask)
 
     ## Check data ##
     # check fully-resolved tops
