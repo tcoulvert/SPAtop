@@ -8,7 +8,6 @@ from src.analysis.utils import dp_to_TopNumProb, reset_collision_dp
 
 N_AK4_JETS = 10
 N_AK8_JETS = 2
-N_AK15_JETS = 2
 N_TOPS = 2
 
 RESOLVED_CHI2_CUT = 20  # taken by-eye from boosted chi2 plots
@@ -179,37 +178,46 @@ def parse_resolved_w_target(
     fjs_reco=None, chi2_cut=RESOLVED_CHI2_CUT
 ):
     # FRt pt
-    FRt1_pt = np.array(testfile["TARGETS"]["FRt1"]["pt"])
-    FRt2_pt = np.array(testfile["TARGETS"]["FRt2"]["pt"])
+    if "pt" in testfile["TARGETS"]["FRt1"].keys():
+        FRt1_pt = np.array(testfile["TARGETS"]["FRt1"]["pt"])
+        FRt2_pt = np.array(testfile["TARGETS"]["FRt2"]["pt"])
+    else:
+        FRt1_pt = 100 * np.ones_like(np.array(testfile["TARGETS"]["FRt1"]["MASK"]))
+        FRt2_pt = 100 * np.ones_like(np.array(testfile["TARGETS"]["FRt2"]["MASK"]))
     FRt_pts = np.concatenate((FRt1_pt.reshape(-1, 1), FRt2_pt.reshape(-1, 1)), axis=1)
     FRt_pts = ak.Array(FRt_pts)
 
 
-    # resolved mask
-    FRt1_mask = np.array(testfile["TARGETS"]["FRt1"]["mask"])
-    FRt2_mask = np.array(testfile["TARGETS"]["FRt2"]["mask"])
+    # resolved MASK
+    FRt1_mask = np.array(testfile["TARGETS"]["FRt1"]["MASK"])
+    FRt2_mask = np.array(testfile["TARGETS"]["FRt2"]["MASK"])
     FRt_masks = np.concatenate((FRt1_mask.reshape(-1, 1), FRt2_mask.reshape(-1, 1)), axis=1)
     FRt_masks = ak.Array(FRt_masks)
 
 
-    # boosted mask
-    # FB
-    FBt1_mask = np.array(testfile["TARGETS"]["FBt1"]["mask"])
-    FBt2_mask = np.array(testfile["TARGETS"]["FBt2"]["mask"])
-    FBt_masks = np.concatenate((FBt1_mask.reshape(-1, 1), FBt2_mask.reshape(-1, 1)), axis=1)
-    FBt_masks = ak.Array(FBt_masks)
-    # SRqq
-    SRqqt1_mask = np.array(testfile["TARGETS"]["SRqqt1"]["mask"])
-    SRqqt2_mask = np.array(testfile["TARGETS"]["SRqqt2"]["mask"])
-    SRqqt_masks = np.concatenate((SRqqt1_mask.reshape(-1, 1), SRqqt2_mask.reshape(-1, 1)), axis=1)
-    SRqqt_masks = ak.Array(SRqqt_masks)
-    # SRbq
-    SRbqt1_mask = np.array(testfile["TARGETS"]["SRbqt1"]["mask"])
-    SRbqt2_mask = np.array(testfile["TARGETS"]["SRbqt2"]["mask"])
-    SRbqt_masks = np.concatenate((SRbqt1_mask.reshape(-1, 1), SRbqt2_mask.reshape(-1, 1)), axis=1)
-    SRbqt_masks = ak.Array(SRbqt_masks)
-
-    FRt_overlap = FRt_masks & (SRqqt_masks | SRbqt_masks | FBt_masks)  # FR / all overlap
+    FRt_overlap = FRt_masks
+    # boosted MASK
+    if "FBt1" in testfile["TARGETS"].keys():
+        # FB
+        FBt1_mask = np.array(testfile["TARGETS"]["FBt1"]["MASK"])
+        FBt2_mask = np.array(testfile["TARGETS"]["FBt2"]["MASK"])
+        FBt_masks = np.concatenate((FBt1_mask.reshape(-1, 1), FBt2_mask.reshape(-1, 1)), axis=1)
+        FBt_masks = ak.Array(FBt_masks)
+        FRt_overlap = FRt_overlap & FBt_masks
+    if "SRqqt1" in testfile["TARGETS"].keys():
+        # SRqq
+        SRqqt1_mask = np.array(testfile["TARGETS"]["SRqqt1"]["MASK"])
+        SRqqt2_mask = np.array(testfile["TARGETS"]["SRqqt2"]["MASK"])
+        SRqqt_masks = np.concatenate((SRqqt1_mask.reshape(-1, 1), SRqqt2_mask.reshape(-1, 1)), axis=1)
+        SRqqt_masks = ak.Array(SRqqt_masks)
+        FRt_overlap = FRt_overlap & SRqqt_masks
+    if "SRbqt1" in testfile["TARGETS"].keys():
+        # SRbq
+        SRbqt1_mask = np.array(testfile["TARGETS"]["SRbqt1"]["MASK"])
+        SRbqt2_mask = np.array(testfile["TARGETS"]["SRbqt2"]["MASK"])
+        SRbqt_masks = np.concatenate((SRbqt1_mask.reshape(-1, 1), SRbqt2_mask.reshape(-1, 1)), axis=1)
+        SRbqt_masks = ak.Array(SRbqt_masks)
+        FRt_overlap = FRt_overlap & SRbqt_masks
     FRt_overlap = ak.Array(ak.to_numpy(FRt_overlap).astype(float))  # necessary for downstream analysis, b/c NumPy requires uniform typing
 
 
@@ -271,21 +279,21 @@ def parse_resolved_w_target(
     except:
         # resolved top detection probability
         dp_FRt1 = np.logical_and(
-            np.array(predfile["TARGETS"]["FRt1"]["mask"]),
+            np.array(predfile["TARGETS"]["FRt1"]["MASK"]),
             np.array(predfile["TARGETS"]["FRt1"]["chi2"]) < chi2_cut
         ).astype("float")
         dp_FRt2 = np.logical_and(
-            np.array(predfile["TARGETS"]["FRt2"]["mask"]),
+            np.array(predfile["TARGETS"]["FRt2"]["MASK"]),
             np.array(predfile["TARGETS"]["FRt2"]["chi2"]) < chi2_cut
         ).astype("float")
 
         # jet assignment probability
         ap_FRt1 = np.logical_and(
-            np.array(predfile["TARGETS"]["FRt1"]["mask"]),
+            np.array(predfile["TARGETS"]["FRt1"]["MASK"]),
             np.array(predfile["TARGETS"]["FRt1"]["chi2"]) < chi2_cut
         ).astype("float")
         ap_FRt2 = np.logical_and(
-            np.array(predfile["TARGETS"]["FRt2"]["mask"]),
+            np.array(predfile["TARGETS"]["FRt2"]["MASK"]),
             np.array(predfile["TARGETS"]["FRt2"]["chi2"]) < chi2_cut
         ).astype("float")
 
@@ -322,7 +330,7 @@ def parse_resolved_w_target(
     if fjs_reco is None:
         goodJetIdx = ak.local_index(js)
     else:
-        goodJetIdx = get_unoverlapped_jet_index(fjs_reco, js, dR_min=0.4)
+        goodJetIdx = get_unoverlapped_jet_index(fjs_reco, js, dR_min=0.5)
 
 
     # generate look up tables

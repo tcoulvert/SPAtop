@@ -8,7 +8,6 @@ from src.analysis.utils import dp_to_TopNumProb, reset_collision_dp
 
 N_AK4_JETS = 10
 N_AK8_JETS = 2
-N_AK15_JETS = 2
 N_TOPS = 2
 
 def get_unoverlapped_jet_index(fjs, js, dR_min=0.5):
@@ -160,7 +159,7 @@ def gen_target_SRt_LUT(
 
 def parse_semi_resolved_w_target(
     testfile, predfile, method,
-    vfjs_reco=None
+    fjs_reco_bqq=None
 ):
     # FRt pt
     SRt1_pt = np.array(testfile["TARGETS"][f"SR{method}t1"]["pt"])
@@ -169,25 +168,25 @@ def parse_semi_resolved_w_target(
     SRt_pts = ak.Array(SRt_pts)
 
 
-    # resolved mask
-    SRt1_mask = np.array(testfile["TARGETS"][f"SR{method}t1"]["mask"])
-    SRt2_mask = np.array(testfile["TARGETS"][f"SR{method}t1"]["mask"])
+    # resolved MASK
+    SRt1_mask = np.array(testfile["TARGETS"][f"SR{method}t1"]["MASK"])
+    SRt2_mask = np.array(testfile["TARGETS"][f"SR{method}t1"]["MASK"])
     SRt_masks = np.concatenate((SRt1_mask.reshape(-1, 1), SRt2_mask.reshape(-1, 1)), axis=1)
     SRt_masks = ak.Array(SRt_masks)
 
 
-    # boosted mask
+    # boosted MASK
     # FB
-    FBt1_mask = np.array(testfile["TARGETS"]["FBt1"]["mask"])
-    FBt2_mask = np.array(testfile["TARGETS"]["FBt2"]["mask"])
+    FBt1_mask = np.array(testfile["TARGETS"]["FBt1"]["MASK"])
+    FBt2_mask = np.array(testfile["TARGETS"]["FBt2"]["MASK"])
     FBt_masks = np.concatenate((FBt1_mask.reshape(-1, 1), FBt2_mask.reshape(-1, 1)), axis=1)
     FBt_masks = ak.Array(FBt_masks)
 
     # FR overlap with FB
     if method == 'bq':
         # SRqq
-        SRqqt1_mask = np.array(testfile["TARGETS"]["SRqqt1"]["mask"])
-        SRqqt2_mask = np.array(testfile["TARGETS"]["SRqqt2"]["mask"])
+        SRqqt1_mask = np.array(testfile["TARGETS"]["SRqqt1"]["MASK"])
+        SRqqt2_mask = np.array(testfile["TARGETS"]["SRqqt2"]["MASK"])
         SRqqt_masks = np.concatenate((SRqqt1_mask.reshape(-1, 1), SRqqt2_mask.reshape(-1, 1)), axis=1)
         SRqqt_masks = ak.Array(SRqqt_masks)
         
@@ -241,12 +240,12 @@ def parse_semi_resolved_w_target(
         ap_SRt2 = np.array(predfile["TARGETS"][f"SR{method}t2"]["assignment_probability"])
     except:
         # semi-boosted top detection probability
-        dp_SRt1 = np.array(predfile["TARGETS"][f"SR{method}t1"]["mask"]).astype("float")
-        dp_SRt2 = np.array(predfile["TARGETS"][f"SR{method}t2"]["mask"]).astype("float")
+        dp_SRt1 = np.array(predfile["TARGETS"][f"SR{method}t1"]["MASK"]).astype("float")
+        dp_SRt2 = np.array(predfile["TARGETS"][f"SR{method}t2"]["MASK"]).astype("float")
 
         # jet/fatjet assignment probability
-        ap_SRt1 = np.array(predfile["TARGETS"][f"SR{method}t1"]["mask"]).astype("float")
-        ap_SRt2 = np.array(predfile["TARGETS"][f"SR{method}t2"]["mask"]).astype("float")
+        ap_SRt1 = np.array(predfile["TARGETS"][f"SR{method}t1"]["MASK"]).astype("float")
+        ap_SRt2 = np.array(predfile["TARGETS"][f"SR{method}t2"]["MASK"]).astype("float")
 
     dps = np.concatenate((dp_SRt1.reshape(-1, 1), dp_SRt2.reshape(-1, 1)), axis=1)
     aps = np.concatenate((ap_SRt1.reshape(-1, 1), ap_SRt2.reshape(-1, 1)), axis=1)
@@ -292,12 +291,12 @@ def parse_semi_resolved_w_target(
 
 
     # find jets that are overlapped with reco boosted top
-    if vfjs_reco is None:
+    if fjs_reco_bqq is None:
         goodJetIdx = ak.local_index(js)
         goodFatJetIdx = ak.local_index(fjs)
     else:
-        goodJetIdx = get_unoverlapped_jet_index(vfjs_reco, js, dR_min=0.4)
-        goodFatJetIdx = get_unoverlapped_jet_index(vfjs_reco, fjs, dR_min=0.6)
+        goodJetIdx = get_unoverlapped_jet_index(fjs_reco_bqq, js, dR_min=0.5)
+        goodFatJetIdx = get_unoverlapped_jet_index(fjs_reco_bqq, fjs, dR_min=0.8)
 
 
     # generate look up tables
@@ -318,7 +317,7 @@ def parse_semi_resolved_w_target(
     ).snapshot()
 
     # reconstruct FBt to remove overlapped ak4 & ak8 jets
-    fj_reco = fjs[qq_ps_selected - N_AK4_JETS]
+    fjs_reco_xq = fjs[qq_ps_selected - N_AK4_JETS]
 
 
-    return LUT_pred, LUT_target, fj_reco
+    return LUT_pred, LUT_target, fjs_reco_xq

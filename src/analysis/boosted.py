@@ -8,10 +8,7 @@ from src.analysis.utils import dp_to_TopNumProb, reset_collision_dp
 
 N_AK4_JETS = 10
 N_AK8_JETS = 2
-N_AK15_JETS = 2
 N_TOPS = 2
-
-BOOSTED_CHI2_CUT = 45  # taken by-eye from boosted chi2 plots
 
 
 def sel_pred_FBt_by_dp_ap(dps, aps, bqq_ps):
@@ -28,7 +25,7 @@ def sel_pred_FBt_by_dp_ap(dps, aps, bqq_ps):
     bqq_ps_sel = bqq_ps[idx_sel]
 
     # require bqq assignment is a AK15 jet
-    ak15Filter = bqq_ps_sel >= (N_AK4_JETS + N_AK8_JETS)
+    ak15Filter = bqq_ps_sel >= N_AK4_JETS
     bqq_ps_passed = bqq_ps_sel.mask[ak15Filter]
     bqq_ps_passed = ak.drop_none(bqq_ps_passed)
 
@@ -59,9 +56,9 @@ def gen_pred_FBt_LUT(bqq_ps_passed, bqq_ts_selected, fj_pts, builder):
         for i, bqq_p in enumerate(bqq_p_event):
 
             correct = 0.
-            predFBt_pt = fj_pt_event[bqq_p - (N_AK4_JETS + N_AK8_JETS)]
+            predFBt_pt = fj_pt_event[bqq_p - N_AK4_JETS]
             for bqq_t in bqq_t_event:
-                if bqq_p - (N_AK4_JETS + N_AK8_JETS) == bqq_t:
+                if bqq_p - N_AK4_JETS == bqq_t:
                     correct = 1.
 
             builder.begin_list()
@@ -91,7 +88,7 @@ def gen_target_FBt_LUT(bqq_ps_passed, bqq_ts_selected, targetFBt_pts, builder):
             retrieved = 0.
             targetFBt_pt = targetH_pts_event[i]
             for bqq_p in bqq_p_event:
-                if bqq_p - (N_AK4_JETS + N_AK8_JETS) == bqq_t:
+                if bqq_p - N_AK4_JETS == bqq_t:
                     retrieved = 1.
 
             builder.begin_list()
@@ -109,7 +106,7 @@ def gen_target_FBt_LUT(bqq_ps_passed, bqq_ts_selected, targetFBt_pts, builder):
 # or
 # [targetFBt retrieved or not, target FBt pt]
 def parse_boosted_w_target(
-    testfile, predfile, chi2_cut=BOOSTED_CHI2_CUT
+    testfile, predfile
 ):
     # Collect H pt, mask, target and predicted jet and fjets for 3 Hs in each event
     # t pt
@@ -118,9 +115,9 @@ def parse_boosted_w_target(
     FBt_pts = np.concatenate((FBt1_pt.reshape(-1, 1), FBt2_pt.reshape(-1, 1)), axis=1)
     FBt_pts = ak.Array(FBt_pts)
 
-    # mask
-    FBt1_mask = np.array(testfile["TARGETS"]["FBt1"]["mask"])
-    FBt2_mask = np.array(testfile["TARGETS"]["FBt2"]["mask"])
+    # MASK
+    FBt1_mask = np.array(testfile["TARGETS"]["FBt1"]["MASK"])
+    FBt2_mask = np.array(testfile["TARGETS"]["FBt2"]["MASK"])
     FBt_masks = np.concatenate((FBt1_mask.reshape(-1, 1), FBt2_mask.reshape(-1, 1)), axis=1)
     FBt_masks = ak.Array(FBt_masks)
 
@@ -133,42 +130,55 @@ def parse_boosted_w_target(
     bqq_ts = ak.Array(bqq_ts)
 
     # pred jet/fjets
-    try:
-        # pred assignment
-        bqq_FBt1_p = np.array(predfile["TARGETS"]["FBt1"]["bqq"])
-        bqq_FBt2_p = np.array(predfile["TARGETS"]["FBt2"]["bqq"])
+    # pred assignment
+    bqq_FBt1_p = np.array(predfile["TARGETS"]["FBt1"]["bqq"])
+    bqq_FBt2_p = np.array(predfile["TARGETS"]["FBt2"]["bqq"])
 
-        # FBt detection probability
-        dp_FBt1 = np.array(predfile["TARGETS"]["FBt1"]["detection_probability"])
-        dp_FBt2 = np.array(predfile["TARGETS"]["FBt2"]["detection_probability"])
+    # FBt detection probability
+    dp_FBt1 = np.array(predfile["TARGETS"]["FBt1"]["detection_probability"])
+    dp_FBt2 = np.array(predfile["TARGETS"]["FBt2"]["detection_probability"])
 
-        # FBt assignment probability
-        ap_FBt1 = np.array(predfile["TARGETS"]["FBt1"]["assignment_probability"])
-        ap_FBt2 = np.array(predfile["TARGETS"]["FBt2"]["assignment_probability"])
-    except:
-        # pred assignment
-        bqq_FBt1_p = np.array(predfile["TARGETS"]["FBt1"]["bqq"]) + (N_AK4_JETS + N_AK8_JETS)
-        bqq_FBt2_p = np.array(predfile["TARGETS"]["FBt2"]["bqq"]) + (N_AK4_JETS + N_AK8_JETS)
+    # FBt assignment probability
+    ap_FBt1 = np.array(predfile["TARGETS"]["FBt1"]["assignment_probability"])
+    ap_FBt2 = np.array(predfile["TARGETS"]["FBt2"]["assignment_probability"])
 
-        # boosted top detection probability
-        dp_FBt1 = np.logical_and(
-            np.array(predfile["TARGETS"]["FBt1"]["mask"]),
-            np.array(predfile["TARGETS"]["FBt1"]["chi2"]) < chi2_cut
-        ).astype("float")
-        dp_FBt2 = np.logical_and(
-            np.array(predfile["TARGETS"]["FBt2"]["mask"]),
-            np.array(predfile["TARGETS"]["FBt2"]["chi2"]) < chi2_cut
-        ).astype("float")
+    # # pred jet/fjets
+    # try:
+    #     # pred assignment
+    #     bqq_FBt1_p = np.array(predfile["TARGETS"]["FBt1"]["bqq"])
+    #     bqq_FBt2_p = np.array(predfile["TARGETS"]["FBt2"]["bqq"])
 
-        # veryfatjet assignment probability
-        ap_FBt1 = np.logical_and(
-            np.array(predfile["TARGETS"]["FBt1"]["mask"]),
-            np.array(predfile["TARGETS"]["FBt1"]["chi2"]) < chi2_cut
-        ).astype("float")
-        ap_FBt2 = np.logical_and(
-            np.array(predfile["TARGETS"]["FBt2"]["mask"]),
-            np.array(predfile["TARGETS"]["FBt2"]["chi2"]) < chi2_cut
-        ).astype("float")
+    #     # FBt detection probability
+    #     dp_FBt1 = np.array(predfile["TARGETS"]["FBt1"]["detection_probability"])
+    #     dp_FBt2 = np.array(predfile["TARGETS"]["FBt2"]["detection_probability"])
+
+    #     # FBt assignment probability
+    #     ap_FBt1 = np.array(predfile["TARGETS"]["FBt1"]["assignment_probability"])
+    #     ap_FBt2 = np.array(predfile["TARGETS"]["FBt2"]["assignment_probability"])
+    # except:
+    #     # pred assignment
+    #     bqq_FBt1_p = np.array(predfile["TARGETS"]["FBt1"]["bqq"]) + (N_AK4_JETS + N_AK8_JETS)
+    #     bqq_FBt2_p = np.array(predfile["TARGETS"]["FBt2"]["bqq"]) + (N_AK4_JETS + N_AK8_JETS)
+
+    #     # boosted top detection probability
+    #     dp_FBt1 = np.logical_and(
+    #         np.array(predfile["TARGETS"]["FBt1"]["MASK"]),
+    #         np.array(predfile["TARGETS"]["FBt1"]["chi2"]) < chi2_cut
+    #     ).astype("float")
+    #     dp_FBt2 = np.logical_and(
+    #         np.array(predfile["TARGETS"]["FBt2"]["MASK"]),
+    #         np.array(predfile["TARGETS"]["FBt2"]["chi2"]) < chi2_cut
+    #     ).astype("float")
+
+    #     # veryfatjet assignment probability
+    #     ap_FBt1 = np.logical_and(
+    #         np.array(predfile["TARGETS"]["FBt1"]["MASK"]),
+    #         np.array(predfile["TARGETS"]["FBt1"]["chi2"]) < chi2_cut
+    #     ).astype("float")
+    #     ap_FBt2 = np.logical_and(
+    #         np.array(predfile["TARGETS"]["FBt2"]["MASK"]),
+    #         np.array(predfile["TARGETS"]["FBt2"]["chi2"]) < chi2_cut
+    #     ).astype("float")
 
     bqq_ps = np.concatenate((bqq_FBt1_p.reshape(-1, 1), bqq_FBt2_p.reshape(-1, 1)), axis=1)
     bqq_ps = ak.Array(bqq_ps)
@@ -177,15 +187,15 @@ def parse_boosted_w_target(
 
 
     # collect veryfatjet kinematics
-    vfj_pt = np.array(testfile["INPUTS"]["VeryBoostedJets"]["vfj_pt"])
-    vfj_eta = np.array(testfile["INPUTS"]["VeryBoostedJets"]["vfj_eta"])
-    vfj_phi = np.array(testfile["INPUTS"]["VeryBoostedJets"]["vfj_pt"])
-    vfj_mass = np.array(testfile["INPUTS"]["VeryBoostedJets"]["vfj_pt"])
-    vfjs = ak.zip({
-        "pt": vfj_pt,
-        "eta": vfj_eta,
-        "phi": vfj_phi,
-        "mass": vfj_mass,
+    fj_pt = np.array(testfile["INPUTS"]["BoostedJets"]["fj_pt"])
+    fj_eta = np.array(testfile["INPUTS"]["BoostedJets"]["fj_eta"])
+    fj_phi = np.array(testfile["INPUTS"]["BoostedJets"]["fj_pt"])
+    fj_mass = np.array(testfile["INPUTS"]["BoostedJets"]["fj_pt"])
+    fjs = ak.zip({
+        "pt": fj_pt,
+        "eta": fj_eta,
+        "phi": fj_phi,
+        "mass": fj_mass,
     }, with_name="Momentum4D")
 
 
@@ -196,7 +206,7 @@ def parse_boosted_w_target(
 
     # generate correct/retrieved LUT for pred/target respectively
     LUT_pred = gen_pred_FBt_LUT(
-        bqq_ps_selected, bqq_ts_selected, vfjs.pt,
+        bqq_ps_selected, bqq_ts_selected, fjs.pt,
         ak.ArrayBuilder()
     ).snapshot()
     LUT_target = gen_target_FBt_LUT(
@@ -206,7 +216,7 @@ def parse_boosted_w_target(
 
 
     # reconstruct FBt to remove overlapped ak4 & ak8 jets
-    vfj_reco = vfjs[bqq_ps_selected - (N_AK4_JETS + N_AK8_JETS)]
+    fj_reco = fjs[bqq_ps_selected - N_AK4_JETS]
 
 
-    return LUT_pred, LUT_target, vfj_reco
+    return LUT_pred, LUT_target, fj_reco

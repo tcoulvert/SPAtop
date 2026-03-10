@@ -17,17 +17,19 @@ DIRPATH = '/'.join(FILEPATH.split('/')[:-1])
 
 N_TOPS = 2
 TOP_MASS = 172.52  # GeV
+TOP_SIGMA = 20.
 W_MASS = 80.37  # GeV
+W_SIGMA = 14.
 
 PLOT_CHI2_HISTS = False
 PLOT_ROCS = False
 SAVE_H5 = True
 
-RESOLVED_CHI2_CUT = 20  # taken by-eye from boosted chi2 plots
+# RESOLVED_CHI2_CUT = 20  # taken by-eye from boosted chi2 plots
 
 SPANET_TTBAR_CHI2_METHOD = True
 
-file_path = os.path.join(DIRPATH, "../../data/delphes/v4/tt_hadronic_testing_SLIMMED.h5")
+file_path = os.path.join(DIRPATH, "../../data/spatopvol/v8/tt_hadronic_testing2k_clean_jetmask_corr_valid_targets.h5")
 # 1) Load arrays
 with h5py.File(file_path, "r") as f:
     pt   = f['INPUTS/Jets/pt'][:]
@@ -39,12 +41,12 @@ with h5py.File(file_path, "r") as f:
     tgt_t1_b    = f['TARGETS/FRt1/b'][:]
     tgt_t1_q1   = f['TARGETS/FRt1/q1'][:]
     tgt_t1_q2   = f['TARGETS/FRt1/q2'][:]
-    tgt_t1_mask = f["TARGETS/FRt1/mask"][:]
+    tgt_t1_mask = f["TARGETS/FRt1/MASK"][:]
 
     tgt_t2_b    = f['TARGETS/FRt2/b'][:]
     tgt_t2_q1   = f['TARGETS/FRt2/q1'][:]
     tgt_t2_q2   = f['TARGETS/FRt2/q2'][:]
-    tgt_t2_mask = f["TARGETS/FRt2/mask"][:]
+    tgt_t2_mask = f["TARGETS/FRt2/MASK"][:]
 
 # 2) Build jagged [events][jets] array
 jets = ak.zip({
@@ -80,9 +82,9 @@ if SPANET_TTBAR_CHI2_METHOD:
         & (tt.t1.w.j2.index != tt.t2.w.j1.index) & (tt.t1.w.j2.index != tt.t2.w.j2.index)
     )
 
-    chi2 = ( (tt.t1.mass - tt.t2.mass) / (0.15 * TOP_MASS) )**2 
-    + ( (tt.t1.w.mass - W_MASS) / (0.15 * W_MASS) )**2
-    + ( (tt.t2.w.mass - W_MASS) / (0.15 * W_MASS) )**2
+    chi2 = ( (tt.t1.mass - tt.t2.mass) / TOP_SIGMA )**2 
+    + ( (tt.t1.w.mass - W_MASS) / W_SIGMA )**2
+    + ( (tt.t2.w.mass - W_MASS) / W_SIGMA )**2
     chi2[tt_mask] = 1e5
     
     best_idx = ak.argmin(chi2, axis=1)
@@ -109,7 +111,7 @@ else:
         t = ak.with_field(t, (t.w.j1 + t.w.j2 + t.b).pt, "pt")
 
         # 6) Top χ²
-        chi2_all1 = ( (t.w.mass - W_MASS) / (0.1 * W_MASS) )**2 + ( (t.mass - TOP_MASS) / (0.1 * TOP_MASS) )**2
+        chi2_all1 = ( (t.w.mass - W_MASS) / W_SIGMA )**2 + ( (t.mass - TOP_MASS) / TOP_SIGMA )**2
         idx1 = ak.argmin(chi2_all1, axis=1)
         best_t = ak.firsts(t[ak.local_index(t) == idx1])
 
@@ -130,7 +132,7 @@ else:
 
 # Save out new h5 file
 if SAVE_H5:
-    out_filepath = os.path.join(DIRPATH, "../../data/delphes/v4/tt_hadronic_baseline.h5")
+    out_filepath = os.path.join(DIRPATH, "../../data/spatopvol/tt_hadronic_predict2k_clean_jetmask_corr_valid_targets_fr_baseline.h5")
     with h5py.File(out_filepath, 'a') as f:
         with h5py.File(file_path, 'r') as test_f:
             for jet_class in test_f['INPUTS'].keys():
@@ -139,7 +141,7 @@ if SAVE_H5:
                         f[f'INPUTS/{jet_class}/{variable}'] = test_f[f'INPUTS/{jet_class}/{variable}'][:]
 
         for i in range(N_TOPS):
-            f[f'TARGETS/FRt{i+1}/mask'] = ak.to_numpy(top_dict[f'FRt{i+1}_mask'])
+            f[f'TARGETS/FRt{i+1}/MASK'] = ak.to_numpy(top_dict[f'FRt{i+1}_mask'])
             f[f'TARGETS/FRt{i+1}/b'] = ak.to_numpy(top_dict[f'FRt{i+1}_b'])
             f[f'TARGETS/FRt{i+1}/q1'] = ak.to_numpy(top_dict[f'FRt{i+1}_q1'])
             f[f'TARGETS/FRt{i+1}/q2'] = ak.to_numpy(top_dict[f'FRt{i+1}_q2'])

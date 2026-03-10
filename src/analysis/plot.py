@@ -22,27 +22,31 @@ def calc_pur_eff(target_path, pred_path, bins_dict, chi2_cuts=[45, 20]):
 
     FR_condition = any("FR" in key for key in pred_h5["TARGETS"].keys())
     FB_condition = any("FB" in key for key in pred_h5["TARGETS"].keys())
-    SR_condition = any("SR" in key for key in pred_h5["TARGETS"].keys())
+    SRqq_condition = any("SRqq" in key for key in pred_h5["TARGETS"].keys())
+    SRbq_condition = any("SRbq" in key for key in pred_h5["TARGETS"].keys())
 
     ## generate look up tables ##
     # boosted
     if FB_condition:
-        LUT_boosted_pred, LUT_boosted_target, vfjs_reco = parse_boosted_w_target(
-            target_h5, pred_h5, 
-            chi2_cut=chi2_cuts[0]
+        LUT_boosted_pred, LUT_boosted_target, fjs_reco_bqq = parse_boosted_w_target(
+            target_h5, pred_h5
         )
     else:
         LUT_boosted_pred, LUT_boosted_target = None, None
     # semi-resolved
-    if SR_condition:
-        LUT_semiresolved_qq_pred, LUT_semiresolved_qq_target, fjs_reco_qq = parse_semi_resolved_w_target(target_h5, pred_h5, 'qq', vfjs_reco=None)
-        LUT_semiresolved_qq_wOR_pred, LUT_semiresolved_qq_wOR_target, _ = parse_semi_resolved_w_target(target_h5, pred_h5, 'qq', vfjs_reco=vfjs_reco)
-        LUT_semiresolved_bq_pred, LUT_semiresolved_bq_target, fjs_reco_bq = parse_semi_resolved_w_target(target_h5, pred_h5, 'bq', vfjs_reco=None)
-        LUT_semiresolved_bq_wOR_pred, LUT_semiresolved_bq_wOR_target, _ = parse_semi_resolved_w_target(target_h5, pred_h5, 'bq', vfjs_reco=vfjs_reco)
+    # qq
+    if SRqq_condition:
+        LUT_semiresolved_qq_pred, LUT_semiresolved_qq_target, fjs_reco_qq = parse_semi_resolved_w_target(target_h5, pred_h5, 'qq', fjs_reco_bqq=None)
+        LUT_semiresolved_qq_wOR_pred, LUT_semiresolved_qq_wOR_target, _ = parse_semi_resolved_w_target(target_h5, pred_h5, 'qq', fjs_reco_bqq=fjs_reco_bqq)
     else:
         LUT_semiresolved_qq_pred, LUT_semiresolved_qq_target = None, None
-        LUT_semiresolved_bq_pred, LUT_semiresolved_bq_target = None, None
         LUT_semiresolved_qq_wOR_pred, LUT_semiresolved_qq_wOR_target = None, None
+    # bq
+    if SRbq_condition:
+        LUT_semiresolved_bq_pred, LUT_semiresolved_bq_target, fjs_reco_bq = parse_semi_resolved_w_target(target_h5, pred_h5, 'bq', fjs_reco_bqq=None)
+        LUT_semiresolved_bq_wOR_pred, LUT_semiresolved_bq_wOR_target, _ = parse_semi_resolved_w_target(target_h5, pred_h5, 'bq', fjs_reco_bqq=fjs_reco_bqq)
+    else:
+        LUT_semiresolved_bq_pred, LUT_semiresolved_bq_target = None, None
         LUT_semiresolved_bq_wOR_pred, LUT_semiresolved_bq_wOR_target = None, None
 
     # resolved
@@ -52,16 +56,28 @@ def calc_pur_eff(target_path, pred_path, bins_dict, chi2_cuts=[45, 20]):
             fjs_reco=None, 
             chi2_cut=chi2_cuts[1]
         )
-        if SR_condition and FB_condition:
+        if SRqq_condition and SRbq_condition and FB_condition:
             LUT_resolved_wOR_pred, LUT_resolved_wOR_target, _ = parse_resolved_w_target(
                 target_h5, pred_h5, 
-                fjs_reco=[vfjs_reco, fjs_reco_qq, fjs_reco_bq], 
+                fjs_reco=[fjs_reco_bqq, fjs_reco_qq, fjs_reco_bq], 
+                chi2_cut=chi2_cuts[1]
+            )
+        elif SRqq_condition and FB_condition:
+            LUT_resolved_wOR_pred, LUT_resolved_wOR_target, _ = parse_resolved_w_target(
+                target_h5, pred_h5, 
+                fjs_reco=[fjs_reco_bqq, fjs_reco_qq], 
+                chi2_cut=chi2_cuts[1]
+            )
+        elif SRbq_condition and FB_condition:
+            LUT_resolved_wOR_pred, LUT_resolved_wOR_target, _ = parse_resolved_w_target(
+                target_h5, pred_h5, 
+                fjs_reco=[fjs_reco_bqq, fjs_reco_bq], 
                 chi2_cut=chi2_cuts[1]
             )
         elif FB_condition:
             LUT_resolved_wOR_pred, LUT_resolved_wOR_target, _ = parse_resolved_w_target(
                 target_h5, pred_h5, 
-                fjs_reco=vfjs_reco,
+                fjs_reco=fjs_reco_bqq,
                 chi2_cut=chi2_cuts[1]
             )
         else:
@@ -72,7 +88,7 @@ def calc_pur_eff(target_path, pred_path, bins_dict, chi2_cuts=[45, 20]):
 
 
     # make no_OR LUTs
-    if FR_condition and (FB_condition or SR_condition):
+    if FR_condition and (FB_condition or SRqq_condition or SRbq_condition):
         LUT_resolved_pred_no_OR = []
         for event in LUT_resolved_wOR_pred:
             event_no_OR = []
@@ -81,18 +97,17 @@ def calc_pur_eff(target_path, pred_path, bins_dict, chi2_cuts=[45, 20]):
                     event_no_OR.append(predFRt)
             LUT_resolved_pred_no_OR.append(event_no_OR)
 
-        if FB_condition or SR_condition:
-            LUT_resolved_target_no_OR = []
-            for event in LUT_resolved_wOR_target:
-                event_no_OR = []
-                for targetFRt in event:
-                    if targetFRt[2] == 0:
-                        event_no_OR.append(targetFRt)
-                LUT_resolved_target_no_OR.append(event_no_OR)
+        LUT_resolved_target_no_OR = []
+        for event in LUT_resolved_wOR_target:
+            event_no_OR = []
+            for targetFRt in event:
+                if targetFRt[2] == 0:
+                    event_no_OR.append(targetFRt)
+            LUT_resolved_target_no_OR.append(event_no_OR)
     else:
         LUT_resolved_pred_no_OR, LUT_resolved_target_no_OR = None, None
 
-    if SR_condition and FB_condition:
+    if SRqq_condition and FB_condition:
         LUT_semiresolved_qq_pred_no_OR = []
         for event in LUT_semiresolved_qq_wOR_pred:
             event_no_OR = []
@@ -108,7 +123,10 @@ def calc_pur_eff(target_path, pred_path, bins_dict, chi2_cuts=[45, 20]):
                 if targetSRt[2] == 0:
                     event_no_OR.append(targetSRt)
             LUT_semiresolved_qq_target_no_OR.append(event_no_OR)
+    else:
+        LUT_semiresolved_qq_pred_no_OR, LUT_semiresolved_qq_target_no_OR = None, None
 
+    if SRbq_condition and FB_condition:
         LUT_semiresolved_bq_pred_no_OR = []
         for event in LUT_semiresolved_bq_wOR_pred:
             event_no_OR = []
@@ -125,7 +143,6 @@ def calc_pur_eff(target_path, pred_path, bins_dict, chi2_cuts=[45, 20]):
                     event_no_OR.append(targetSRt)
             LUT_semiresolved_bq_target_no_OR.append(event_no_OR)
     else:
-        LUT_semiresolved_qq_pred_no_OR, LUT_semiresolved_qq_target_no_OR = None, None
         LUT_semiresolved_bq_pred_no_OR, LUT_semiresolved_bq_target_no_OR = None, None
 
 
@@ -142,22 +159,26 @@ def calc_pur_eff(target_path, pred_path, bins_dict, chi2_cuts=[45, 20]):
     if FR_condition:
         results["pur_r"], results["purerr_r"] = calc_eff(None, None, None, LUT_resolved_pred, bins_dict['FR'])
         results["eff_r"], results["efferr_r"] = calc_pur(None, None, None, LUT_resolved_target, bins_dict['FR'])
-        if FB_condition or SR_condition:
+        if FB_condition or SRqq_condition or SRbq_condition:
             # resolved no OR
             results["pur_r_or"], results["purerr_r_or"] = calc_eff(None, None, None, LUT_resolved_pred_no_OR, bins_dict['FR'])
             results["eff_r_or"], results["efferr_r_or"] = calc_pur(None, None, None, LUT_resolved_target_no_OR, bins_dict['FR'])
     # semi-resolved
-    if SR_condition:
+    # qq
+    if SRqq_condition:
         # semi-resolved qq
         results["pur_srqq"], results["purerr_srqq"] = calc_eff(None, LUT_semiresolved_qq_pred, None, None, bins_dict['SRqq'])
         results["eff_srqq"], results["efferr_srqq"] = calc_pur(None, LUT_semiresolved_qq_target, None, None, bins_dict['SRqq'])
-        # semi-resolved bq
-        results["pur_srbq"], results["purerr_srbq"] = calc_eff(None, None, LUT_semiresolved_bq_pred, None, bins_dict['SRbq'])
-        results["eff_srbq"], results["efferr_srbq"] = calc_pur(None, None, LUT_semiresolved_bq_target, None, bins_dict['SRbq'])
         if FB_condition:
             # semi-resolved qq no OR
             results["pur_srqq_or"], results["purerr_srqq_or"] = calc_eff(None, LUT_semiresolved_qq_pred_no_OR, None, None, bins_dict['SRqq'])
             results["eff_srqq_or"], results["efferr_srqq_or"] = calc_pur(None, LUT_semiresolved_qq_target_no_OR, None, None, bins_dict['SRqq'])
+    # bq
+    if SRbq_condition:
+        # semi-resolved bq
+        results["pur_srbq"], results["purerr_srbq"] = calc_eff(None, None, LUT_semiresolved_bq_pred, None, bins_dict['SRbq'])
+        results["eff_srbq"], results["efferr_srbq"] = calc_pur(None, None, LUT_semiresolved_bq_target, None, bins_dict['SRbq'])
+        if FB_condition:
             # semi-resolved bq no OR
             results["pur_srbq_or"], results["purerr_srbq_or"] = calc_eff(None, None, LUT_semiresolved_bq_pred_no_OR, None, bins_dict['SRbq'])
             results["eff_srbq_or"], results["efferr_srbq_or"] = calc_pur(None, None, LUT_semiresolved_bq_target_no_OR, None, bins_dict['SRbq'])
@@ -170,31 +191,33 @@ def calc_pur_eff(target_path, pred_path, bins_dict, chi2_cuts=[45, 20]):
             "Number of Resolved Prediction before OR:",
             np.array([pred for event in LUT_resolved_pred for pred in event]).shape[0],
         )
-        if FB_condition or SR_condition:
+        if FB_condition or SRqq_condition or SRbq_condition:
             print(
                 "Number of Resolved Prediction after OR:",
                 np.array([pred for event in LUT_resolved_pred_no_OR for pred in event]).shape[0],
             )
-    if SR_condition:
+    if SRqq_condition:
         print(
             "Number of Semi-Resolved-qq Prediction before OR:",
             np.array([pred for event in LUT_semiresolved_qq_pred for pred in event]).shape[0],
-        )
-        print(
-            "Number of Semi-Resolved-bq Prediction before OR:",
-            np.array([pred for event in LUT_semiresolved_bq_pred for pred in event]).shape[0],
         )
         if FB_condition:
             print(
                 "Number of Semi-Resolved-qq Prediction after OR:",
                 np.array([pred for event in LUT_semiresolved_qq_pred_no_OR for pred in event]).shape[0],
             )
+    if SRbq_condition:
+        print(
+            "Number of Semi-Resolved-bq Prediction before OR:",
+            np.array([pred for event in LUT_semiresolved_bq_pred for pred in event]).shape[0],
+        )
+        if FB_condition:
             print(
                 "Number of Semi-Resolved-bq Prediction after OR:",
                 np.array([pred for event in LUT_semiresolved_bq_pred_no_OR for pred in event]).shape[0],
             )
 
-    return results, FB_condition, SR_condition, FR_condition
+    return results, FB_condition, SRqq_condition, SRbq_condition, FR_condition
 
 
 # I started to use "efficiency" for describing how many gen tops were reconstructed
@@ -323,7 +346,7 @@ def plot_pur_eff_w_dict(
     )
 
 
-    SR_condition = False
+    SRqq_condition, SRbq_condition = False, False
     ## plot purities and efficiencies ##
     for tag, pred_path in plot_dict.items():
 
@@ -334,10 +357,10 @@ def plot_pur_eff_w_dict(
             chi2_cuts = [int(cut) for cut in tag_list[1:]]
 
             print("Processing", tag_label)
-            results, FB_condition, SR_condition, FR_condition = calc_pur_eff(target_path, pred_path, bins_dict, chi2_cuts=chi2_cuts)
+            results, FB_condition, SRqq_condition, SRbq_condition, FR_condition = calc_pur_eff(target_path, pred_path, bins_dict, chi2_cuts=chi2_cuts)
         else:
             print("Processing", tag_label)
-            results, FB_condition, SR_condition, FR_condition = calc_pur_eff(target_path, pred_path, bins_dict)
+            results, FB_condition, SRqq_condition, SRbq_condition, FR_condition = calc_pur_eff(target_path, pred_path, bins_dict)
 
 
         if FB_condition:
@@ -363,7 +386,7 @@ def plot_pur_eff_w_dict(
             ax_r[1].errorbar(
                 x=bin_centers_dict['FR'], y=results["eff_r"], xerr=xerr_dict['FR'], yerr=results["efferr_r"], fmt="o", capsize=5, label=tag_label
             )
-            if FB_condition or SR_condition:
+            if FB_condition or SRqq_condition or SRbq_condition:
                 ax_r_or[0].errorbar(
                     x=bin_centers_dict['FR'], y=results["pur_r_or"], xerr=xerr_dict['FR'], yerr=results["purerr_r_or"], fmt="o", capsize=5, label=tag_label
                 )
@@ -371,20 +394,14 @@ def plot_pur_eff_w_dict(
                     x=bin_centers_dict['FR'], y=results["eff_r_or"], xerr=xerr_dict['FR'], yerr=results["efferr_r_or"], fmt="o", capsize=5, label=tag_label
                 )
         # semi-resolved
-        if SR_condition:
+        # qq
+        if SRqq_condition:
             # semi-resolved qq
             ax_srqq[0].errorbar(
                 x=bin_centers_dict['SRqq'], y=results["pur_srqq"], xerr=xerr_dict['SRqq'], yerr=results["purerr_srqq"], fmt="o", capsize=5, label=tag_label
             )
             ax_srqq[1].errorbar(
                 x=bin_centers_dict['SRqq'], y=results["eff_srqq"], xerr=xerr_dict['SRqq'], yerr=results["efferr_srqq"], fmt="o", capsize=5, label=tag_label
-            )
-            # semi-resolved bq
-            ax_srbq[0].errorbar(
-                x=bin_centers_dict['SRbq'], y=results["pur_srbq"], xerr=xerr_dict['SRbq'], yerr=results["purerr_srbq"], fmt="o", capsize=5, label=tag_label
-            )
-            ax_srbq[1].errorbar(
-                x=bin_centers_dict['SRbq'], y=results["eff_srbq"], xerr=xerr_dict['SRbq'], yerr=results["efferr_srbq"], fmt="o", capsize=5, label=tag_label
             )
             if FB_condition:
                 # qq
@@ -394,7 +411,17 @@ def plot_pur_eff_w_dict(
                 ax_srqq_or[1].errorbar(
                     x=bin_centers_dict['SRqq'], y=results["eff_srqq_or"], xerr=xerr_dict['SRqq'], yerr=results["efferr_srqq_or"], fmt="o", capsize=5, label=tag_label
                 )
-                # bqq
+        # bq
+        if SRbq_condition:
+            # semi-resolved bq
+            ax_srbq[0].errorbar(
+                x=bin_centers_dict['SRbq'], y=results["pur_srbq"], xerr=xerr_dict['SRbq'], yerr=results["purerr_srbq"], fmt="o", capsize=5, label=tag_label
+            )
+            ax_srbq[1].errorbar(
+                x=bin_centers_dict['SRbq'], y=results["eff_srbq"], xerr=xerr_dict['SRbq'], yerr=results["efferr_srbq"], fmt="o", capsize=5, label=tag_label
+            )
+            if FB_condition:
+                # bq
                 ax_srbq_or[0].errorbar(
                     x=bin_centers_dict['SRbq'], y=results["pur_srbq_or"], xerr=xerr_dict['SRbq'], yerr=results["purerr_srbq_or"], fmt="o", capsize=5, label=tag_label
                 )
