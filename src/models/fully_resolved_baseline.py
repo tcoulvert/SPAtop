@@ -72,8 +72,8 @@ if SPANET_TTBAR_CHI2_METHOD:
     w = ak.with_field(w, (w.j1 + w.j2).mass, "mass")
 
     t = ak.cartesian({"w": w, "b": bjets}, axis=1)
-    t = ak.with_field(t, (t.w.j1 + t.w.j2 + t.b).mass, "top_mass")
-    t = ak.with_field(t, (t.w.j1 + t.w.j2 + t.b).pt, "top_pt")
+    t = ak.with_field(t, (t.w.j1 + t.w.j2 + t.b).mass, "mass")
+    t = ak.with_field(t, (t.w.j1 + t.w.j2 + t.b).pt, "pt")
 
     tt = ak.combinations(t, 2, axis=1, fields=["t1", "t2"])
     tt_mask = (
@@ -82,10 +82,13 @@ if SPANET_TTBAR_CHI2_METHOD:
         & (tt.t1.w.j2.index != tt.t2.w.j1.index) & (tt.t1.w.j2.index != tt.t2.w.j2.index)
     )
 
-    chi2 = ( (tt.t1.mass - tt.t2.mass) / TOP_SIGMA )**2 
-    + ( (tt.t1.w.mass - W_MASS) / W_SIGMA )**2
-    + ( (tt.t2.w.mass - W_MASS) / W_SIGMA )**2
-    chi2[tt_mask] = 1e5
+    chi2 = ak.where(
+        tt_mask,
+        ( (tt.t1.mass - tt.t2.mass) / TOP_SIGMA )**2 
+        + ( (tt.t1.w.mass - W_MASS) / W_SIGMA )**2
+        + ( (tt.t2.w.mass - W_MASS) / W_SIGMA )**2,
+        1e5
+    )
     
     best_idx = ak.argmin(chi2, axis=1)
     best_tt = ak.firsts(tt[ak.local_index(tt) == best_idx])
