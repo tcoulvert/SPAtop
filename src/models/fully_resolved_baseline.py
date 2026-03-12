@@ -14,6 +14,8 @@ vec.register_awkward()
 # start = time.time()
 FILEPATH = os.path.abspath(__file__)
 DIRPATH = '/'.join(FILEPATH.split('/')[:-1])
+PLOT_DIRPATH = os.path.join(DIRPATH, 'v8/Chi2_FR')
+if not os.path.exists(PLOT_DIRPATH): os.makedirs(PLOT_DIRPATH)
 
 N_TOPS = 2
 TOP_MASS = 172.52  # GeV
@@ -21,9 +23,11 @@ TOP_SIGMA = 20.
 W_MASS = 80.37  # GeV
 W_SIGMA = 14.
 
-PLOT_CHI2_HISTS = False
-PLOT_ROCS = False
-SAVE_H5 = True
+FILL_VALUE = 1e5
+
+PLOT_CHI2_HISTS = True
+PLOT_ROCS = True
+SAVE_H5 = False
 
 # RESOLVED_CHI2_CUT = 20  # taken by-eye from boosted chi2 plots
 
@@ -87,7 +91,7 @@ if SPANET_TTBAR_CHI2_METHOD:
         ( (tt.t1.mass - tt.t2.mass) / TOP_SIGMA )**2 
         + ( (tt.t1.w.mass - W_MASS) / W_SIGMA )**2
         + ( (tt.t2.w.mass - W_MASS) / W_SIGMA )**2,
-        1e5
+        FILL_VALUE
     )
     
     best_idx = ak.argmin(chi2, axis=1)
@@ -175,40 +179,40 @@ def correct_mask(pred_b, pred_q1, pred_q2):
 if PLOT_CHI2_HISTS:
     # Plot Top χ² histograms
     for i in range(N_TOPS):
-        valid_t = ~ak.is_none(top_dict[f'FRt{i+1}_chi2'])
+        valid_t = ~ak.is_none(top_dict[f'FRt{i+1}_chi2']) & (top_dict[f'FRt{i+1}_chi2'] < 500)
         chi2_vals_1 = ak.ravel(top_dict[f'FRt{i+1}_chi2'][valid_t])
         plt.figure()
-        plt.hist(chi2_vals_1, bins=50)
+        plt.hist(chi2_vals_1, bins=100)
         plt.xlabel(f"χ² (Top{i+1})")
         plt.ylabel("Frequency")
         plt.yscale('log')
         plt.title(f"Chi-Squared Distribution for Top{i+1} Candidates")
         plt.grid(True)
-        plt.savefig(os.path.join(DIRPATH, f"fully_resolved_chisq_top{i+1}.pdf"))
+        plt.savefig(os.path.join(PLOT_DIRPATH, f"fully_resolved_chisq_top{i+1}.pdf"))
 
     # Plot Top χ² histograms
     for i in range(N_TOPS):
         correct_t = correct_mask(top_dict[f'FRt{i+1}_b'], top_dict[f'FRt{i+1}_q1'], top_dict[f'FRt{i+1}_q2'])
-        valid_t = ~ak.is_none(correct_t)
+        valid_t = ~ak.is_none(correct_t) & (top_dict[f'FRt{i+1}_chi2'] < 500)
         corr_chi2_t_vals = ak.ravel(top_dict[f'FRt{i+1}_chi2'][valid_t][correct_t[valid_t]])
         incorr_chi2_t_vals = ak.ravel(top_dict[f'FRt{i+1}_chi2'][valid_t][~correct_t[valid_t]])
         plt.figure()
-        plt.hist(corr_chi2_t_vals, bins=50, label='Correct top assignment', alpha=0.7)
-        plt.hist(incorr_chi2_t_vals, bins=50, label='Incorrect top assignment', alpha=0.7)
+        plt.hist(corr_chi2_t_vals, bins=100, label='Correct top assignment', alpha=0.7)
+        plt.hist(incorr_chi2_t_vals, bins=100, label='Incorrect top assignment', alpha=0.7)
         plt.xlabel(f"χ² (Top{i+1})")
         plt.ylabel("Frequency")
         plt.yscale('log')
         plt.title(f"Chi-Squared Distribution for Top{i+1} Candidates")
         plt.grid(True)
-        plt.savefig(os.path.join(DIRPATH, f"fully_resolved_chisqCorr_top{i+1}.pdf"))
+        plt.savefig(os.path.join(PLOT_DIRPATH, f"fully_resolved_chisqCorr_top{i+1}.pdf"))
 
 # Plot resolved baseline ROC curve
 if PLOT_ROCS:
     correct_t1 = correct_mask(top_dict[f'FRt{1}_b'], top_dict[f'FRt{1}_q1'], top_dict[f'FRt{1}_q2'])
     correct_t2 = correct_mask(top_dict[f'FRt{2}_b'], top_dict[f'FRt{2}_q1'], top_dict[f'FRt{2}_q2'])
     
-    valid_t1 = ~ak.is_none(correct_t1)
-    valid_t2 = ~ak.is_none(correct_t2)
+    valid_t1 = ~ak.is_none(correct_t1) & (top_dict[f'FRt1_chi2'] < 500)
+    valid_t2 = ~ak.is_none(correct_t2) & (top_dict[f'FRt2_chi2'] < 500)
 
     print(f"num valid t1 = {ak.sum(valid_t1)} out of {ak.num(valid_t1, axis=0)}")
     print(f"num valid t2 = {ak.sum(valid_t2)} out of {ak.num(valid_t2, axis=0)}")
@@ -236,4 +240,4 @@ if PLOT_ROCS:
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig(os.path.join(DIRPATH, "fully_resolved_chisq_ROC.pdf"))
+    plt.savefig(os.path.join(PLOT_DIRPATH, "fully_resolved_chisq_ROC.pdf"))

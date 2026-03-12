@@ -278,24 +278,28 @@ def parse_resolved_w_target(
         ap_FRt2 = np.array(predfile["TARGETS"]["FRt2"]["assignment_probability"])
     except:
         # resolved top detection probability
-        dp_FRt1 = np.logical_and(
-            np.array(predfile["TARGETS"]["FRt1"]["MASK"]),
-            np.array(predfile["TARGETS"]["FRt1"]["chi2"]) < chi2_cut
-        ).astype("float")
-        dp_FRt2 = np.logical_and(
-            np.array(predfile["TARGETS"]["FRt2"]["MASK"]),
-            np.array(predfile["TARGETS"]["FRt2"]["chi2"]) < chi2_cut
-        ).astype("float")
+        dp_FRt1 = np.array(predfile["TARGETS"]["FRt1"]["MASK"]).astype("float")
+        dp_FRt2 = np.array(predfile["TARGETS"]["FRt2"]["MASK"]).astype("float")
 
         # jet assignment probability
-        ap_FRt1 = np.logical_and(
-            np.array(predfile["TARGETS"]["FRt1"]["MASK"]),
-            np.array(predfile["TARGETS"]["FRt1"]["chi2"]) < chi2_cut
-        ).astype("float")
-        ap_FRt2 = np.logical_and(
-            np.array(predfile["TARGETS"]["FRt2"]["MASK"]),
-            np.array(predfile["TARGETS"]["FRt2"]["chi2"]) < chi2_cut
-        ).astype("float")
+        ap_FRt1 = np.array(predfile["TARGETS"]["FRt1"]["MASK"]).astype("float")
+        ap_FRt2 = np.array(predfile["TARGETS"]["FRt2"]["MASK"]).astype("float")
+        if chi2_cut != 0:
+            # resolved top detection probability
+            dp_FRt1 = np.logical_and(
+                dp_FRt1, np.array(predfile["TARGETS"]["FRt1"]["chi2"]) < chi2_cut
+            ).astype("float")
+            dp_FRt2 = np.logical_and(
+                dp_FRt2, np.array(predfile["TARGETS"]["FRt2"]["chi2"]) < chi2_cut
+            ).astype("float")
+
+            # jet assignment probability
+            ap_FRt1 = np.logical_and(
+                ap_FRt1, np.array(predfile["TARGETS"]["FRt1"]["chi2"]) < chi2_cut
+            ).astype("float")
+            ap_FRt2 = np.logical_and(
+                ap_FRt2, np.array(predfile["TARGETS"]["FRt2"]["chi2"]) < chi2_cut
+            ).astype("float")
 
     dps = np.concatenate((dp_FRt1.reshape(-1, 1), dp_FRt2.reshape(-1, 1)), axis=1)
     aps = np.concatenate((ap_FRt1.reshape(-1, 1), ap_FRt2.reshape(-1, 1)), axis=1)

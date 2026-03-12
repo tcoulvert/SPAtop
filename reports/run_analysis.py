@@ -6,7 +6,7 @@ import numpy as np
 import vector
 vector.register_awkward()
 
-from src.analysis.plot import calc_pur_eff, plot_pur_eff_w_dict
+from src.analysis.plot import calc_pur_eff, plot_pur_eff_w_dict, plot_pur_w_dict
 
 if len(sys.argv) < 2: raise Exception('You need to provide path to config.')
 with open(sys.argv[1], 'r') as f:
@@ -23,4 +23,5 @@ bins_dict = {
     'all': np.arange(0, 1000, 50),
 }
 
-plot_pur_eff_w_dict(config['pred_files'], config['target_file'], config['save_path'], proj_name='SPAtop', bins_dict=bins_dict)
+# plot_pur_eff_w_dict(config['pred_files'], config['target_file'], config['save_path'], proj_name='SPAtop', bins_dict=bins_dict)
+plot_pur_w_dict(config['pred_files'], config['target_file'], config['save_path'], proj_name='SPAtop', bins_dict=bins_dict)
