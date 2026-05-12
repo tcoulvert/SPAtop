@@ -1,0 +1,74 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ts-spatop-predict-v10-full
+  labels:
+    jobgroup: spatop-job-eval
+spec:
+  template:
+    spec:
+      securityContext:
+        runAsUser: 0
+        fsGroup: 0
+      containers:
+        - name: training
+          image: gitlab-registry.nrp-nautilus.io/mquinnan/top-spanet:spatop-container
+          command:
+            - "/bin/bash"
+            - "-c"
+            - |
+              set -e  # exit on error
+
+              echo "Installing SPANet v2.3, tensorboard and rich..."
+              pip install git+https://github.com/billy000400/SPANet@maad_dev
+              pip install tensorboard rich
+
+              mkdir /spatopvol/data/delphes/v10
+
+              echo "Starting prediction job..."
+              python -m spanet.predict \
+                /spatopvol/logs/spatop_v10_full_output/version_/ \
+                /spatopvol/data/delphes/v10/tt_hadronic_predict2k_clean_jetmask_corr_valid_targets_sr.h5 \
+                -tf /spatopvol/data/delphes/v8/tt_hadronic_testing2k_clean_jetmask_corr_valid_targets.h5 
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+            - mountPath: /spatopvol
+              name: spatopvol
+            - name: git-repo
+              mountPath: /opt/repo
+          resources:
+            limits:
+              memory: 64Gi
+              cpu: "16"
+              nvidia.com/gpu: "1"
+            requests:
+              memory: 32Gi
+              cpu: "8"
+              nvidia.com/gpu: "1"
+      initContainers:
+        - name: init-clone-repo
+          image: alpine/git
+          args:
+            - clone
+            - --single-branch
+            - https://github.com/quinnanm/SPAtop
+            - -b
+            - meldev
+            - --recurse-submodules
+            - /opt/repo/SPAtop
+          volumeMounts:
+            - name: git-repo
+              mountPath: /opt/repo
+      volumes:
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 8Gi
+        - name: git-repo
+          emptyDir: {}
+        - name: spatopvol
+          persistentVolumeClaim:
+            claimName: spatopvol
+      restartPolicy: Never
+  backoffLimit: 5

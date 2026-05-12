@@ -1,0 +1,72 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ts-spatop-predict-irvine-fr
+  labels:
+    jobgroup: spatop-job-eval
+spec:
+  template:
+    spec:
+      securityContext:
+        runAsUser: 0
+        fsGroup: 0
+      containers:
+        - name: training
+          image: gitlab-registry.nrp-nautilus.io/mquinnan/top-spanet:spatop-container
+          command:
+            - "/bin/bash"
+            - "-c"
+            - |
+              set -e  # exit on error
+
+              echo "Installing SPANet v2.3, tensorboard and rich..."
+              pip install git+https://github.com/Alexanders101/SPANet.git@v2.3
+              pip install tensorboard rich
+
+              echo "Starting prediction job..."
+              python -m spanet.predict \
+                /spatopvol2/logs/irvine_fr_output/version_7/ \
+                /spatopvol2/ttbar_predict_spanetv2_pt_filter.h5 \
+                -tf /spatopvol2/ttbar_testing_spanetv2_pt_filter.h5 
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+            - mountPath: /spatopvol2
+              name: spatopvol2
+            - name: git-repo
+              mountPath: /opt/repo
+          resources:
+            limits:
+              memory: 64Gi
+              cpu: "16"
+              nvidia.com/gpu: "1"
+            requests:
+              memory: 32Gi
+              cpu: "8"
+              nvidia.com/gpu: "1"
+      initContainers:
+        - name: init-clone-repo
+          image: alpine/git
+          args:
+            - clone
+            - --single-branch
+            - https://github.com/quinnanm/SPAtop
+            - -b
+            - meldev
+            - --recurse-submodules
+            - /opt/repo/SPAtop
+          volumeMounts:
+            - name: git-repo
+              mountPath: /opt/repo
+      volumes:
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 8Gi
+        - name: git-repo
+          emptyDir: {}
+        - name: spatopvol2
+          persistentVolumeClaim:
+            claimName: spatopvol2
+      restartPolicy: Never
+  backoffLimit: 5

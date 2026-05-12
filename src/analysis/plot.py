@@ -33,18 +33,25 @@ def calc_pur_eff(target_path, pred_path, bins_dict, chi2_cuts=[45, 20], mode: st
         )
     else:
         LUT_boosted_pred, LUT_boosted_target = None, None
+
     # semi-resolved
     # qq
-    if SRqq_condition:
+    if SRqq_condition and FB_condition:
         LUT_semiresolved_qq_pred, LUT_semiresolved_qq_target, fjs_reco_qq = parse_semi_resolved_w_target(target_h5, pred_h5, 'qq', fjs_reco_bqq=None)
         LUT_semiresolved_qq_wOR_pred, LUT_semiresolved_qq_wOR_target, _ = parse_semi_resolved_w_target(target_h5, pred_h5, 'qq', fjs_reco_bqq=fjs_reco_bqq)
+    elif SRqq_condition:
+        LUT_semiresolved_qq_pred, LUT_semiresolved_qq_target, fjs_reco_qq = parse_semi_resolved_w_target(target_h5, pred_h5, 'qq', fjs_reco_bqq=None)
+        LUT_semiresolved_qq_wOR_pred, LUT_semiresolved_qq_wOR_target = None, None
     else:
         LUT_semiresolved_qq_pred, LUT_semiresolved_qq_target = None, None
         LUT_semiresolved_qq_wOR_pred, LUT_semiresolved_qq_wOR_target = None, None
     # bq
-    if SRbq_condition:
+    if SRbq_condition and FB_condition:
         LUT_semiresolved_bq_pred, LUT_semiresolved_bq_target, fjs_reco_bq = parse_semi_resolved_w_target(target_h5, pred_h5, 'bq', fjs_reco_bqq=None)
         LUT_semiresolved_bq_wOR_pred, LUT_semiresolved_bq_wOR_target, _ = parse_semi_resolved_w_target(target_h5, pred_h5, 'bq', fjs_reco_bqq=fjs_reco_bqq)
+    elif SRbq_condition:
+        LUT_semiresolved_bq_pred, LUT_semiresolved_bq_target, fjs_reco_bq = parse_semi_resolved_w_target(target_h5, pred_h5, 'bq', fjs_reco_bqq=None)
+        LUT_semiresolved_bq_wOR_pred, LUT_semiresolved_bq_wOR_target = None, None
     else:
         LUT_semiresolved_bq_pred, LUT_semiresolved_bq_target = None, None
         LUT_semiresolved_bq_wOR_pred, LUT_semiresolved_bq_wOR_target = None, None
@@ -453,14 +460,14 @@ def plot_pur_eff_w_dict(
     # m: merged (b+r w OR)
     # b: boosted
     # r: resolved
-    fig_m, ax_m = plt.subplots(1, 2, figsize=(12, 5))
-    fig_b, ax_b = plt.subplots(1, 2, figsize=(12, 5))
-    fig_r, ax_r = plt.subplots(1, 2, figsize=(12, 5))
-    fig_r_or, ax_r_or = plt.subplots(1, 2, figsize=(12, 5))
-    fig_srqq, ax_srqq = plt.subplots(1, 2, figsize=(12, 5))
-    fig_srqq_or, ax_srqq_or = plt.subplots(1, 2, figsize=(12, 5))
-    fig_srbq, ax_srbq = plt.subplots(1, 2, figsize=(12, 5))
-    fig_srbq_or, ax_srbq_or = plt.subplots(1, 2, figsize=(12, 5))
+    fig_m, ax_m = plt.subplots(1, 2, figsize=(15, 5))
+    fig_b, ax_b = plt.subplots(1, 2, figsize=(15, 5))
+    fig_r, ax_r = plt.subplots(1, 2, figsize=(15, 5))
+    fig_r_or, ax_r_or = plt.subplots(1, 2, figsize=(15, 5))
+    fig_srqq, ax_srqq = plt.subplots(1, 2, figsize=(15, 5))
+    fig_srqq_or, ax_srqq_or = plt.subplots(1, 2, figsize=(15, 5))
+    fig_srbq, ax_srbq = plt.subplots(1, 2, figsize=(15, 5))
+    fig_srbq_or, ax_srbq_or = plt.subplots(1, 2, figsize=(15, 5))
 
     ## preset figure labels, titles, limits, etc. ##
     # merged

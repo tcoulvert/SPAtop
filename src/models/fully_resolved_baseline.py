@@ -188,6 +188,7 @@ if PLOT_CHI2_HISTS:
         plt.yscale('log')
         plt.title(f"Chi-Squared Distribution for Top{i+1} Candidates")
         plt.grid(True)
+        plt.legend()
         plt.savefig(os.path.join(PLOT_DIRPATH, f"fully_resolved_chisq_top{i+1}.pdf"))
 
     # Plot Top χ² histograms
@@ -204,6 +205,7 @@ if PLOT_CHI2_HISTS:
         plt.yscale('log')
         plt.title(f"Chi-Squared Distribution for Top{i+1} Candidates")
         plt.grid(True)
+        plt.legend()
         plt.savefig(os.path.join(PLOT_DIRPATH, f"fully_resolved_chisqCorr_top{i+1}.pdf"))
 
 # Plot resolved baseline ROC curve
