@@ -27,7 +27,7 @@ spec:
               python -m spanet.train \
                 -of /spatopvol/options_files/v10/spatop_v10_full1GPU.json \
                 -l /spatopvol/logs/ \
-                -n spatop_v10_full1GPU_output 
+                -n spatop_v10_full1GPU_output > /spatopvol/1GPU_24gb_output.txt
           volumeMounts:
             - name: dshm
               mountPath: /dev/shm
@@ -38,7 +38,7 @@ spec:
           resources:
             limits:
               memory: 36Gi
-              cpu: "10"
+              cpu: "9"
               nvidia.com/gpu: "1"
             requests:
               memory: 32Gi

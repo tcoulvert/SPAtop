@@ -28,9 +28,9 @@ cmap_petroff10 = ["#3f90da", "#ffa90e", "#bd1f01", "#94a4a2", "#832db6", "#a96b5
 plt.rcParams.update({"axes.prop_cycle": cycler("color", cmap_petroff10)})
 
 from src.data.delphes.matching import (
+    reconstruct_top,
+    FullyResolved_top, SemiResolvedQQ_top, SemiResolvedBQ1_top, SemiResolvedBQ2_top, FullyBoosted_top, 
     match_fjet_to_jet,
-    match_top_to_fjet,
-    match_top_to_jet,
 )
 
 vector.register_awkward()
@@ -43,7 +43,7 @@ logging.basicConfig(level=logging.INFO)
 
 
 MIN_JET_PT = 30  # 20
-MIN_FJET_PT = 200  # 200
+MIN_FJET_PT = 150  # 200
 PROJECT_DIR = Path(__file__).resolve().parents[3]
 
 PLOTS = True
@@ -97,6 +97,9 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     print('='*60+'\n'+'='*60+'\n'+'='*60)
     print(f'num events = {len(arrays["Particle/Particle.PID"])}')
 
+    
+    ################################
+    # Read Delphes file
     part_pid = arrays["Particle/Particle.PID"]  # PDG ID
     part_status = arrays["Particle/Particle.Status"]
     part_m1 = arrays["Particle/Particle.M1"]
@@ -142,7 +145,6 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     fj_nneutral = arrays["FatJet/FatJet.NNeutrals"]
     fj_ncharged = arrays["FatJet/FatJet.NCharged"]
 
-
     # gen small-radius jet info
     gen_pt = arrays["GenJet/GenJet.PT"]
     gen_eta = arrays["GenJet/GenJet.Eta"]
@@ -156,6 +158,9 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     gen_fj_mass = arrays["GenFatJet/GenFatJet.Mass"]
 
 
+    
+    ################################
+    # Build quarks
     particles = ak.zip(
         {
             "pt": part_pt,
@@ -171,8 +176,6 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         },
         with_name="Momentum4D",
     )
-
-
 
     tops_condition = np.logical_and(
         np.abs(particles.pid) == 6, np.logical_or(
@@ -222,28 +225,8 @@ def get_datasets(arrays, n_tops):  # noqa: C901
 
 
 
-    def fid_mask(particle, pt_threshold=8, max_eta=2.3, barrel_endcap_gap=(1.4, 1.6)):
-        pt_mask = ak.sum(particle['pt'] > pt_threshold, axis=1) == n_tops
-        eta_mask = ak.sum(
-            (
-                np.abs(particle['eta']) < barrel_endcap_gap[0]
-            ) | np.logical_and(
-                np.abs(particle['eta']) > barrel_endcap_gap[1],
-                np.abs(particle['eta']) < max_eta
-            ), axis=1
-        ) == n_tops
-
-        return pt_mask & eta_mask
-
-    # fiducial mask for the quarks
-    quark_fid_mask = (
-        fid_mask(bquarks)
-        & fid_mask(wquarks_d1)
-        & fid_mask(wquarks_d2)
-    )
-    print('-'*60)
-    print(f'num events with all quarks passing fiducial cuts = {ak.sum(quark_fid_mask)}')
-
+    ################################
+    # Build (f)jets and gen(f)jets
     jets = ak.zip(
         {
             "pt": pt,
@@ -292,87 +275,174 @@ def get_datasets(arrays, n_tops):  # noqa: C901
 
 
     
-    # Fully-Resolved tops
-    top_idx, top_b_idx, top_q1_idx, top_q2_idx = match_top_to_jet(
-        bquarks, wquarks_d1, wquarks_d2, jets, 
-        ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder()
-    )
-    top_idx, top_b_idx, top_q1_idx, top_q2_idx = (
-        top_idx.snapshot(), top_b_idx.snapshot(), top_q1_idx.snapshot(), top_q2_idx.snapshot()
-    )
-    # Fully-Boosted and Semi-Resolved tops
-    fj_top_idx, fj_top_bqq_idx, fj_top_qq_idx, fj_top_bq1_idx, fj_top_bq2_idx = match_top_to_fjet(
-        topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2, fjets, 
-        ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder()
-    )
-    fj_top_idx, fj_top_bqq_idx, fj_top_qq_idx, fj_top_bq1_idx, fj_top_bq2_idx = (
-        fj_top_idx.snapshot(), 
-        fj_top_bqq_idx.snapshot(), fj_top_qq_idx.snapshot(), 
-        fj_top_bq1_idx.snapshot(), fj_top_bq2_idx.snapshot()
-    )
-    matched_fj_j_idx, matched_fj_j_DR  = match_fjet_to_jet(fjets, jets, ak.ArrayBuilder(), ak.ArrayBuilder())
-    matched_fj_j_idx, matched_fj_j_DR = matched_fj_j_idx.snapshot(), matched_fj_j_DR.snapshot()
+    ################################
+    # Pre-selection cut(s) and ordering
+    #  -> what cuts we apply depends on what phase-space (and benchmark) we're targeting
 
-    # # keep events with >= min_jets -> what cuts we apply depends on what phase-space (and benchmark) we're targeting
-    event_mask = ak.num(pt[pt > MIN_JET_PT]) >= 3*n_tops  # phase-space cuts for resolved-like training
-    # print(f"Num events with >=3 jets per top = {ak.sum(event_mask, axis=0)}")
-    # print(f"    -> Num events with >=3 jets per top & quark fiducial mask = {ak.sum(event_mask & quark_fid_mask, axis=0)}")
-    # print('-'*60)
-
-    excl_FBandSR_bool = (
-        ~ak.all( (fj_top_bqq_idx > 0) & (fj_top_qq_idx > 0) )  # FB and SRqq
-        & ~ak.all( (fj_top_bqq_idx > 0) & (fj_top_bq1_idx > 0) )  # FB and SRbq1
-        & ~ak.all( (fj_top_bqq_idx > 0) & (fj_top_bq2_idx > 0) )  # FB and SRbq2
-        & ~ak.all( (fj_top_qq_idx > 0) & (fj_top_bq1_idx > 0) )  # SRqq and SRbq1
-        & ~ak.all( (fj_top_qq_idx > 0) & (fj_top_bq2_idx > 0) )  # SRqq and SRbq2
-        & ~ak.all( (fj_top_bq1_idx > 0) & (fj_top_bq2_idx > 0) )  # SRbq1 and SRbq2
-    )
-    print(f"Exclusive FB and SRs? {excl_FBandSR_bool}")
+    topquark_mask = (topquarks['pt'] > 0)  # In case we want cuts on quarks, for now cuts do nothing
+    bquark_mask = topquark_mask & (bquarks['pt'] > 0)
+    wboson_mask = topquark_mask & (wbosons['pt'] > 0)
+    w1quark_mask = topquark_mask & wboson_mask & (wquarks_d1['pt'] > 0)
+    w2quark_mask = topquark_mask & wboson_mask & (wquarks_d1['pt'] > 0)
     
+    event_mask = (
+        topquark_mask & bquark_mask & wboson_mask & w1quark_mask & w2quark_mask
+        & (ak.num(pt[pt > MIN_JET_PT]) >= 3*n_tops)  # resolved-like training
+    )
 
-    top_fjets_mask = (fj_top_bqq_idx > 0)
-    w_fjets_mask = (fj_top_qq_idx > 0)
-    bq_fjets_mask = ( (fj_top_bq1_idx > 0) | (fj_top_bq2_idx > 0) )
-    qcd_fjets_mask = ( ~top_fjets_mask & ~w_fjets_mask & ~bq_fjets_mask )
+    jet_sort = ak.argsort(pt, ascending=False, axis=-1)
+    jet_mask = (pt[event_mask] > MIN_JET_PT)
 
+    fjet_sort = ak.argsort(fj_pt, ascending=False, axis=-1)
+    fjet_mask = (fj_pt[event_mask] > MIN_FJET_PT)
+
+    N_JETS = 3*n_tops + 4
+    N_FJETS = n_tops + 1
+
+
+    ################################
+    # Perform pre-selection and sorting
+    # Jets
+    jets = jets[jet_sort][event_mask][jet_mask][:, :N_JETS]
+    pt = pt[jet_sort][event_mask][jet_mask][:, :N_JETS]
+    eta = eta[jet_sort][event_mask][jet_mask][:, :N_JETS]
+    phi = phi[jet_sort][event_mask][jet_mask][:, :N_JETS]
+    mass = mass[jet_sort][event_mask][jet_mask][:, :N_JETS]
+    btag = btag[jet_sort][event_mask][jet_mask][:, :N_JETS]
+    flavor = flavor[jet_sort][event_mask][jet_mask][:, :N_JETS]
+    jets['idx'] = ak.local_index(pt)
+
+    # FatJets
+    fjets = fjets[fjet_sort][event_mask][fjet_mask][:, :N_FJETS]
+    fj_pt = fj_pt[fjet_sort][event_mask][fjet_mask][:, :N_FJETS]
+    fj_eta = fj_eta[fjet_sort][event_mask][fjet_mask][:, :N_FJETS]
+    fj_phi = fj_phi[fjet_sort][event_mask][fjet_mask][:, :N_FJETS]
+    fj_mass = fj_mass[fjet_sort][event_mask][fjet_mask][:, :N_FJETS]
+    fj_TtagRN = fj_TtagRN[fjet_sort][event_mask][fjet_mask][:, :N_FJETS]
+    fj_WtagRN = fj_WtagRN[fjet_sort][event_mask][fjet_mask][:, :N_FJETS]
+    fj_sdp4 = fj_sdp4[fjet_sort][event_mask][fjet_mask][:, :N_FJETS]
+    fj_sdmass2 = fj_sdmass2[fjet_sort][event_mask][fjet_mask][:, :N_FJETS]
+    fj_sdmass = fj_sdmass[fjet_sort][event_mask][fjet_mask][:, :N_FJETS]
+    fj_taus = fj_taus[fjet_sort][event_mask][fjet_mask][:, :N_FJETS]
+    fj_tau21 = fj_tau21[fjet_sort][event_mask][fjet_mask][:, :N_FJETS]
+    fj_tau32 = fj_tau32[fjet_sort][event_mask][fjet_mask][:, :N_FJETS]
+    fj_charge = fj_charge[fjet_sort][event_mask][fjet_mask][:, :N_FJETS]
+    fj_ehadovereem = fj_ehadovereem[fjet_sort][event_mask][fjet_mask][:, :N_FJETS]
+    fj_neutralenergyfrac = fj_neutralenergyfrac[fjet_sort][event_mask][fjet_mask][:, :N_FJETS]
+    fj_chargedenergyfrac = fj_chargedenergyfrac[fjet_sort][event_mask][fjet_mask][:, :N_FJETS]
+    fj_nneutral = fj_nneutral[fjet_sort][event_mask][fjet_mask][:, :N_FJETS]
+    fj_ncharged = fj_ncharged[fjet_sort][event_mask][fjet_mask][:, :N_FJETS]
+    fjets['idx'] = ak.local_index(fj_pt)
+
+    # Quarks
+    particles = particles[event_mask]
+    topquarks = topquarks[event_mask]
+    bquarks = bquarks[event_mask]
+    wbosons = wbosons[event_mask]
+    wquarks_d1 = wquarks_d1[event_mask]
+    wquarks_d2 = wquarks_d2[event_mask]
+
+
+    ################################
+    # Reconstruct tops and match jets/fjets 
+    # Fully-Resolved tops
+    FR_matched_jet_idxs, _ = reconstruct_top(
+        topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2,
+        ak.combinations(jets, 3, axis=1),
+        FullyResolved_top,
+        ak.ArrayBuilder(), ak.ArrayBuilder()
+    )
+    FR_matched_jet_idxs = FR_matched_jet_idxs.snapshot()
+    FR_matched_bjet_idxs = FR_matched_jet_idxs[..., 0]
+    FR_matched_q1jet_idxs = FR_matched_jet_idxs[..., 1]
+    FR_matched_q2jet_idxs = FR_matched_jet_idxs[..., 2]
+
+    # Semi-ResolvedQQ tops
+    SRqq_matched_jet_idxs, SRqq_matched_fjet_idxs = reconstruct_top(
+        topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2,
+        ak.cartesian({'jets': jets, 'fjets': fjets}),
+        SemiResolvedQQ_top,
+        ak.ArrayBuilder(), ak.ArrayBuilder()
+    )
+    SRqq_matched_jet_idxs, SRqq_matched_fjet_idxs = ak.firsts(SRqq_matched_jet_idxs.snapshot(), axis=-1), ak.firsts(SRqq_matched_fjet_idxs.snapshot(), axis=-1)
+    
+    # Semi-ResolvedBQ1 tops
+    SRbq1_matched_jet_idxs, SRbq1_matched_fjet_idxs = reconstruct_top(
+        topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2,
+        ak.cartesian({'jets': jets, 'fjets': fjets}),
+        SemiResolvedBQ1_top,
+        ak.ArrayBuilder(), ak.ArrayBuilder()
+    )
+    SRbq1_matched_jet_idxs, SRbq1_matched_fjet_idxs = ak.firsts(SRbq1_matched_jet_idxs.snapshot(), axis=-1), ak.firsts(SRbq1_matched_fjet_idxs.snapshot(), axis=-1)
+    
+    # Semi-ResolvedBQ2 tops
+    SRbq2_matched_jet_idxs, SRbq2_matched_fjet_idxs = reconstruct_top(
+        topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2,
+        ak.cartesian({'jets': jets, 'fjets': fjets}),
+        SemiResolvedBQ2_top,
+        ak.ArrayBuilder(), ak.ArrayBuilder()
+    )
+    SRbq2_matched_jet_idxs, SRbq2_matched_fjet_idxs = ak.firsts(SRbq2_matched_jet_idxs.snapshot(), axis=-1), ak.firsts(SRbq2_matched_fjet_idxs.snapshot(), axis=-1)
+    
+    # Fully-Boosted tops
+    _, FB_matched_fjet_idxs = reconstruct_top(
+        topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2,
+        fjets,
+        FullyBoosted_top,
+        ak.ArrayBuilder(), ak.ArrayBuilder()
+    )
+    FB_matched_fjet_idxs = ak.firsts(FB_matched_fjet_idxs.snapshot(), axis=-1)
+    
+    # Jet-FatJet overlap
+    matched_fjet_jet_idx, matched_fjet_jet_DR  = match_fjet_to_jet(fjets, jets, ak.ArrayBuilder(), ak.ArrayBuilder())
+    matched_fjet_jet_idx, matched_fjet_jet_DR = matched_fjet_jet_idx.snapshot(), matched_fjet_jet_DR.snapshot()
+
+
+    ################################
+    # Reconstruction dicts
+    top_pt = ak.fill_none(ak.pad_none(topquarks.pt, target=n_tops, axis=1, clip=True), -1)
+    top_pt_dict = {}
+    for i in range(n_tops):
+        top_pt_dict[f"top{i+1}_pt"] = top_pt[:, i].to_numpy()
+
+    top_fullyResolved = {}
+    for i in range(n_tops):
+        top_fullyResolved[f"top{i+1}_b"] = FR_matched_bjet_idxs[:, i]
+        top_fullyResolved[f"top{i+1}_q1"] = FR_matched_q1jet_idxs[:, i]
+        top_fullyResolved[f"top{i+1}_q2"] = FR_matched_q2jet_idxs[:, i]
+        top_fullyResolved[f"top{i+1}_mask"] = (top_fullyResolved[f"top{i+1}_b"] != -1)
+        print(f'top {i+1} - num fully-resolved tops = {ak.sum(top_fullyResolved[f"top{i+1}_mask"])}')
+    print(f'num fully-resolved tops = {sum([ak.sum(top_fullyResolved[f"top{i+1}_mask"]) for i in range(n_tops)])}')
+
+
+    ################################
+    # PNet tagger emulations
     # apply emulated TvsQCD and WvsQCD bools @ 1.0% QCD eff WPs
-    fjets["Ttag"] = ak.where(
-        (
-            ( top_fjets_mask & (fjets["TtagRN"] < TVSQCD_EFFS['t']) )
-            | ( w_fjets_mask & (fjets["TtagRN"] < TVSQCD_EFFS['W']) )
-            | ( bq_fjets_mask & (fjets["TtagRN"] < TVSQCD_EFFS['bq']) )
-            | ( qcd_fjets_mask & (fjets["TtagRN"] < TVSQCD_EFFS['QCD']) )
-        ), 1, 0
-    )
-    fjets["Wtag"] = ak.where(
-        (
-            ( top_fjets_mask & (fjets["WtagRN"] < WVSQCD_EFFS['t']) )
-            | ( w_fjets_mask & (fjets["WtagRN"] < WVSQCD_EFFS['W']) )
-            | ( bq_fjets_mask & (fjets["WtagRN"] < WVSQCD_EFFS['bq']) )
-            | ( qcd_fjets_mask & (fjets["WtagRN"] < WVSQCD_EFFS['QCD']) )
-        ), 1, 0
-    )
+    for i in range(n_tops):
+        top_fjet_mask = (ak.local_index(fjets) == FB_matched_fjet_idxs[:, i])
+        w_fjet_mask = ( ~top_fjet_mask & (ak.local_index(fjets) == SRqq_matched_fjet_idxs[:, i]) )
+        bq1_fjet_mask = ( ~top_fjet_mask & (ak.local_index(fjets) == SRbq1_matched_fjet_idxs[:, i]) )
+        bq2_fjet_mask = ( ~top_fjet_mask & (ak.local_index(fjets) == SRbq2_matched_fjet_idxs[:, i]) )
+        qcd_fjet_mask = ( ~top_fjet_mask & ~w_fjet_mask & ~bq1_fjet_mask & ~bq2_fjet_mask )
+
+        # Emulate PNet AK8 T-tagger
+        fjets["Ttag"][top_fjet_mask] = (fjets["TtagRN"][top_fjet_mask] < TVSQCD_EFFS['t'])
+        fjets["Ttag"][w_fjet_mask] = (fjets["TtagRN"][top_fjet_mask] < TVSQCD_EFFS['W'])
+        fjets["Ttag"][bq1_fjet_mask] = (fjets["TtagRN"][bq1_fjet_mask] < TVSQCD_EFFS['bq'])
+        fjets["Ttag"][bq2_fjet_mask] = (fjets["TtagRN"][bq2_fjet_mask] < TVSQCD_EFFS['bq'])
+        fjets["Ttag"][qcd_fjet_mask] = (fjets["TtagRN"][qcd_fjet_mask] < TVSQCD_EFFS['QCD'])
+        # Emulate PNet AK8 W-tagger
+        fjets["Wtag"][top_fjet_mask] = (fjets["WtagRN"][top_fjet_mask] < WVSQCD_EFFS['t'])
+        fjets["Wtag"][w_fjet_mask] = (fjets["WtagRN"][top_fjet_mask] < WVSQCD_EFFS['W'])
+        fjets["Wtag"][bq1_fjet_mask] = (fjets["WtagRN"][bq1_fjet_mask] < WVSQCD_EFFS['bq'])
+        fjets["Wtag"][bq2_fjet_mask] = (fjets["WtagRN"][bq2_fjet_mask] < WVSQCD_EFFS['bq'])
+        fjets["Wtag"][qcd_fjet_mask] = (fjets["WtagRN"][qcd_fjet_mask] < WVSQCD_EFFS['QCD'])
     fj_Ttag = fjets["Ttag"]
     fj_Wtag = fjets["Wtag"]
 
-    
 
-    ## Jets ##
-    # sort by pt
-    sorted_by_pt = ak.argsort(pt, ascending=False, axis=-1)
-    btag = btag[sorted_by_pt][event_mask]
-    pt = pt[sorted_by_pt][event_mask]
-    eta = eta[sorted_by_pt][event_mask]
-    phi = phi[sorted_by_pt][event_mask]
-    mass = mass[sorted_by_pt][event_mask]
-    flavor = flavor[sorted_by_pt][event_mask]
-    top_idx = top_idx[sorted_by_pt][event_mask]
-    top_b_idx = top_b_idx[sorted_by_pt][event_mask]
-    top_q1_idx = top_q1_idx[sorted_by_pt][event_mask]
-    top_q2_idx = top_q2_idx[sorted_by_pt][event_mask]
-    matched_fj_j_idx = matched_fj_j_idx[sorted_by_pt][event_mask]
-    matched_fj_j_DR = matched_fj_j_DR[sorted_by_pt][event_mask]
-
+    ################################
+    # Plots for validating reconstruction
     if PLOTS:
         # jet pt
         plot_destdir = os.path.join(PROJECT_DIR, 'plots', 'jet_pt')
@@ -426,74 +496,8 @@ def get_datasets(arrays, n_tops):  # noqa: C901
             plt.savefig(os.path.join(plot_destdir, f"{jet_type}jet_genjet_minDeltaR.pdf"), format='pdf')
             plt.close()
 
-    # keep only top N_JETS
-    N_JETS = 3*n_tops + 4
-    btag = btag[:, :N_JETS]
-    pt = pt[:, :N_JETS]
-    eta = eta[:, :N_JETS]
-    phi = phi[:, :N_JETS]
-    mass = mass[:, :N_JETS]
-    flavor = flavor[:, :N_JETS]
-    top_idx = top_idx[:, :N_JETS]
-    top_b_idx = top_b_idx[:, :N_JETS]
-    top_q1_idx = top_q1_idx[:, :N_JETS]
-    top_q2_idx = top_q2_idx[:, :N_JETS]
-    matched_fj_j_idx = matched_fj_j_idx[:, :N_JETS]
-    matched_fj_j_DR = matched_fj_j_DR[:, :N_JETS]
 
-    ## FatJets ##
-    # sort by pt
-    sorted_by_fj_pt = ak.argsort(fj_pt, ascending=False, axis=-1)
-    fj_pt = fj_pt[sorted_by_fj_pt][event_mask]
-    fj_eta = fj_eta[sorted_by_fj_pt][event_mask]
-    fj_phi = fj_phi[sorted_by_fj_pt][event_mask]
-    fj_mass = fj_mass[sorted_by_fj_pt][event_mask]
-    fj_sdmass = fj_sdmass[sorted_by_fj_pt][event_mask]
-    fj_Ttag = fj_Ttag[sorted_by_fj_pt][event_mask]
-    fj_Wtag = fj_Wtag[sorted_by_fj_pt][event_mask]
-    fj_tau21 = fj_tau21[sorted_by_fj_pt][event_mask]
-    fj_tau32 = fj_tau32[sorted_by_fj_pt][event_mask]
-    fj_charge = fj_charge[sorted_by_fj_pt][event_mask]
-    fj_ehadovereem = fj_ehadovereem[sorted_by_fj_pt][event_mask]
-    fj_neutralenergyfrac = fj_neutralenergyfrac[sorted_by_fj_pt][event_mask]
-    fj_chargedenergyfrac = fj_chargedenergyfrac[sorted_by_fj_pt][event_mask]
-    fj_nneutral = fj_nneutral[sorted_by_fj_pt][event_mask]
-    fj_ncharged = fj_ncharged[sorted_by_fj_pt][event_mask]
-    fj_top_idx = fj_top_idx[sorted_by_fj_pt][event_mask]
-    fj_top_bqq_idx = fj_top_bqq_idx[sorted_by_fj_pt][event_mask]
-    fj_top_qq_idx = fj_top_qq_idx[sorted_by_fj_pt][event_mask]
-    fj_top_bq1_idx = fj_top_bq1_idx[sorted_by_fj_pt][event_mask]
-    fj_top_bq2_idx = fj_top_bq2_idx[sorted_by_fj_pt][event_mask]
-
-    # keep only top N_FJETS
-    N_FJETS = n_tops
-    fj_pt = fj_pt[:, :N_FJETS]
-    fj_eta = fj_eta[:, :N_FJETS]
-    fj_phi = fj_phi[:, :N_FJETS]
-    fj_mass = fj_mass[:, :N_FJETS]
-    fj_sdmass = fj_sdmass[:, :N_FJETS]
-    fj_Ttag = fj_Ttag[:, :N_FJETS]
-    fj_Wtag = fj_Wtag[:, :N_FJETS]
-    fj_tau21 = fj_tau21[:, :N_FJETS]
-    fj_tau32 = fj_tau32[:, :N_FJETS]
-    fj_charge = fj_charge[:, :N_FJETS]
-    fj_ehadovereem = fj_ehadovereem[:, :N_FJETS]
-    fj_neutralenergyfrac = fj_neutralenergyfrac[:, :N_FJETS]
-    fj_chargedenergyfrac = fj_chargedenergyfrac[:, :N_FJETS]
-    fj_nneutral = fj_nneutral[:, :N_FJETS]
-    fj_ncharged = fj_ncharged[:, :N_FJETS]
-    fj_top_idx = fj_top_idx[:, :N_FJETS]
-    fj_top_bqq_idx = fj_top_bqq_idx[:, :N_FJETS]
-    fj_top_qq_idx = fj_top_qq_idx[:, :N_FJETS]
-    fj_top_bq1_idx = fj_top_bq1_idx[:, :N_FJETS]
-    fj_top_bq2_idx = fj_top_bq2_idx[:, :N_FJETS]
-
-    # add top pT info
-    top_pt = topquarks[event_mask].pt
-    top_pt = ak.fill_none(ak.pad_none(top_pt, target=n_tops, axis=1, clip=True), -1)
-    top_pt_dict = {}
-    for i in range(n_tops):
-        top_pt_dict[f"top{i+1}_pt"] = top_pt[:, i].to_numpy()
+    
 
     # mask to define zero-padded small-radius jets
     mask = pt > MIN_JET_PT
