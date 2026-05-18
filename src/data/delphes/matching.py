@@ -112,6 +112,25 @@ def SemiResolvedQQ_top(
     return top_jetfjet_deltaR, top_jet_idxs, top_fjet_idxs
 
 @nb.njit
+def SemiResolvedBQ_top(
+    topquark, bquark, wboson, wquark1, wquark2, 
+    jetfjet  # Should be the cartesian product of jet and fjet collections
+):
+    topBQ1_jetfjet_deltaR, topBQ1_jet_idxs, topBQ1_fjet_idxs = SemiResolvedBQ1_top(
+        topquark, bquark, wboson, wquark1, wquark2, 
+        jetfjet
+    )
+    topBQ2_jetfjet_deltaR, topBQ2_jet_idxs, topBQ2_fjet_idxs = SemiResolvedBQ1_top(
+        topquark, bquark, wboson, wquark1, wquark2, 
+        jetfjet
+    )
+
+    if topBQ2_jetfjet_deltaR < topBQ1_jetfjet_deltaR:
+        return topBQ2_jetfjet_deltaR, topBQ2_jet_idxs, topBQ2_fjet_idxs
+    else:
+        return topBQ1_jetfjet_deltaR, topBQ1_jet_idxs, topBQ1_fjet_idxs
+
+@nb.njit
 def SemiResolvedBQ1_top(
     topquark, bquark, wboson, wquark1, wquark2, 
     jetfjet  # Should be the cartesian product of jet and fjet collections
