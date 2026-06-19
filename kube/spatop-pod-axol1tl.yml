@@ -15,12 +15,12 @@ spec:
     resources:
       limits:
         nvidia.com/gpu: 1
-        memory: 30Gi
-        cpu: 4
+        memory: 12Gi
+        cpu: 2
       requests:
         nvidia.com/gpu: 1
-        memory: 30Gi
-        cpu: 3
+        memory: 10Gi
+        cpu: 1
     volumeMounts:
     - mountPath: /data
       name: spatopvol

@@ -29,7 +29,7 @@
 
     "skip_connections": true,
     "initial_embedding_skip_connections": true,
-    "event_info_file": "/data/spatop/event_files/tt_hadronic_v7_full.yaml",
+    "event_info_file": "/data/spatop/event_files/v11/tt_hadronic_v7_full.yaml",
     "training_file": "/data/spatop/tpm70_wpm30_FB350_training/all_merged.h5",
 
     "normalize_features": true,
