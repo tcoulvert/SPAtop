@@ -3,7 +3,7 @@
 ## 1. Check out the GitHub repository
 ```bash
 cd work
-git clone https://github.com/tcoulvert/SPAtop/tree/topnet_dev
+git clone https://github.com/tcoulvert/SPAtop/
 ```
 
 ## 2. Install the Python venv (Ensure you have installed python 3.9 or greater)
@@ -16,6 +16,9 @@ If for some reason the code does not run properly, it could be because packages 
 python -m venv
 pip install -r requirements.txt
 ```
+
+## ASIDE: Running with Kubernetes
+If you don'e need the other tools in the repository, and simply want to launch jobs via kubernetes, the relevant files are located under `kube/`. In particular, the most recent models are located at `kube/v11`. The `spatop-job-train-v8-full.yml` file is the baseline model, that likely is too small for the complexity of the problem. The `spatop-job-train-v11-full1GPU.yml` file is the much larger model that demonstrates a first-attempt at scanning the hyperparameters. Both of these models use the `axol1tl` namespace and the relevant files (configs, data, etc) are already located on the PVC. To setup further parameter scans, you'll need to change the options file loacted under `/data/spatop/options_files/v11/<file_name>` on the axol1tl PVC, and then change the reference in the `spatop-job-train-v11-full1GPU.yml` file.
 
 ## 3. Copy and convert the dataset(s)
 Copy the Delphes ROOT TTree datasets from:
