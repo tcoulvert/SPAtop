@@ -17,6 +17,9 @@ JET_DR = 0.5  # https://github.com/delphes/delphes/blob/master/cards/delphes_car
 FJET_DR = 0.8  # https://github.com/delphes/delphes/blob/master/cards/delphes_card_CMS.tcl#L658
 DR_FILL_VALUE = 999
 NOJET_FILL_VALUE = -1
+TOP_MASS, TOP_MASS_WINDOW = 172.5, 70  # GeV
+W_MASS, W_MASS_WINDOW = 80, 30  # GeV
+FR_PTCUT, SRQQ_PTCUT, SRBQ_PTCUT, FB_PTCUT = 0., 0., 0., 350.  # GeV
 
 # https://registry.hub.docker.com/r/jmduarte/mapyde - docker image for madgraph, pythia8, and delphes
 
@@ -31,41 +34,30 @@ def reconstruct_top(
     topquarks, bquarks, wbosons, wquarks1, wquarks2, 
     jetfjets, 
     reco_check_func, 
-    matched_jets_builder, matched_fjets_builder
+    matched_jetfjets_builder
 ):
     # Loop over every event
     for topquarks_event, bquarks_event, wbosons_event, wquarks1_event, wquarks2_event, jetfjets_event in zip(
         topquarks, bquarks, wbosons, wquarks1, wquarks2, jetfjets
     ):
         # Loop over every top (+ daughters)
-        matched_jets_builder.begin_list()
-        matched_fjets_builder.begin_list()
+        matched_jetfjets_builder.begin_list()
         for topquark, bquark, wboson, wquark1, wquark2 in zip(
             topquarks_event, bquarks_event, wbosons_event, wquarks1_event, wquarks2_event
         ):  # dont need to check b and w mother index b/c constructed to match
-            _, exmpl_jet_idxs, exmpl_fjet_idxs = reco_check_func(topquark, bquark, wboson, wquark1, wquark2, jetfjets_event[0])
-            minDR, minDR_jet_idxs, minDR_fjet_idxs = DR_FILL_VALUE, [NOJET_FILL_VALUE for _ in exmpl_jet_idxs], [NOJET_FILL_VALUE for _ in exmpl_fjet_idxs]  # mindeltaR, mindeltaR_jetidx, mindeltaR_fjetidx
+            minDR, minDR_jetfjet_idx = DR_FILL_VALUE, NOJET_FILL_VALUE  # mindeltaR, mindeltaR_jetidx, mindeltaR_fjetidx
             
             # Find the jet(s) and fatjet(s) with the smallest combined deltaR, depending on the reco type
-            for jetfjet in jetfjets_event:
-                top_jetfjet_deltaR, top_jet_idxs, top_fjet_idxs = reco_check_func(topquark, bquark, wboson, wquark1, wquark2, jetfjet)
-                minDR, minDR_jet_idxs, minDR_fjet_idxs = (top_jetfjet_deltaR, top_jet_idxs, top_fjet_idxs) if top_jetfjet_deltaR < minDR else (minDR, minDR_jet_idxs, minDR_fjet_idxs)
+            for i, jetfjet in enumerate(jetfjets_event):
+                top_jetfjet_deltaR  = reco_check_func(topquark, bquark, wboson, wquark1, wquark2, jetfjet)
+                minDR, minDR_jetfjet_idx = (top_jetfjet_deltaR, i) if top_jetfjet_deltaR < minDR else (minDR, minDR_jetfjet_idx)
 
-            # Add the matched jets to the jet builder
-            matched_jets_builder.begin_list()
-            for minDR_jet_idx in minDR_jet_idxs:
-                matched_jets_builder.append(minDR_jet_idx)
-            matched_jets_builder.end_list()
-            # Add the matched fatjets to the fatjet builder
-            matched_fjets_builder.begin_list()
-            for minDR_fjet_idx in minDR_fjet_idxs:
-                matched_fjets_builder.append(minDR_fjet_idx)
-            matched_fjets_builder.end_list()
+            # Add the matched jetfjets to the jetfjet builder
+            matched_jetfjets_builder.append(minDR_jetfjet_idx)
 
-        matched_jets_builder.end_list()
-        matched_fjets_builder.end_list()
+        matched_jetfjets_builder.end_list()
 
-    return matched_jets_builder, matched_fjets_builder
+    return matched_jetfjets_builder
 
 
 
@@ -74,23 +66,28 @@ def reconstruct_top(
 @nb.njit
 def FullyBoosted_top(
     topquark, bquark, wboson, wquark1, wquark2, 
-    jetfjet  # Should be just the fjet collection
+    jetfjet  # Should be the cartesian product of fjet collection with itself, choose 1 (i.e. wraps with 'fjet' field for common treatment downstream)
 ):
-    topquark_deltaR = jetfjet.deltaR(topquark)
-    bquark_deltaR = jetfjet.deltaR(bquark)
-    wboson_deltaR = jetfjet.deltaR(wboson)
-    wquark1_deltaR = jetfjet.deltaR(wquark1)
-    wquark2_deltaR = jetfjet.deltaR(wquark2)
+    topquark_deltaR = jetfjet['fjet'].deltaR(topquark)
+    bquark_deltaR = jetfjet['fjet'].deltaR(bquark)
+    wboson_deltaR = jetfjet['fjet'].deltaR(wboson)
+    wquark1_deltaR = jetfjet['fjet'].deltaR(wquark1)
+    wquark2_deltaR = jetfjet['fjet'].deltaR(wquark2)
+
+    topmass = jetfjet['fjet'].mass
+    topmass_window = (topmass > (TOP_MASS - TOP_MASS_WINDOW)) and (topmass < (TOP_MASS + TOP_MASS_WINDOW))
+    toppt = jetfjet['fjet'].pt
+    toppt_window = toppt > FB_PTCUT
+
 
     # Fully-Boosted
     top_jetfjet_deltaR = topquark_deltaR if (
         topquark_deltaR < FJET_DR 
         and bquark_deltaR < FJET_DR 
         and wboson_deltaR < FJET_DR and wquark1_deltaR < FJET_DR and wquark2_deltaR < FJET_DR
-    ) else DR_FILL_VALUE
-    top_jet_idxs, top_fjet_idxs = [NOJET_FILL_VALUE], [jetfjet['idx']]
+    ) and topmass_window and toppt_window else DR_FILL_VALUE
 
-    return top_jetfjet_deltaR, top_jet_idxs, top_fjet_idxs
+    return top_jetfjet_deltaR
 
 @nb.njit
 def SemiResolvedQQ_top(
@@ -102,33 +99,35 @@ def SemiResolvedQQ_top(
     wquark1_deltaR = jetfjet['fjet'].deltaR(wquark1)
     wquark2_deltaR = jetfjet['fjet'].deltaR(wquark2)
 
+    topmass = (jetfjet['fjet'] + jetfjet['jet']).mass
+    topmass_window = (topmass > (TOP_MASS - TOP_MASS_WINDOW)) and (topmass < (TOP_MASS + TOP_MASS_WINDOW))
+    wmass = jetfjet['fjet'].mass
+    wmass_window = (wmass > (W_MASS - W_MASS_WINDOW)) and (wmass < (W_MASS + W_MASS_WINDOW))
+
     # Semi-Resolved qq
     top_jetfjet_deltaR = (bquark_deltaR + wboson_deltaR) if (
         bquark_deltaR < JET_DR 
         and wboson_deltaR < FJET_DR and wquark1_deltaR < FJET_DR and wquark2_deltaR < FJET_DR
-    ) else DR_FILL_VALUE
-    top_jet_idxs, top_fjet_idxs = [jetfjet['jet']['idx']], [jetfjet['fjet']['idx']]
+    ) and topmass_window and wmass_window else DR_FILL_VALUE
 
-    return top_jetfjet_deltaR, top_jet_idxs, top_fjet_idxs
+    return top_jetfjet_deltaR
 
 @nb.njit
 def SemiResolvedBQ_top(
     topquark, bquark, wboson, wquark1, wquark2, 
     jetfjet  # Should be the cartesian product of jet and fjet collections
 ):
-    topBQ1_jetfjet_deltaR, topBQ1_jet_idxs, topBQ1_fjet_idxs = SemiResolvedBQ1_top(
+    topBQ1_jetfjet_deltaR = SemiResolvedBQ1_top(
         topquark, bquark, wboson, wquark1, wquark2, 
         jetfjet
     )
-    topBQ2_jetfjet_deltaR, topBQ2_jet_idxs, topBQ2_fjet_idxs = SemiResolvedBQ1_top(
+    topBQ2_jetfjet_deltaR = SemiResolvedBQ1_top(
         topquark, bquark, wboson, wquark1, wquark2, 
         jetfjet
     )
 
-    if topBQ2_jetfjet_deltaR < topBQ1_jetfjet_deltaR:
-        return topBQ2_jetfjet_deltaR, topBQ2_jet_idxs, topBQ2_fjet_idxs
-    else:
-        return topBQ1_jetfjet_deltaR, topBQ1_jet_idxs, topBQ1_fjet_idxs
+    if topBQ2_jetfjet_deltaR < topBQ1_jetfjet_deltaR: return topBQ2_jetfjet_deltaR
+    else: return topBQ1_jetfjet_deltaR
 
 @nb.njit
 def SemiResolvedBQ1_top(
@@ -139,14 +138,16 @@ def SemiResolvedBQ1_top(
     wquark1_deltaR = jetfjet['fjet'].deltaR(wquark1)
     wquark2_deltaR = jetfjet['jet'].deltaR(wquark2)
 
+    topmass = (jetfjet['fjet'] + jetfjet['jet']).mass
+    topmass_window = (topmass > (TOP_MASS - TOP_MASS_WINDOW)) and (topmass < (TOP_MASS + TOP_MASS_WINDOW))
+
     # Semi-Resolved bq1
     top_jetfjet_deltaR = (bquark_deltaR + wquark1_deltaR + wquark2_deltaR) if (
         bquark_deltaR < FJET_DR and wquark1_deltaR < FJET_DR 
         and wquark2_deltaR < JET_DR
-    ) else DR_FILL_VALUE
-    top_jet_idxs, top_fjet_idxs = [jetfjet['jet']['idx']], [jetfjet['fjet']['idx']]
+    ) and topmass_window else DR_FILL_VALUE
 
-    return top_jetfjet_deltaR, top_jet_idxs, top_fjet_idxs
+    return top_jetfjet_deltaR
 
 @nb.njit
 def SemiResolvedBQ2_top(
@@ -157,31 +158,37 @@ def SemiResolvedBQ2_top(
     wquark1_deltaR = jetfjet['jet'].deltaR(wquark1)
     wquark2_deltaR = jetfjet['fjet'].deltaR(wquark2)
 
+    topmass = (jetfjet['fjet'] + jetfjet['jet']).mass
+    topmass_window = (topmass > (TOP_MASS - TOP_MASS_WINDOW)) and (topmass < (TOP_MASS + TOP_MASS_WINDOW))
+
     # Semi-Resolved bq2
     top_jetfjet_deltaR = (bquark_deltaR + wquark1_deltaR + wquark2_deltaR) if (
         bquark_deltaR < FJET_DR and wquark2_deltaR < FJET_DR
         and wquark1_deltaR < JET_DR
-    ) else DR_FILL_VALUE
-    top_jet_idxs, top_fjet_idxs = [jetfjet['jet']['idx']], [jetfjet['fjet']['idx']]
+    ) and topmass_window else DR_FILL_VALUE
 
-    return top_jetfjet_deltaR, top_jet_idxs, top_fjet_idxs
+    return top_jetfjet_deltaR
 
 @nb.njit
 def FullyResolved_top(
     topquark, bquark, wboson, wquark1, wquark2, 
     jetfjet  # Should be the cartesian product of jet collection with itself, choose 3
 ):
-    bquark_deltaR = jetfjet['jet1'].deltaR(bquark)
-    wquark1_deltaR = jetfjet['jet2'].deltaR(wquark1)
-    wquark2_deltaR = jetfjet['jet3'].deltaR(wquark2)
+    bquark_deltaR = jetfjet['bjet'].deltaR(bquark)
+    wquark1_deltaR = jetfjet['q1jet'].deltaR(wquark1)
+    wquark2_deltaR = jetfjet['q2jet'].deltaR(wquark2)
+
+    topmass = (jetfjet['bjet'] + jetfjet['q1jet'] + jetfjet['q2jet']).mass
+    topmass_window = (topmass > (TOP_MASS - TOP_MASS_WINDOW)) and (topmass < (TOP_MASS + TOP_MASS_WINDOW))
+    wmass = (jetfjet['q1jet'] + jetfjet['q2jet']).mass
+    wmass_window = (wmass > (W_MASS - W_MASS_WINDOW)) and (wmass < (W_MASS + W_MASS_WINDOW))
 
     # Fully-Resolved
     top_jetfjet_deltaR = (bquark_deltaR + wquark1_deltaR + wquark2_deltaR) if (
         bquark_deltaR < JET_DR and wquark1_deltaR < JET_DR and wquark2_deltaR < JET_DR
-    ) else DR_FILL_VALUE
-    top_jet_idxs, top_fjet_idxs = [jetfjet['jet1']['idx'], jetfjet['jet2']['idx'], jetfjet['jet3']['idx']], [NOJET_FILL_VALUE]
+    ) and topmass_window and wmass_window else DR_FILL_VALUE
 
-    return top_jetfjet_deltaR, top_jet_idxs, top_fjet_idxs
+    return top_jetfjet_deltaR
 
 
 

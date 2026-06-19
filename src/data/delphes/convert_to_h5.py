@@ -46,13 +46,22 @@ MIN_JET_PT = 30  # 20
 MIN_FJET_PT = 150  # 200
 PROJECT_DIR = Path(__file__).resolve().parents[3]
 
-PLOTS = True
+PLOTS = False
 RNG = np.random.default_rng(seed=21)
 
 TVSQCD_EFFS = {'t': 83.21e-2, 'W': 6.90e-2, 'bq': 19.65e-2, 'QCD': 1e-2}
 WVSQCD_EFFS = {'t': 15.19e-2, 'W': 56.15e-2, 'bq': 9.92e-2, 'QCD': 1e-2}
 
 ################################
+
+# def awkidx(record):
+#     return record.idx
+# def typer(array_view_type):
+#     return array_view_type
+# def lower(context, builder, sig, args):
+#     return context.compile_internal(builder, awkidx, sig, args)
+# ak.behavior["__numba_typer__", "Momentum4D", "idx"] = typer
+# ak.behavior["__numba_lower__", "Momentum4D", "idx"] = lower
 
 
 def to_np_array(ak_array, max_n=10, pad=0):
@@ -123,8 +132,6 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     fj_eta = arrays["FatJet/FatJet.Eta"]
     fj_phi = arrays["FatJet/FatJet.Phi"]
     fj_mass = arrays["FatJet/FatJet.Mass"]
-    # fj_Ttag = arrays["Jet/Jet.TvsQCD"]
-    # fj_Wtag = arrays["Jet/Jet.WvsQCD"]
     fj_TtagRN = random2D(fj_pt, RNG.random(size=ak.sum(ak.num(fj_pt))), ak.ArrayBuilder()).snapshot()
     fj_WtagRN = random2D(fj_pt, RNG.random(size=ak.sum(ak.num(fj_pt))), ak.ArrayBuilder()).snapshot()
     fj_sdp4 = arrays["FatJet/FatJet.SoftDroppedP4[5]"]
@@ -247,7 +254,9 @@ def get_datasets(arrays, n_tops):  # noqa: C901
             "mass": fj_mass,
             "idx": ak.local_index(fj_pt),
             "TtagRN": fj_TtagRN,
-            "WtagRN": fj_WtagRN
+            "WtagRN": fj_WtagRN,
+            "Ttag": ak.zeros_like(fj_pt),
+            "Wtag": ak.zeros_like(fj_pt),
         },
         with_name="Momentum4D",
     )
@@ -286,7 +295,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     w2quark_mask = topquark_mask & wboson_mask & (wquarks_d1['pt'] > 0)
     
     event_mask = (
-        topquark_mask & bquark_mask & wboson_mask & w1quark_mask & w2quark_mask
+        (ak.sum(topquark_mask & bquark_mask & wboson_mask & w1quark_mask & w2quark_mask, axis=1) > 0)
         & (ak.num(pt[pt > MIN_JET_PT]) >= 3*n_tops)  # resolved-like training
     )
 
@@ -310,7 +319,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     mass = mass[jet_sort][event_mask][jet_mask][:, :N_JETS]
     btag = btag[jet_sort][event_mask][jet_mask][:, :N_JETS]
     flavor = flavor[jet_sort][event_mask][jet_mask][:, :N_JETS]
-    jets['idx'] = ak.local_index(pt)
+    jets['idx'] = ak.local_index(pt, axis=1)
 
     # FatJets
     fjets = fjets[fjet_sort][event_mask][fjet_mask][:, :N_FJETS]
@@ -344,45 +353,60 @@ def get_datasets(arrays, n_tops):  # noqa: C901
 
 
     ################################
-    # Reconstruct tops and match jets/fjets 
-    # Fully-Resolved tops
-    FR_matched_jet_idxs, _ = reconstruct_top(
+    # Recontrsuct tops
+    def get_matched_jetfjets_idx(combo_arr, selected_idxs, field):
+        if field == '':
+            return ak.fill_none(
+                [ak.firsts(combo_arr[ak.local_index(combo_arr, axis=1) == selected_idxs[:, i]]['idx']) for i in range(n_tops)], 
+                -1
+            ).to_numpy().T
+        else:
+            return ak.fill_none(
+                [ak.firsts(combo_arr[ak.local_index(combo_arr, axis=1) == selected_idxs[:, i]][field]['idx']) for i in range(n_tops)], 
+                -1
+            ).to_numpy().T
+
+    FR_3jets = ak.combinations(jets, 3, fields=['bjet', 'q1jet', 'q2jet'], axis=1)
+    FR_combo_jet_idxs = reconstruct_top(
         topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2,
-        ak.combinations(jets, 3, axis=1),
+        FR_3jets,
         FullyResolved_top,
-        ak.ArrayBuilder(), ak.ArrayBuilder()
-    )
-    FR_matched_jet_idxs = FR_matched_jet_idxs.snapshot()
-    FR_matched_bjet_idxs = FR_matched_jet_idxs[..., 0].to_numpy()
-    FR_matched_q1jet_idxs = FR_matched_jet_idxs[..., 1].to_numpy()
-    FR_matched_q2jet_idxs = FR_matched_jet_idxs[..., 2].to_numpy()
+        ak.ArrayBuilder()
+    ).snapshot()
+    FR_bjet_idxs = get_matched_jetfjets_idx(FR_3jets, FR_combo_jet_idxs, 'bjet')
+    FR_q1jet_idxs = get_matched_jetfjets_idx(FR_3jets, FR_combo_jet_idxs, 'q1jet')
+    FR_q2jet_idxs = get_matched_jetfjets_idx(FR_3jets, FR_combo_jet_idxs, 'q2jet')
 
     # Semi-ResolvedQQ tops
-    SRqq_matched_jet_idxs, SRqq_matched_fjet_idxs = reconstruct_top(
+    SR_1jet1fjet = ak.cartesian({'jet': jets, 'fjet': fjets})
+    SRqq_combo_jetfjet_idxs = reconstruct_top(
         topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2,
-        ak.cartesian({'jets': jets, 'fjets': fjets}),
+        SR_1jet1fjet,
         SemiResolvedQQ_top,
-        ak.ArrayBuilder(), ak.ArrayBuilder()
-    )
-    SRqq_matched_jet_idxs, SRqq_matched_fjet_idxs = ak.firsts(SRqq_matched_jet_idxs.snapshot(), axis=-1).to_numpy(), ak.firsts(SRqq_matched_fjet_idxs.snapshot(), axis=-1).to_numpy()
+        ak.ArrayBuilder()
+    ).snapshot()
+    SRqq_qqfjet_idxs = get_matched_jetfjets_idx(SR_1jet1fjet, SRqq_combo_jetfjet_idxs, 'fjet')
+    SRqq_bjet_idxs = get_matched_jetfjets_idx(SR_1jet1fjet, SRqq_combo_jetfjet_idxs, 'jet')
     
     # Semi-ResolvedBQ tops
-    SRbq_matched_jet_idxs, SRbq_matched_fjet_idxs = reconstruct_top(
+    SRbq_combo_jetfjet_idxs = reconstruct_top(
         topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2,
-        ak.cartesian({'jets': jets, 'fjets': fjets}),
+        SR_1jet1fjet,
         SemiResolvedBQ_top,
-        ak.ArrayBuilder(), ak.ArrayBuilder()
-    )
-    SRbq_matched_jet_idxs, SRbq_matched_fjet_idxs = ak.firsts(SRbq_matched_jet_idxs.snapshot(), axis=-1).to_numpy(), ak.firsts(SRbq_matched_fjet_idxs.snapshot(), axis=-1).to_numpy()
+        ak.ArrayBuilder()
+    ).snapshot()
+    SRbq_bqfjet_idxs = get_matched_jetfjets_idx(SR_1jet1fjet, SRbq_combo_jetfjet_idxs, 'fjet')
+    SRbq_qjet_idxs = get_matched_jetfjets_idx(SR_1jet1fjet, SRbq_combo_jetfjet_idxs, 'jet')
     
     # Fully-Boosted tops
-    _, FB_matched_fjet_idxs = reconstruct_top(
+    FB_1fjet = ak.combinations(fjets, 1, fields=['fjet'])
+    FB_combo_fjet_idxs = reconstruct_top(
         topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2,
-        fjets,
+        FB_1fjet,
         FullyBoosted_top,
-        ak.ArrayBuilder(), ak.ArrayBuilder()
-    )
-    FB_matched_fjet_idxs = ak.firsts(FB_matched_fjet_idxs.snapshot(), axis=-1).to_numpy()
+        ak.ArrayBuilder()
+    ).snapshot()
+    FB_bqqfjet_idxs = get_matched_jetfjets_idx(FB_1fjet, FB_combo_fjet_idxs, 'fjet')
     
     # Jet-FatJet overlap
     matched_fjet_jet_idx, matched_fjet_jet_DR  = match_fjet_to_jet(fjets, jets, ak.ArrayBuilder(), ak.ArrayBuilder())
@@ -398,29 +422,29 @@ def get_datasets(arrays, n_tops):  # noqa: C901
 
     top_fullyResolved = {}
     for i in range(n_tops):
-        top_fullyResolved[f"top{i+1}_b"] = FR_matched_bjet_idxs[:, i]
-        top_fullyResolved[f"top{i+1}_q1"] = FR_matched_q1jet_idxs[:, i]
-        top_fullyResolved[f"top{i+1}_q2"] = FR_matched_q2jet_idxs[:, i]
+        top_fullyResolved[f"top{i+1}_b"] = FR_bjet_idxs[:, i]
+        top_fullyResolved[f"top{i+1}_q1"] = FR_q1jet_idxs[:, i]
+        top_fullyResolved[f"top{i+1}_q2"] = FR_q2jet_idxs[:, i]
         top_fullyResolved[f"top{i+1}_mask"] = (top_fullyResolved[f"top{i+1}_b"] != -1)
     print(f'num FR tops = {sum([ak.sum(top_fullyResolved[f"top{i+1}_mask"]) for i in range(n_tops)])}')
 
     top_semiResolved_qq = {}
     for i in range(n_tops):
-        top_semiResolved_qq[f"top{i+1}_b"] = SRqq_matched_jet_idxs[:, i]
-        top_semiResolved_qq[f"top{i+1}_qq"] = SRqq_matched_fjet_idxs[:, i]
+        top_semiResolved_qq[f"top{i+1}_b"] = SRqq_bjet_idxs[:, i]
+        top_semiResolved_qq[f"top{i+1}_qq"] = SRqq_qqfjet_idxs[:, i]
         top_semiResolved_qq[f"top{i+1}_mask"] = (top_semiResolved_qq[f"top{i+1}_b"] != -1)
     print(f'num SRqq tops = {sum([ak.sum(top_semiResolved_qq[f"top{i+1}_mask"]) for i in range(n_tops)])}')
 
     top_semiResolved_bq = {}
     for i in range(n_tops):
-        top_semiResolved_bq[f"top{i+1}_q"] = SRbq_matched_jet_idxs[:, i]
-        top_semiResolved_bq[f"top{i+1}_bq"] = SRbq_matched_fjet_idxs[:, i]
+        top_semiResolved_bq[f"top{i+1}_q"] = SRbq_qjet_idxs[:, i]
+        top_semiResolved_bq[f"top{i+1}_bq"] = SRbq_bqfjet_idxs[:, i]
         top_semiResolved_bq[f"top{i+1}_mask"] = (top_semiResolved_bq[f"top{i+1}_q"] != -1)
     print(f'num SRbq tops = {sum([ak.sum(top_semiResolved_bq[f"top{i+1}_mask"]) for i in range(n_tops)])}')
 
     top_fullyBoosted = {}
     for i in range(n_tops):
-        top_fullyBoosted[f"top{i+1}_bqq"] = FB_matched_fjet_idxs[:, i]
+        top_fullyBoosted[f"top{i+1}_bqq"] = FB_bqqfjet_idxs[:, i]
         top_fullyBoosted[f"top{i+1}_mask"] = (top_fullyBoosted[f"top{i+1}_bqq"] != -1)
     print(f'num FB tops = {sum([ak.sum(top_fullyBoosted[f"top{i+1}_mask"]) for i in range(n_tops)])}')
 
@@ -436,15 +460,15 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         qcd_fjet_mask = ( ~top_fjet_mask & ~w_fjet_mask & ~bq_fjet_mask )
 
         # Emulate PNet AK8 T-tagger
-        fjets["Ttag"][top_fjet_mask] = (fjets["TtagRN"][top_fjet_mask] < TVSQCD_EFFS['t'])
-        fjets["Ttag"][w_fjet_mask] = (fjets["TtagRN"][top_fjet_mask] < TVSQCD_EFFS['W'])
-        fjets["Ttag"][bq_fjet_mask] = (fjets["TtagRN"][bq_fjet_mask] < TVSQCD_EFFS['bq'])
-        fjets["Ttag"][qcd_fjet_mask] = (fjets["TtagRN"][qcd_fjet_mask] < TVSQCD_EFFS['QCD'])
+        fjets[top_fjet_mask]["Ttag"] = (fjets["TtagRN"][top_fjet_mask] < TVSQCD_EFFS['t'])
+        fjets[w_fjet_mask]["Ttag"] = (fjets["TtagRN"][w_fjet_mask] < TVSQCD_EFFS['W'])
+        fjets[bq_fjet_mask]["Ttag"] = (fjets["TtagRN"][bq_fjet_mask] < TVSQCD_EFFS['bq'])
+        fjets[qcd_fjet_mask]["Ttag"] = (fjets["TtagRN"][qcd_fjet_mask] < TVSQCD_EFFS['QCD'])
         # Emulate PNet AK8 W-tagger
-        fjets["Wtag"][top_fjet_mask] = (fjets["WtagRN"][top_fjet_mask] < WVSQCD_EFFS['t'])
-        fjets["Wtag"][w_fjet_mask] = (fjets["WtagRN"][top_fjet_mask] < WVSQCD_EFFS['W'])
-        fjets["Wtag"][bq_fjet_mask] = (fjets["WtagRN"][bq_fjet_mask] < WVSQCD_EFFS['bq'])
-        fjets["Wtag"][qcd_fjet_mask] = (fjets["WtagRN"][qcd_fjet_mask] < WVSQCD_EFFS['QCD'])
+        fjets[top_fjet_mask]["Wtag"] = (fjets["WtagRN"][top_fjet_mask] < WVSQCD_EFFS['t'])
+        fjets[w_fjet_mask]["Wtag"] = (fjets["WtagRN"][w_fjet_mask] < WVSQCD_EFFS['W'])
+        fjets[bq_fjet_mask]["Wtag"] = (fjets["WtagRN"][bq_fjet_mask] < WVSQCD_EFFS['bq'])
+        fjets[qcd_fjet_mask]["Wtag"] = (fjets["WtagRN"][qcd_fjet_mask] < WVSQCD_EFFS['QCD'])
     fj_Ttag = fjets["Ttag"]
     fj_Wtag = fjets["Wtag"]
 
@@ -507,87 +531,24 @@ def get_datasets(arrays, n_tops):  # noqa: C901
 
     ################################
     # Cleaning non-reconstructable events
-    at_least_one_target_mask = np.zeros_like(ak.to_numpy(ak.firsts(pt)))
+    at_least_one_target_mask = np.zeros_like(ak.to_numpy(ak.firsts(pt))).astype("bool")
     for i in range(n_tops):
         at_least_one_target_mask += ak.to_numpy(
             top_fullyResolved[f"top{i+1}_mask"]
             | top_semiResolved_qq[f"top{i+1}_mask"]
             | top_semiResolved_bq[f"top{i+1}_mask"]
             | top_fullyBoosted[f"top{i+1}_mask"]
-        ).astype("float32")
+        ).astype("bool")
     print(f"Viable tops = {np.sum(at_least_one_target_mask)}")
     at_least_one_target_mask = np.flatnonzero(at_least_one_target_mask)
 
     ################################
     # Sanity checking reconstruction
-    # FR tops
-    check_b, check_q1, check_q2 = [], [], []
-    for i in range(n_tops):
-        check_b += np.unique(ak.count(top_fullyResolved[f"top{i+1}_b"], axis=-1)).to_list()
-        check_q1 += np.unique(ak.count(top_fullyResolved[f"top{i+1}_q1"], axis=-1)).to_list()
-        check_q2 += np.unique(ak.count(top_fullyResolved[f"top{i+1}_q2"], axis=-1)).to_list()
-    if 2 in check_b: 
-        logging.warning(" Some fully-resolved tops match to 2 bjets! Check truth")
-    if 2 in check_q1:
-        logging.warning(" Some fully-resolved tops match to 2 wjet1s! Check truth")
-    if 2 in check_q2:
-        logging.warning(" Some fully-resolved tops match to 2 wjet2s! Check truth")
-    print(f"All proper numbers of jets for fully-resolved: {ak.all(np.array(check_b) < 2) & ak.all(np.array(check_q1) < 2) & ak.all(np.array(check_q2) < 2)}")
+    # pass
 
-    # SRqq tops
-    check_b, check_qq = [], []
-    for i in range(n_tops):
-        check_b += np.unique(ak.count(top_semiResolved_qq[f"top{i+1}_b"], axis=-1)).to_list()
-        check_qq += np.unique(ak.count(top_semiResolved_qq[f"top{i+1}_qq"], axis=-1)).to_list()
-    if 2 in check_b: 
-        logging.warning(" Some semi-resolved (qq) tops match to 2 bjets! Check truth")
-    if 2 in check_qq:
-        logging.warning(" Some semi-resolved (qq) tops match to 2 qq fatjets! Check truth")
-    print(f"All proper numbers of fatjets/jets for semi-resolved (qq fatjet): {ak.all(np.array(check_b) < 2) & ak.all(np.array(check_qq) < 2)}")
-
-    # SRbq tops
-    check_q, check_bq = [], []
-    for i in range(n_tops):
-        check_q += np.unique(ak.count(top_semiResolved_bq[f"top{i+1}_q"], axis=-1)).to_list()
-        check_bq += np.unique(ak.count(top_semiResolved_bq[f"top{i+1}_bq"], axis=-1)).to_list()
-    if 2 in check_q: 
-        logging.warning(" Some semi-resolved (bq) tops match to 2 wjets! Check truth")
-    if 2 in check_bq:
-        logging.warning(" Some semi-resolved (bq) tops match to 2 bq fatjets! Check truth")
-    print(f"All proper numbers of fatjets/jets for semi-resolved (bq fatjet): {ak.all(np.array(check_q) < 2) & ak.all(np.array(check_bq) < 2)}")
-
-    # FB tops
-    fj_check_bqq = []
-    for i in range(n_tops):
-        fj_check_bqq += np.unique(ak.count(top_fullyBoosted[f"top{i+1}_bqq"], axis=-1)).to_list()
-    if 2 in fj_check_bqq:
-        logging.warning(" Some fully-boosted tops match to 2 fatjets! Check truth")
-    print(f"All proper numbers of fatjets for fully-boosted: {ak.all(np.array(fj_check_bqq) < 2)}")
-
-    ## Clip data ##
-    for i in range(n_tops):
-        # fully-resolved
-        top_fullyResolved[f"top{i+1}_mask"] = top_fullyResolved[f"top{i+1}_mask"].to_numpy()
-        top_fullyResolved[f"top{i+1}_b"] = ak.fill_none(ak.firsts(top_fullyResolved[f"top{i+1}_b"]), -1).to_numpy()
-        top_fullyResolved[f"top{i+1}_q1"] = ak.fill_none(ak.firsts(top_fullyResolved[f"top{i+1}_q1"]), -1).to_numpy()
-        top_fullyResolved[f"top{i+1}_q2"] = ak.fill_none(ak.firsts(top_fullyResolved[f"top{i+1}_q2"]), -1).to_numpy()
-
-        # semi-resolved (qq fatjet)
-        top_semiResolved_qq[f"top{i+1}_mask"] = top_semiResolved_qq[f"top{i+1}_mask"].to_numpy()
-        top_semiResolved_qq[f"top{i+1}_b"] = ak.fill_none(ak.firsts(top_semiResolved_qq[f"top{i+1}_b"]), -1).to_numpy()
-        top_semiResolved_qq[f"top{i+1}_qq"] = ak.fill_none(ak.firsts(top_semiResolved_qq[f"top{i+1}_qq"]), -1).to_numpy()
-
-        # semi-resolved (bq fatjet)
-        top_semiResolved_bq[f"top{i+1}_mask"] = top_semiResolved_bq[f"top{i+1}_mask"].to_numpy()
-        top_semiResolved_bq[f"top{i+1}_q"] = ak.fill_none(ak.firsts(top_semiResolved_bq[f"top{i+1}_q"]), -1).to_numpy()
-        top_semiResolved_bq[f"top{i+1}_bq"] = ak.fill_none(ak.firsts(top_semiResolved_bq[f"top{i+1}_bq"]), -1).to_numpy()
-
-        # fully-boosted
-        top_fullyBoosted[f"top{i+1}_mask"] = top_fullyBoosted[f"top{i+1}_mask"].to_numpy()
-        top_fullyBoosted[f"top{i+1}_bqq"] = ak.fill_none(ak.firsts(top_fullyBoosted[f"top{i+1}_bqq"]), -1).to_numpy()
-
-    ## Store processed data in dataset for training/testing ##
-    # Store the model inputs
+    ################################
+    # Store processed data in dataset for training/testing
+    # Inputs
     datasets = {}
     datasets["INPUTS/Jets/MASK"] = to_np_array(pt > 0, max_n=N_JETS).astype("bool")[at_least_one_target_mask]
     datasets["INPUTS/Jets/pt"] = to_np_array(pt, max_n=N_JETS).astype("float32")[at_least_one_target_mask]
@@ -620,7 +581,7 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     datasets["INPUTS/BoostedJets/fj_nneutral"] = to_np_array(fj_nneutral, max_n=N_FJETS).astype("float32")[at_least_one_target_mask]
     datasets["INPUTS/BoostedJets/fj_ncharged"] = to_np_array(fj_ncharged, max_n=N_FJETS).astype("float32")[at_least_one_target_mask]
 
-    # Store the truth-level info
+    # Targets
     for i in range(n_tops):
         # fully-resolved tops
         datasets[f"TARGETS/FRt{i+1}/MASK"] = top_fullyResolved[f"top{i+1}_mask"][at_least_one_target_mask]
@@ -645,6 +606,28 @@ def get_datasets(arrays, n_tops):  # noqa: C901
         datasets[f"TARGETS/FBt{i+1}/MASK"] = top_fullyBoosted[f"top{i+1}_mask"][at_least_one_target_mask]
         datasets[f"TARGETS/FBt{i+1}/bqq"] = top_fullyBoosted[f"top{i+1}_bqq"][at_least_one_target_mask]
         datasets[f"TARGETS/FBt{i+1}/pt"] = top_pt_dict[f"top{i+1}_pt"][at_least_one_target_mask]
+
+        # Auxiliary for dataset-checking
+        # datasets[f'AUXILIARY/FRt{i+1}/b_deltaR'] = ak.fill_none(ak.firsts(jets[ak.local_index(jets) == top_fullyResolved[f"top{i+1}_b"]].deltaR(bquarks[:, i])[at_least_one_target_mask]), -1).to_numpy()
+        # datasets[f'AUXILIARY/FRt{i+1}/q1_deltaR'] = ak.fill_none(ak.firsts(jets[ak.local_index(jets) == top_fullyResolved[f"top{i+1}_q1"]].deltaR(wquarks_d1[:, i])[at_least_one_target_mask]), -1).to_numpy()
+        # datasets[f'AUXILIARY/FRt{i+1}/q2_deltaR'] = ak.fill_none(ak.firsts(jets[ak.local_index(jets) == top_fullyResolved[f"top{i+1}_q2"]].deltaR(wquarks_d2[:, i])[at_least_one_target_mask]), -1).to_numpy()
+
+        # datasets[f'AUXILIARY/SRqqt{i+1}/b_deltaR'] = ak.fill_none(ak.firsts(jets[ak.local_index(jets) == top_semiResolved_qq[f"top{i+1}_b"]].deltaR(bquarks[:, i])[at_least_one_target_mask]), -1).to_numpy()
+        # datasets[f'AUXILIARY/SRqqt{i+1}/q1_deltaR'] = ak.fill_none(ak.firsts(fjets[ak.local_index(fjets) == top_semiResolved_qq[f"top{i+1}_qq"]].deltaR(wquarks_d1[:, i])[at_least_one_target_mask]), -1).to_numpy()
+        # datasets[f'AUXILIARY/SRqqt{i+1}/q2_deltaR'] = ak.fill_none(ak.firsts(fjets[ak.local_index(fjets) == top_semiResolved_qq[f"top{i+1}_qq"]].deltaR(wquarks_d2[:, i])[at_least_one_target_mask]), -1).to_numpy()
+        # datasets[f'AUXILIARY/SRqqt{i+1}/w_deltaR'] = ak.fill_none(ak.firsts(fjets[ak.local_index(fjets) == top_semiResolved_qq[f"top{i+1}_qq"]].deltaR(wbosons[:, i])[at_least_one_target_mask]), -1).to_numpy()
+
+        # datasets[f'AUXILIARY/SRbqt{i+1}/b_deltaR'] = ak.fill_none(ak.firsts(fjets[ak.local_index(fjets) == top_semiResolved_bq[f"top{i+1}_bq"]].deltaR(bquarks[:, i])[at_least_one_target_mask]), -1).to_numpy()
+        # datasets[f'AUXILIARY/SRbqt{i+1}/q1_deltaR_q'] = ak.fill_none(ak.firsts(jets[ak.local_index(jets) == top_semiResolved_bq[f"top{i+1}_q"]].deltaR(wquarks_d1[:, i])[at_least_one_target_mask]), -1).to_numpy()
+        # datasets[f'AUXILIARY/SRbqt{i+1}/q1_deltaR_bq'] = ak.fill_none(ak.firsts(fjets[ak.local_index(fjets) == top_semiResolved_bq[f"top{i+1}_bq"]].deltaR(wquarks_d1[:, i])[at_least_one_target_mask]), -1).to_numpy()
+        # datasets[f'AUXILIARY/SRbqt{i+1}/q2_deltaR_q'] = ak.fill_none(ak.firsts(jets[ak.local_index(jets) == top_semiResolved_bq[f"top{i+1}_q"]].deltaR(wquarks_d2[:, i])[at_least_one_target_mask]), -1).to_numpy()
+        # datasets[f'AUXILIARY/SRbqt{i+1}/q2_deltaR_bq'] = ak.fill_none(ak.firsts(fjets[ak.local_index(fjets) == top_semiResolved_bq[f"top{i+1}_bq"]].deltaR(wquarks_d2[:, i])[at_least_one_target_mask]), -1).to_numpy()
+        
+        # datasets[f'AUXILIARY/FBt{i+1}/b_deltaR'] = ak.fill_none(ak.firsts(fjets[ak.local_index(fjets) == top_fullyBoosted[f"top{i+1}_bqq"]].deltaR(bquarks[:, i])[at_least_one_target_mask]), -1).to_numpy()
+        # datasets[f'AUXILIARY/FBt{i+1}/q1_deltaR'] = ak.fill_none(ak.firsts(fjets[ak.local_index(fjets) == top_fullyBoosted[f"top{i+1}_bqq"]].deltaR(wquarks_d1[:, i])[at_least_one_target_mask]), -1).to_numpy()
+        # datasets[f'AUXILIARY/FBt{i+1}/q2_deltaR'] = ak.fill_none(ak.firsts(fjets[ak.local_index(fjets) == top_fullyBoosted[f"top{i+1}_bqq"]].deltaR(wquarks_d2[:, i])[at_least_one_target_mask]), -1).to_numpy()
+        # datasets[f'AUXILIARY/FBt{i+1}/w_deltaR'] = ak.fill_none(ak.firsts(fjets[ak.local_index(fjets) == top_fullyBoosted[f"top{i+1}_bqq"]].deltaR(wbosons[:, i])[at_least_one_target_mask]), -1).to_numpy()
+        # datasets[f'AUXILIARY/FBt{i+1}/t_deltaR'] = ak.fill_none(ak.firsts(fjets[ak.local_index(fjets) == top_fullyBoosted[f"top{i+1}_bqq"]].deltaR(topquarks[:, i])[at_least_one_target_mask]), -1).to_numpy()
 
     return datasets
 
@@ -679,15 +662,17 @@ def process_file(file_name, out_file, train_frac, n_tops):
         if re.match('root://', file_name): subprocess.run(['rm', '-rf', current_file_name])
         return datasets
     except Exception as e:
+        if re.match('root://', file_name): subprocess.run(['rm', '-rf', current_file_name])
         if e is KeyboardInterrupt: return 999
         logging.info(f"Preprocessing failed for file:\n{file_name}\n\nwith error:\n{e}\n\n...continuing with other files")
         return 400
 
-def save_file(filepath: str, dataset):
-    if len(filepath.split('/').split('.')) == 1:
+def save_file(filepath: str, dataset: dict):
+    if len(filepath.split('/')[-1].split('.')) == 1:
         raise Exception(f'No filepath extension, ambiguous how to save file.')
     else:
-        filetype = filepath.split('/').split('.')[-1]
+        filetype = filepath.split('/')[-1].split('.')[-1]
+    print(f"Saving {len(dataset[list(dataset.keys())[0]])} events into {filepath}")
         
     if filetype == 'h5':
         with h5py.File(filepath, "w") as output:
@@ -697,11 +682,15 @@ def save_file(filepath: str, dataset):
                 logging.info(f"Dataset shape: {concat_data.shape}")
                 output.create_dataset(dataset_name, data=concat_data)
     elif filetype == 'root':
-        with uproot.create(filepath, "w") as output:
-            output['Events'] = uproot.newtree({
-                dataset_name: all_data.dtype for dataset_name, all_data in dataset.items()
-            })
-            output['Events'].extend(dataset)
+        with uproot.recreate(filepath) as output:
+            merged_dataset = {}
+            for dataset_name, all_data in dataset.items():
+                concat_data = np.concatenate(all_data, axis=0)
+                logging.info(f"Dataset name: {dataset_name}")
+                logging.info(f"Dataset type: {concat_data.dtype}")
+                logging.info(f"Dataset shape: {concat_data.shape}")
+                merged_dataset[dataset_name] = concat_data
+            output['Events'] = merged_dataset
     else: raise NotImplementedError(f'Requested file type saving not implemented, try \'.h5\' or \'.root\'.')
 
 @click.command()
@@ -716,7 +705,12 @@ def save_file(filepath: str, dataset):
     default=-1,
     help="Size for output files in MB, default is \'-1\' which creates 1 merged output file",
 )
-@click.option("--train-frac", default=0.50, help="Fraction for training.")
+@click.option(
+    "--file_limit",
+    default=-1,
+    help="Number of output files to make, default is \'-1\' which creates all output files",
+)
+@click.option("--train-frac", default=0.80, help="Fraction for training.")
 @click.option(
     "--n-tops",
     "n_tops",
@@ -726,7 +720,7 @@ def save_file(filepath: str, dataset):
 )
 @click.option("--plots", is_flag=True, help="Boolean to make plots.")
 @click.option("--multip", is_flag=True, help="Boolean to use multiprocessing.")
-def main(in_files, out_file, split_file_size, train_frac, n_tops, plots, multip):
+def main(in_files, out_file, split_file_size, file_limit, train_frac, n_tops, plots, multip):
     if plots:
         PLOTS = True
     
@@ -747,6 +741,7 @@ def main(in_files, out_file, split_file_size, train_frac, n_tops, plots, multip)
             expanded_in_files.append(file_name)
     in_files = expanded_in_files
     out_file_idx = 0
+    new_outfile_with_idx = lambda outfile, idx: outfile[:outfile.rfind('.')]+str(idx)+outfile[outfile.rfind('.'):]
     if not multip:
         for file_name in in_files:
             datasets = process_file(file_name, out_file, train_frac, n_tops)
@@ -758,9 +753,12 @@ def main(in_files, out_file, split_file_size, train_frac, n_tops, plots, multip)
                 all_datasets[dataset_name].append(data)
             num_events = sum(len(all_datasets[dataset_name][i]) for i in range(len(all_datasets[dataset_name])))
             if split_file_size > 0 and num_events > 2_000*split_file_size:
-                save_file(out_file[:out_file.rfind('.')]+out_file_idx+out_file[out_file.rfind('.'):], all_datasets)
+                save_file(new_outfile_with_idx(out_file, out_file_idx), all_datasets)
                 out_file_idx += 1; all_datasets = {}
-        save_file(out_file[:out_file.rfind('.')]+out_file_idx+out_file[out_file.rfind('.'):], all_datasets)
+            if out_file_idx == file_limit: break
+        if all_datasets != {}:
+            if split_file_size > 0: save_file(new_outfile_with_idx(out_file, out_file_idx), all_datasets)
+            else: save_file(out_file, all_datasets)
     else:
         with Pool(10) as p:
             out_files, train_fracs, n_topses = [out_file]*len(in_files), [train_frac]*len(in_files), [n_tops]*len(in_files)

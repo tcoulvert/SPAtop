@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: ts-spatop-pod
+  name: ts-spatop-pod-axol1tl
 spec:
   securityContext:
     runAsUser: 0
@@ -22,13 +22,13 @@ spec:
         memory: 30Gi
         cpu: 3
     volumeMounts:
-    - mountPath: /spatopvol
+    - mountPath: /data
       name: spatopvol
   restartPolicy: Never
   volumes:
     - name: spatopvol
       persistentVolumeClaim:
-        claimName: spatopvol
+        claimName: traindatavol
   tolerations:
     - key: "nautilus.io/axol1tl"
       operator: "Exists"

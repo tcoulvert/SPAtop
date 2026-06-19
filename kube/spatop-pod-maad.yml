@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: spatop-pod
+  name: ts-spatop-pod
 spec:
   securityContext:
     runAsUser: 0
