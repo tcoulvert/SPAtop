@@ -4,7 +4,7 @@ import os
 import subprocess
 
 # HEP packages
-import eos_utils as eos
+#import eos_utils as eos
 
 ################################
 
