@@ -32,6 +32,7 @@ from src.data.delphes.matching import (
     FullyResolved_top, SemiResolvedQQ_top, SemiResolvedBQ_top, FullyBoosted_top, 
     match_fjet_to_jet,
 )
+from src.data.delphes.condor_conversion import LPCVanillaSubmitter
 
 vector.register_awkward()
 vector.register_numba()
@@ -720,7 +721,13 @@ def save_file(filepath: str, dataset: dict):
 )
 @click.option("--plots", is_flag=True, help="Boolean to make plots.")
 @click.option("--multip", is_flag=True, help="Boolean to use multiprocessing.")
-def main(in_files, out_file, split_file_size, file_limit, train_frac, n_tops, plots, multip):
+@click.option("--condor", is_flag=True, help="Boolean to use condor processing.")
+@click.option(
+    "--condor_files_per_job",
+    default=10,
+    help="Number of input files per condor job",
+)
+def main(in_files, out_file, split_file_size, file_limit, train_frac, n_tops, plots, multip, condor, condor_files_per_job):
     if plots:
         PLOTS = True
     
@@ -742,7 +749,7 @@ def main(in_files, out_file, split_file_size, file_limit, train_frac, n_tops, pl
     in_files = expanded_in_files
     out_file_idx = 0
     new_outfile_with_idx = lambda outfile, idx: outfile[:outfile.rfind('.')]+str(idx)+outfile[outfile.rfind('.'):]
-    if not multip:
+    if not multip and not condor:
         for file_name in in_files:
             datasets = process_file(file_name, out_file, train_frac, n_tops)
             if type(datasets) is int: 
@@ -759,7 +766,14 @@ def main(in_files, out_file, split_file_size, file_limit, train_frac, n_tops, pl
         if all_datasets != {}:
             if split_file_size > 0: save_file(new_outfile_with_idx(out_file, out_file_idx), all_datasets)
             else: save_file(out_file, all_datasets)
-    else:
+    elif condor:
+        job_filepaths = [
+            list(in_files[i*condor_files_per_job:(i+1)*condor_files_per_job]) 
+            for i in range(len(in_files)//condor_files_per_job)
+        ]
+        submitter = LPCVanillaSubmitter(job_filepaths, out_file)
+        submitter.submit()
+    elif multip:
         with Pool(10) as p:
             out_files, train_fracs, n_topses = [out_file]*len(in_files), [train_frac]*len(in_files), [n_tops]*len(in_files)
             results = p.imap_unordered(process_file, zip(in_files, out_files, train_fracs, n_topses))
