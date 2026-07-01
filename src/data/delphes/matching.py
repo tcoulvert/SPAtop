@@ -121,7 +121,7 @@ def SemiResolvedBQ_top(
         topquark, bquark, wboson, wquark1, wquark2, 
         jetfjet
     )
-    topBQ2_jetfjet_deltaR = SemiResolvedBQ1_top(
+    topBQ2_jetfjet_deltaR = SemiResolvedBQ2_top(
         topquark, bquark, wboson, wquark1, wquark2, 
         jetfjet
     )

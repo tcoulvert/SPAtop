@@ -724,7 +724,7 @@ def save_file(filepath: str, dataset: dict):
 @click.option("--condor", is_flag=True, help="Boolean to use condor processing.")
 @click.option(
     "--condor_files_per_job",
-    default=10,
+    default=100,
     help="Number of input files per condor job",
 )
 def main(in_files, out_file, split_file_size, file_limit, train_frac, n_tops, plots, multip, condor, condor_files_per_job):
@@ -771,9 +771,6 @@ def main(in_files, out_file, split_file_size, file_limit, train_frac, n_tops, pl
             list(in_files[i*condor_files_per_job:(i+1)*condor_files_per_job]) 
             for i in range(len(in_files)//condor_files_per_job)
         ]
-        job_filepaths = [job_filepaths[0]]
-        print(job_filepaths)
-        print(out_file)
         submitter = LPCVanillaSubmitter(job_filepaths, out_file)
         submitter.submit()
     elif multip:

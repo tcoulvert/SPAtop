@@ -163,14 +163,14 @@ def parse_semi_resolved_w_target(
 ):
     # FRt pt
     SRt1_pt = np.array(testfile["TARGETS"][f"SR{method}t1"]["pt"])
-    SRt2_pt = np.array(testfile["TARGETS"][f"SR{method}t1"]["pt"])
+    SRt2_pt = np.array(testfile["TARGETS"][f"SR{method}t2"]["pt"])
     SRt_pts = np.concatenate((SRt1_pt.reshape(-1, 1), SRt2_pt.reshape(-1, 1)), axis=1)
     SRt_pts = ak.Array(SRt_pts)
 
 
     # resolved MASK
     SRt1_mask = np.array(testfile["TARGETS"][f"SR{method}t1"]["MASK"])
-    SRt2_mask = np.array(testfile["TARGETS"][f"SR{method}t1"]["MASK"])
+    SRt2_mask = np.array(testfile["TARGETS"][f"SR{method}t2"]["MASK"])
     SRt_masks = np.concatenate((SRt1_mask.reshape(-1, 1), SRt2_mask.reshape(-1, 1)), axis=1)
     SRt_masks = ak.Array(SRt_masks)
 
