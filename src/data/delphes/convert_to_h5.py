@@ -367,7 +367,11 @@ def get_datasets(arrays, n_tops):  # noqa: C901
                 -1
             ).to_numpy().T
 
-    FR_3jets = ak.combinations(jets, 3, fields=['bjet', 'q1jet', 'q2jet'], axis=1)
+    FR_3jets_idxs = ak.argcartesian([jets, jets, jets], axis=1)
+    FR_3jet0, FR_3jet1, FR_3jet2 = ak.unzip(FR_3jets_idxs)
+    FR_3jets_mask = (FR_3jet0 != FR_3jet1) & (FR_3jet0 != FR_3jet2) & (FR_3jet1 != FR_3jet2)
+    FR_3jet0, FR_3jet1, FR_3jet2 = FR_3jet0[FR_3jets_mask], FR_3jet1[FR_3jets_mask], FR_3jet2[FR_3jets_mask]
+    FR_3jets = ak.zip({'bjet': jets[FR_3jet0], 'q1jet': jets[FR_3jet1], 'q2jet': jets[FR_3jet2]})
     FR_combo_jet_idxs = reconstruct_top(
         topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2,
         FR_3jets,
