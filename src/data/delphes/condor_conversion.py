@@ -4,7 +4,7 @@ import os
 import subprocess
 
 # HEP packages
-import eos_utils as eos
+#import eos_utils as eos
 
 ################################
 
@@ -118,8 +118,8 @@ class LPCVanillaSubmitter:
             
             for i, filepaths in enumerate(dataset_filepaths):
                 executable_file.write(f"if [ $1 -eq {i} ]; then\n")
-                executable_file.write(f"    python3.12 /srv/SPAtop/src/data/delphes/convert_to_h5.py {', '.join(filepaths)} --out-file {srv_out_file}\n")
-                executable_file.write(f"    xrdcp {srv_out_file} {job_out_file}")
+                executable_file.write(f"    python3.12 /srv/SPAtop/src/data/delphes/convert_to_h5.py {' '.join(filepaths)} --out-file {srv_out_file}\n")
+                executable_file.write(f"    xrdcp -f {srv_out_file} {job_out_file}\n")
                 executable_file.write("fi\n")
             os.system(f"chmod 775 {job_file_executable}")
             
@@ -132,11 +132,6 @@ class LPCVanillaSubmitter:
                 submit_file.write(f"request_memory = {self.memory}\n")
                 submit_file.write("getenv = True\n")
                 submit_file.write(f'+JobQueue = "{self.queue}"\n')
-                submit_file.write(f'+RunAsOwner = True\n')
-                submit_file.write(f'+InteractiveUser = true\n')
-                submit_file.write(f'+SingularityImage = "/storage/af/user/tsievert/public/heptools-compiled.simg"\n')
-                submit_file.write(f'+SingularityBindCVMFS = False\n')
-                submit_file.write(f'x509userproxy = /storage/af/user/tsievert/x509_proxy \n')
                 submit_file.write(f"should_transfer_files = YES\n")
                 submit_file.write(f"Transfer_Input_Files = {proxy}\n")
                 submit_file.write(f"Transfer_Output_Files = \"\"\n")
