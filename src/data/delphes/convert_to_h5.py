@@ -775,7 +775,6 @@ def main(in_files, out_file, split_file_size, file_limit, train_frac, n_tops, pl
             list(in_files[i*condor_files_per_job:(i+1)*condor_files_per_job]) 
             for i in range(len(in_files)//condor_files_per_job)
         ]
-        job_filepaths = [job_filepaths[0]]
         submitter = LPCVanillaSubmitter(job_filepaths, out_file)
         submitter.submit()
     elif multip:
