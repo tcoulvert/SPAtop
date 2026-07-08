@@ -30,7 +30,7 @@ class LPCVanillaSubmitter:
     def __init__(
         self,
         dataset_filepaths: list[list[str]], out_file: str, 
-        queue="longlunch", memory="4GB"
+        queue="longlunch", memory="8GB"
     ):
         self.queue = queue
         self.memory = memory
