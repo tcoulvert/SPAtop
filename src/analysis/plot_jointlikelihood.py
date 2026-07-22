@@ -104,14 +104,14 @@ def calc_pur_eff(target_path, pred_path, bins_dict, chi2_cuts=[45, 20]):
         for pred_option, reco_class in zip(pred_options, reco_classes):
             func_name(target_h5, pred_h5, pred_option, reco_classes_toppts[reco_class])
 
-        # Merged
-        exists_and_correct = np.array([detass_probability(pred_h5, pred_option) for pred_option in pred_options]).T
-        doesnt_exist = np.array([notexist_probability(pred_h5, pred_option) for pred_option in pred_options]).T
-        loglikelihood = log_likelihood(exists_and_correct, doesnt_exist)
-        mask = np.any(loglikelihood > 0, axis=1)
-        chosen_option = np.tile(pred_options, (loglikelihood.shape(0), 1))[loglikelihood.argmax(axis=1)]
+    # Merged
+    all_pred_options = [reco_class+str(top_idx) for reco_class in reco_classes for top_idx in range(1, max_tops+1)]
+    exists_and_correct = np.array([detass_probability(pred_h5, pred_option) for pred_option in all_pred_options]).T
+    doesnt_exist = np.array([notexist_probability(pred_h5, pred_option) for pred_option in all_pred_options]).T
+    loglikelihood = log_likelihood(exists_and_correct, doesnt_exist)
+    chosen_option = np.tile(all_pred_options, (loglikelihood.shape(0), 1))[loglikelihood.argmax(axis=1)]
 
-        for pred_option in pred_options:
-            func_name(target_h5, pred_h5, pred_option, reco_classes_toppts['Merged'], pred_mask=(chosen_option == pred_option))
+    for pred_option in all_pred_options:
+        func_name(target_h5, pred_h5, pred_option, reco_classes_toppts['Merged'], pred_mask=(chosen_option == pred_option))
 
     ## Make pur/eff plots ##
