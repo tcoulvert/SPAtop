@@ -77,10 +77,10 @@ def func_name(target_h5, pred_h5, reco_class: str, reco_classes_toppts: dict, pr
     recotoppt = reco_toppt(pred_h5, {key: per_event_predictions[:, i] for i, key in enumerate(jet_assignment_keys)})
     gentoppt = target_h5["TARGETS"][reco_class]['pt'][:]
 
-    reco_classes_toppts[reco_class]['correct_and_found_recopt'].append(recotoppt[np.logical_and(correct_mask, pred_mask)])
-    reco_classes_toppts[reco_class]['all_found_recopt'].append(recotoppt[pred_mask])
-    reco_classes_toppts[reco_class]['correct_and_found_genpt'].append(gentoppt[np.logical_and(correct_mask, pred_mask)])
-    reco_classes_toppts[reco_class]['all_correct_genpt'].append(gentoppt[target_mask])
+    reco_classes_toppts['correct_and_found_recopt'].append(recotoppt[np.logical_and(correct_mask, pred_mask)])
+    reco_classes_toppts['all_found_recopt'].append(recotoppt[pred_mask])
+    reco_classes_toppts['correct_and_found_genpt'].append(gentoppt[np.logical_and(correct_mask, pred_mask)])
+    reco_classes_toppts['all_correct_genpt'].append(gentoppt[target_mask])
     
 
 def calc_pur_eff(target_path, pred_path, bins_dict, chi2_cuts=[45, 20]):
@@ -92,14 +92,17 @@ def calc_pur_eff(target_path, pred_path, bins_dict, chi2_cuts=[45, 20]):
     reco_classes = list(set([key[:-1] for key in pred_h5["SpecialKey.Targets"].keys()]))
 
     reco_classes_toppts = {
-        reco_class: copy.deepcopy({'correct_and_found_recopt': [], 'all_found_recopt': [], 'correct_and_found_genpt': [], 'all_correct_genpt': []})
+        reco_class: copy.deepcopy({
+            'correct_and_found_recopt': [], 'all_found_recopt': [], 
+            'correct_and_found_genpt': [], 'all_correct_genpt': []
+        })
         for reco_class in reco_classes+['Merged']
     }
     for top_idx in range(1, max_tops+1):
         pred_options = [reco_class+str(top_idx) for reco_class in reco_classes]
 
-        for reco_class in pred_options:
-            func_name(target_h5, pred_h5, reco_class, reco_classes_toppts)
+        for pred_option, reco_class in zip(pred_options, reco_classes):
+            func_name(target_h5, pred_h5, pred_option, reco_classes_toppts[reco_class])
 
         # Merged
         exists_and_correct = np.array([detass_probability(pred_h5, pred_option) for pred_option in pred_options]).T
@@ -108,8 +111,7 @@ def calc_pur_eff(target_path, pred_path, bins_dict, chi2_cuts=[45, 20]):
         mask = np.any(loglikelihood > 0, axis=1)
         chosen_option = np.tile(pred_options, (loglikelihood.shape(0), 1))[loglikelihood.argmax(axis=1)]
 
-        for reco_class in pred_options:
-            func_name(target_h5, pred_h5, reco_class, reco_classes_toppts, pred_mask=(chosen_option == reco_class))
+        for pred_option in pred_options:
+            func_name(target_h5, pred_h5, pred_option, reco_classes_toppts['Merged'], pred_mask=(chosen_option == pred_option))
 
-
-    ## generate look up tables ##
+    ## Make pur/eff plots ##

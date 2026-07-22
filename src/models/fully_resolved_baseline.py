@@ -157,29 +157,30 @@ if SAVE_H5:
 
 
 # Computes if χ² method found correct tops
-def correct_mask(pred_b, pred_q1, pred_q2):
-    return (
-        tgt_t1_mask
-        & (pred_b == tgt_t1_b)
-        & (
-            ( (pred_q1 == tgt_t1_q1) & (pred_q2 == tgt_t1_q2) ) 
-            | ( (pred_q1 == tgt_t1_q2) & (pred_q2 == tgt_t1_q1) )
+def correct_mask(pred_b, pred_q1, pred_q2, top_idx=1):
+    if top_idx == 1:
+        return (
+            (pred_b == tgt_t1_b)
+            & (
+                ( (pred_q1 == tgt_t1_q1) & (pred_q2 == tgt_t1_q2) ) 
+                | ( (pred_q1 == tgt_t1_q2) & (pred_q2 == tgt_t1_q1) )
+            )
         )
-    ) | (
-        tgt_t2_mask
-        & (pred_b == tgt_t2_b)
-        & (
-            ( (pred_q1 == tgt_t2_q1) & (pred_q2 == tgt_t2_q2) ) 
-            | ( (pred_q1 == tgt_t2_q2) & (pred_q2 == tgt_t2_q1) )
+    elif top_idx == 2:
+        return (
+            (pred_b == tgt_t2_b)
+            & (
+                ( (pred_q1 == tgt_t2_q1) & (pred_q2 == tgt_t2_q2) ) 
+                | ( (pred_q1 == tgt_t2_q2) & (pred_q2 == tgt_t2_q1) )
+            )
         )
-    )
 
 ## Outputs ##
 # Plot resolved baseline χ² distributions
 if PLOT_CHI2_HISTS:
     # Plot Top χ² histograms
     for i in range(N_TOPS):
-        valid_t = ~ak.is_none(top_dict[f'FRt{i+1}_chi2']) & (top_dict[f'FRt{i+1}_chi2'] < 500)
+        valid_t = ~ak.is_none(top_dict[f'FRt{i+1}_chi2']) & (top_dict[f'FRt{i+1}_chi2'] < 500) & (tgt_t1_mask if i == 0 else tgt_t2_mask)
         chi2_vals_1 = ak.ravel(top_dict[f'FRt{i+1}_chi2'][valid_t])
         plt.figure()
         plt.hist(chi2_vals_1, bins=100)
@@ -193,8 +194,8 @@ if PLOT_CHI2_HISTS:
 
     # Plot Top χ² histograms
     for i in range(N_TOPS):
-        correct_t = correct_mask(top_dict[f'FRt{i+1}_b'], top_dict[f'FRt{i+1}_q1'], top_dict[f'FRt{i+1}_q2'])
-        valid_t = ~ak.is_none(correct_t) & (top_dict[f'FRt{i+1}_chi2'] < 500)
+        correct_t = correct_mask(top_dict[f'FRt{i+1}_b'], top_dict[f'FRt{i+1}_q1'], top_dict[f'FRt{i+1}_q2'], top_idx=i+1)
+        valid_t = ~ak.is_none(correct_t) & (top_dict[f'FRt{i+1}_chi2'] < 500) & (tgt_t1_mask if i == 0 else tgt_t2_mask)
         corr_chi2_t_vals = ak.ravel(top_dict[f'FRt{i+1}_chi2'][valid_t][correct_t[valid_t]])
         incorr_chi2_t_vals = ak.ravel(top_dict[f'FRt{i+1}_chi2'][valid_t][~correct_t[valid_t]])
         plt.figure()
@@ -210,11 +211,11 @@ if PLOT_CHI2_HISTS:
 
 # Plot resolved baseline ROC curve
 if PLOT_ROCS:
-    correct_t1 = correct_mask(top_dict[f'FRt{1}_b'], top_dict[f'FRt{1}_q1'], top_dict[f'FRt{1}_q2'])
-    correct_t2 = correct_mask(top_dict[f'FRt{2}_b'], top_dict[f'FRt{2}_q1'], top_dict[f'FRt{2}_q2'])
+    correct_t1 = correct_mask(top_dict[f'FRt{1}_b'], top_dict[f'FRt{1}_q1'], top_dict[f'FRt{1}_q2'], topidx=1)
+    correct_t2 = correct_mask(top_dict[f'FRt{2}_b'], top_dict[f'FRt{2}_q1'], top_dict[f'FRt{2}_q2'], topidx=2)
     
-    valid_t1 = ~ak.is_none(correct_t1) & (top_dict[f'FRt1_chi2'] < 500)
-    valid_t2 = ~ak.is_none(correct_t2) & (top_dict[f'FRt2_chi2'] < 500)
+    valid_t1 = ~ak.is_none(correct_t1) & (top_dict[f'FRt1_chi2'] < 500) & tgt_t1_mask
+    valid_t2 = ~ak.is_none(correct_t2) & (top_dict[f'FRt2_chi2'] < 500) & tgt_t2_mask
 
     print(f"num valid t1 = {ak.sum(valid_t1)} out of {ak.num(valid_t1, axis=0)}")
     print(f"num valid t2 = {ak.sum(valid_t2)} out of {ak.num(valid_t2, axis=0)}")
