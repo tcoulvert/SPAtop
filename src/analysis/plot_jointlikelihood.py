@@ -54,23 +54,37 @@ def reco_toppt(pred_h5, jet_assn_keys: dict[str, np.ndarray]):
     return reco_top.pt
 
 
-def func_name(target_h5, pred_h5, reco_class: str, reco_classes_toppts: dict, pred_mask: None|np.ndarray=None, target_mask: None|np.ndarray=None):
+def split_pur_eff_toppts(target_h5, pred_h5, reco_class: str, reco_classes_toppts: dict):
     jet_assignment_keys = [key for key in pred_h5["SpecialKey.Targets"][reco_class].keys() if 'probability' not in key]
 
     per_event_predictions = np.array([pred_h5["SpecialKey.Targets"][reco_class][key][:] for key in jet_assignment_keys]).T
     per_event_loglikelihood = log_likelihood(
         np.array(detass_probability(pred_h5, reco_class)), np.array(notexist_probability(pred_h5, reco_class))
     )
-    likelihood_mask = (per_event_loglikelihood > 0)
-    pred_mask = np.logical_and(
-        likelihood_mask,
-        pred_mask if pred_mask is not None else np.ones(per_event_predictions.shape[0], dtype=bool)
-    )
+    pred_mask = (per_event_loglikelihood > 0)
     per_event_targets = np.array([target_h5["TARGETS"][reco_class][key][:] for key in jet_assignment_keys]).T
-    target_mask = np.logical_and(
-        target_h5["TARGETS"][reco_class]['MASK'][:], 
-        target_mask if target_mask is not None else np.ones(per_event_targets.shape[0], dtype=bool)
+    target_mask = target_h5["TARGETS"][reco_class]['MASK'][:]
+
+    correct_mask = np.logical_and(target_mask, np.all(per_event_predictions == per_event_targets, axis=1))
+
+    recotoppt = reco_toppt(pred_h5, {key: per_event_predictions[:, i] for i, key in enumerate(jet_assignment_keys)})
+    gentoppt = target_h5["TARGETS"][reco_class]['pt'][:]
+
+    reco_classes_toppts['correct_and_found_recopt'].append(recotoppt[np.logical_and(correct_mask, pred_mask)])
+    reco_classes_toppts['all_found_recopt'].append(recotoppt[pred_mask])
+    reco_classes_toppts['correct_and_found_genpt'].append(gentoppt[np.logical_and(correct_mask, pred_mask)])
+    reco_classes_toppts['all_correct_genpt'].append(gentoppt[target_mask])
+
+def merged_pur_eff_toppts(target_h5, pred_h5, reco_classes: list[str], reco_classes_toppts: dict, chosen_recos: ak.Array):
+    jet_assignment_keys = [key for key in pred_h5["SpecialKey.Targets"][reco_class].keys() if 'probability' not in key]
+
+    per_event_predictions = np.array([pred_h5["SpecialKey.Targets"][reco_class][key][:] for key in jet_assignment_keys]).T
+    per_event_loglikelihood = log_likelihood(
+        np.array(detass_probability(pred_h5, reco_class)), np.array(notexist_probability(pred_h5, reco_class))
     )
+    pred_mask = (per_event_loglikelihood > 0)
+    per_event_targets = np.array([target_h5["TARGETS"][reco_class][key][:] for key in jet_assignment_keys]).T
+    target_mask = target_h5["TARGETS"][reco_class]['MASK'][:]
 
     correct_mask = np.logical_and(target_mask, np.all(per_event_predictions == per_event_targets, axis=1))
 
@@ -91,7 +105,7 @@ def calc_pur_eff(target_path, pred_path, bins_dict, chi2_cuts=[45, 20]):
     max_tops = max([key[-1] for key in pred_h5["SpecialKey.Targets"].keys()])
     reco_classes = list(set([key[:-1] for key in pred_h5["SpecialKey.Targets"].keys()]))
 
-    reco_classes_toppts = {
+    pur_eff_toppts = {
         reco_class: copy.deepcopy({
             'correct_and_found_recopt': [], 'all_found_recopt': [], 
             'correct_and_found_genpt': [], 'all_correct_genpt': []
@@ -102,16 +116,16 @@ def calc_pur_eff(target_path, pred_path, bins_dict, chi2_cuts=[45, 20]):
         pred_options = [reco_class+str(top_idx) for reco_class in reco_classes]
 
         for pred_option, reco_class in zip(pred_options, reco_classes):
-            func_name(target_h5, pred_h5, pred_option, reco_classes_toppts[reco_class])
+            split_pur_eff_toppts(target_h5, pred_h5, pred_option, pur_eff_toppts[reco_class])
 
     # Merged
     all_pred_options = [reco_class+str(top_idx) for reco_class in reco_classes for top_idx in range(1, max_tops+1)]
     exists_and_correct = np.array([detass_probability(pred_h5, pred_option) for pred_option in all_pred_options]).T
     doesnt_exist = np.array([notexist_probability(pred_h5, pred_option) for pred_option in all_pred_options]).T
     loglikelihood = log_likelihood(exists_and_correct, doesnt_exist)
-    chosen_option = np.tile(all_pred_options, (loglikelihood.shape(0), 1))[loglikelihood.argmax(axis=1)]
+    chosen_options = ak.from_regular(np.tile(all_pred_options, (loglikelihood.shape(0), 1))[loglikelihood.argsort(axis=1, descending=True)])[loglikelihood > 0]
 
     for pred_option in all_pred_options:
-        func_name(target_h5, pred_h5, pred_option, reco_classes_toppts['Merged'], pred_mask=(chosen_option == pred_option))
+        merged_pur_eff_toppts(target_h5, pred_h5, pred_option, pur_eff_toppts['Merged'], chosen_options)
 
     ## Make pur/eff plots ##
