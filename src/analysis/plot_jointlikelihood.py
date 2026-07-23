@@ -1,131 +1,232 @@
-import copy
 import os
 
 import h5py as h5
 import matplotlib.pyplot as plt
 import numpy as np
 
-import awkward as ak
-import vector as vec
-vec.register_awkward()
-
 from src.analysis.boosted import parse_boosted_w_target
 from src.analysis.resolved import parse_resolved_w_target
 from src.analysis.semi_resolved import parse_semi_resolved_w_target
+from src.analysis.merged import parse_merged_w_target
 from src.analysis.utils import calc_eff, calc_pur
 
 
-def detass_probability(pred_h5, reco_class: str):
-    return (
-        pred_h5["SpecialKey.Targets"][reco_class]["detection_probability"][:]
-        * pred_h5["SpecialKey.Targets"][reco_class]["assignment_probability"][:]
-    )
-def notexist_probability(pred_h5, reco_class: str):
-    return 1 - pred_h5["SpecialKey.Targets"][reco_class]["detection_probability"][:]
-
-def log_likelihood(detass_prob, notexist_prob):
-    return np.log(detass_prob) - np.log(notexist_prob)
-
-
-def reco_toppt(pred_h5, jet_assn_keys: dict[str, np.ndarray]):
-    Jets = ak.from_regular(ak.zip({
-        "pt": pred_h5['INPUTS']['Jets']['pt'][:],
-        "eta": pred_h5['INPUTS']['Jets']['eta'][:],
-        "phi": pred_h5['INPUTS']['Jets']['phi'][:],
-        "mass": pred_h5['INPUTS']['Jets']['mass'][:],
-    }, with_name="Momentum4D"))
-    BoostedJets = ak.from_regular(ak.zip({
-        "pt": pred_h5['INPUTS']['BoostedJets']['fj_pt'][:],
-        "eta": pred_h5['INPUTS']['BoostedJets']['fj_eta'][:],
-        "phi": pred_h5['INPUTS']['BoostedJets']['fj_phi'][:],
-        "mass": pred_h5['INPUTS']['BoostedJets']['fj_mass'][:],
-    }, with_name="Momentum4D"))
-    n_jets = pred_h5['INPUTS']['Jets']['pt'][:].shape[1]
-    n_fatjets = pred_h5['INPUTS']['BoostedJets']['fj_pt'][:].shape[1]
-
-    jets = []
-    for key, value in jet_assn_keys.items():
-        if len([k for k in key if k.isalpha()]) == 1:
-            jets.append(ak.firsts(Jets[ak.local_index(Jets) == value]))
-        else:
-            jets.append(ak.firsts(BoostedJets[ak.local_index(BoostedJets) == (value - n_jets)]))
-
-    reco_top = sum(jets)
-    return reco_top.pt
-
-
-def split_pur_eff_toppts(target_h5, pred_h5, reco_class: str, reco_classes_toppts: dict):
-    jet_assignment_keys = [key for key in pred_h5["SpecialKey.Targets"][reco_class].keys() if 'probability' not in key]
-
-    per_event_predictions = np.array([pred_h5["SpecialKey.Targets"][reco_class][key][:] for key in jet_assignment_keys]).T
-    per_event_loglikelihood = log_likelihood(
-        np.array(detass_probability(pred_h5, reco_class)), np.array(notexist_probability(pred_h5, reco_class))
-    )
-    pred_mask = (per_event_loglikelihood > 0)
-    per_event_targets = np.array([target_h5["TARGETS"][reco_class][key][:] for key in jet_assignment_keys]).T
-    target_mask = target_h5["TARGETS"][reco_class]['MASK'][:]
-
-    correct_mask = np.logical_and(target_mask, np.all(per_event_predictions == per_event_targets, axis=1))
-
-    recotoppt = reco_toppt(pred_h5, {key: per_event_predictions[:, i] for i, key in enumerate(jet_assignment_keys)})
-    gentoppt = target_h5["TARGETS"][reco_class]['pt'][:]
-
-    reco_classes_toppts['correct_and_found_recopt'].append(recotoppt[np.logical_and(correct_mask, pred_mask)])
-    reco_classes_toppts['all_found_recopt'].append(recotoppt[pred_mask])
-    reco_classes_toppts['correct_and_found_genpt'].append(gentoppt[np.logical_and(correct_mask, pred_mask)])
-    reco_classes_toppts['all_correct_genpt'].append(gentoppt[target_mask])
-
-def merged_pur_eff_toppts(target_h5, pred_h5, reco_classes: list[str], reco_classes_toppts: dict, chosen_recos: ak.Array):
-    jet_assignment_keys = [key for key in pred_h5["SpecialKey.Targets"][reco_class].keys() if 'probability' not in key]
-
-    per_event_predictions = np.array([pred_h5["SpecialKey.Targets"][reco_class][key][:] for key in jet_assignment_keys]).T
-    per_event_loglikelihood = log_likelihood(
-        np.array(detass_probability(pred_h5, reco_class)), np.array(notexist_probability(pred_h5, reco_class))
-    )
-    pred_mask = (per_event_loglikelihood > 0)
-    per_event_targets = np.array([target_h5["TARGETS"][reco_class][key][:] for key in jet_assignment_keys]).T
-    target_mask = target_h5["TARGETS"][reco_class]['MASK'][:]
-
-    correct_mask = np.logical_and(target_mask, np.all(per_event_predictions == per_event_targets, axis=1))
-
-    recotoppt = reco_toppt(pred_h5, {key: per_event_predictions[:, i] for i, key in enumerate(jet_assignment_keys)})
-    gentoppt = target_h5["TARGETS"][reco_class]['pt'][:]
-
-    reco_classes_toppts['correct_and_found_recopt'].append(recotoppt[np.logical_and(correct_mask, pred_mask)])
-    reco_classes_toppts['all_found_recopt'].append(recotoppt[pred_mask])
-    reco_classes_toppts['correct_and_found_genpt'].append(gentoppt[np.logical_and(correct_mask, pred_mask)])
-    reco_classes_toppts['all_correct_genpt'].append(gentoppt[target_mask])
-    
-
-def calc_pur_eff(target_path, pred_path, bins_dict, chi2_cuts=[45, 20]):
+def calc_pur_eff(target_path, pred_path, bins_dict, chi2_cut=45, mode: str='pur_eff'):
     # open files
+    pred_h5 = h5.File(pred_path, "a")
     target_h5 = h5.File(target_path)
-    pred_h5 = h5.File(pred_path)
 
-    max_tops = max([key[-1] for key in pred_h5["SpecialKey.Targets"].keys()])
-    reco_classes = list(set([key[:-1] for key in pred_h5["SpecialKey.Targets"].keys()]))
+    # handle different pl version
+    if "TARGETS" not in pred_h5.keys():
+        pred_h5["INPUTS"] = pred_h5["SpecialKey.Inputs"]
+        pred_h5["TARGETS"] = pred_h5["SpecialKey.Targets"]
 
-    pur_eff_toppts = {
-        reco_class: copy.deepcopy({
-            'correct_and_found_recopt': [], 'all_found_recopt': [], 
-            'correct_and_found_genpt': [], 'all_correct_genpt': []
-        })
-        for reco_class in reco_classes+['Merged']
+    ## generate look up tables ##
+    # boosted
+    LUT_boosted_pred, LUT_boosted_target = parse_boosted_w_target(target_h5, pred_h5)
+
+    # semi-resolved
+    # qq
+    LUT_semiresolved_qq_pred, LUT_semiresolved_qq_target = parse_semi_resolved_w_target(target_h5, pred_h5, 'qq')
+    # bq
+    LUT_semiresolved_bq_pred, LUT_semiresolved_bq_target = parse_semi_resolved_w_target(target_h5, pred_h5, 'bq')
+
+    # resolved
+    LUT_resolved_pred, LUT_resolved_target = parse_resolved_w_target(target_h5, pred_h5, chi2_cut=chi2_cut)
+
+    # merged
+    LUT_merged_pred, LUT_merged_target = parse_merged_w_target(target_h5, pred_h5)
+
+
+    ## calculate efficiencies and purities for b+r, b, and r (and srqq, srbq if available) ##
+    results = {}
+    if 'pur' in mode.lower():
+        results["pur_m"], results["purerr_m"] = calc_eff(LUT_merged_pred, bins_dict['all'])
+        results["pur_b"], results["purerr_b"] = calc_eff(LUT_boosted_pred, bins_dict['FB'])
+        results["pur_r"], results["purerr_r"] = calc_eff(LUT_resolved_pred, bins_dict['FR'])
+        results["pur_srqq"], results["purerr_srqq"] = calc_eff(LUT_semiresolved_qq_pred, bins_dict['SRqq'])
+        results["pur_srbq"], results["purerr_srbq"] = calc_eff(LUT_semiresolved_bq_pred, bins_dict['SRbq'])
+    if 'eff' in mode.lower():
+        results["eff_m"], results["efferr_m"] = calc_pur(LUT_merged_target, bins_dict['all'])
+        results["eff_b"], results["efferr_b"] = calc_pur(LUT_boosted_target, bins_dict['FB'])
+        results["eff_r"], results["efferr_r"] = calc_pur(LUT_resolved_target, bins_dict['FR'])
+        results["eff_srqq"], results["efferr_srqq"] = calc_pur(LUT_semiresolved_qq_target, bins_dict['SRqq'])
+        results["eff_srbq"], results["efferr_srbq"] = calc_pur(LUT_semiresolved_bq_target, bins_dict['SRbq'])
+
+
+    print("Number of Boosted Prediction:", np.array([pred for event in LUT_boosted_pred for pred in event]).shape[0])
+    print("Number of Resolved Prediction:", np.array([pred for event in LUT_resolved_pred for pred in event]).shape[0])
+    print("Number of Semi-Resolved-qq Prediction:", np.array([pred for event in LUT_semiresolved_qq_pred for pred in event]).shape[0])
+    print("Number of Semi-Resolved-bq Prediction:", np.array([pred for event in LUT_semiresolved_bq_pred for pred in event]).shape[0])
+
+    return results
+
+
+# I started to use "efficiency" for describing how many gen tops were reconstructed
+# and "purity" for desrcribing how many reco tops are actually gen tops
+def plot_pur_eff_w_dict(
+    plot_dict, target_path, save_path=None, proj_name=None, 
+    bins_dict={
+        'FR': np.arange(0, 300, 10),
+        'SRqq': np.arange(100, 400, 10),
+        'SRbq': np.arange(100, 400, 10),
+        'FB': np.arange(200, 1000, 50),
+        'all': np.arange(0, 1000, 50),
     }
-    for top_idx in range(1, max_tops+1):
-        pred_options = [reco_class+str(top_idx) for reco_class in reco_classes]
+):
 
-        for pred_option, reco_class in zip(pred_options, reco_classes):
-            split_pur_eff_toppts(target_h5, pred_h5, pred_option, pur_eff_toppts[reco_class])
+    plot_bins_dict = {
+        key: np.append(bins, 2 * bins[-1] - bins[-2])
+        for key, bins in bins_dict.items()
+    }
+    bin_centers_dict = {
+        key: [(plot_bins[i] + plot_bins[i + 1]) / 2 for i in range(plot_bins.size - 1)]
+        for key, plot_bins in plot_bins_dict.items()
+    }
+    xerr_dict = {
+        key: (plot_bins[1] - plot_bins[0]) / 2 * np.ones(plot_bins.shape[0] - 1)
+        for key, plot_bins in plot_bins_dict.items()
+    }
 
-    # Merged
-    all_pred_options = [reco_class+str(top_idx) for reco_class in reco_classes for top_idx in range(1, max_tops+1)]
-    exists_and_correct = np.array([detass_probability(pred_h5, pred_option) for pred_option in all_pred_options]).T
-    doesnt_exist = np.array([notexist_probability(pred_h5, pred_option) for pred_option in all_pred_options]).T
-    loglikelihood = log_likelihood(exists_and_correct, doesnt_exist)
-    chosen_options = ak.from_regular(np.tile(all_pred_options, (loglikelihood.shape(0), 1))[loglikelihood.argsort(axis=1, descending=True)])[loglikelihood > 0]
+    # m: merged (b++sr+r)
+    # b: boosted
+    # r: resolved
+    fig_m, ax_m = plt.subplots(1, 2, figsize=(15, 5))
+    fig_b, ax_b = plt.subplots(1, 2, figsize=(15, 5))
+    fig_r, ax_r = plt.subplots(1, 2, figsize=(15, 5))
+    fig_srqq, ax_srqq = plt.subplots(1, 2, figsize=(15, 5))
+    fig_srbq, ax_srbq = plt.subplots(1, 2, figsize=(15, 5))
 
-    for pred_option in all_pred_options:
-        merged_pur_eff_toppts(target_h5, pred_h5, pred_option, pur_eff_toppts['Merged'], chosen_options)
+    ## preset figure labels, titles, limits, etc. ##
+    # merged
+    ax_m[0].set(
+        xlabel=r"All categories Reco top pT (GeV)",
+        ylabel=r"Reconstruction Purity",
+        title=f"Reconstruction Purity vs. All category Reco top pT",
+    )
+    ax_m[1].set(
+        xlabel=r"All categories Gen top pT (GeV)",
+        ylabel=r"Reconstruction Efficiency",
+        title=f"Reconstruction Efficiency vs. All category Gen top pT",
+    )
+    # boosted
+    ax_b[0].set(
+        xlabel=r"Reco Boosted top pT (GeV)",
+        ylabel=r"Reconstruction Purity",
+        title=f"Reconstruction Purity vs. Reco Boosted top pT",
+    )
+    ax_b[1].set(
+        xlabel=r"Gen Boosted top pT (GeV)",
+        ylabel=r"Reconstruction Efficiency",
+        title=f"Reconstruction Efficiency vs. Gen Boosted top pT",
+    )
+    # resolved
+    ax_r[0].set(
+        xlabel=r"Reco Resolved top pT (GeV)",
+        ylabel=r"Reconstruction Purity",
+        title=f"Reconstruction Purity vs. Reco Resolved top pT",
+    )
+    ax_r[1].set(
+        xlabel=r"Gen Resolved top pT (GeV)",
+        ylabel=r"Reconstruction Efficiency",
+        title=f"Reconstruction Efficiency vs. Gen Resolved top pT",
+    )
+    # semi-resolved qq
+    ax_srqq[0].set(
+        xlabel=r"Reco Semi-Resolved top pT (GeV)",
+        ylabel=r"Reconstruction Purity",
+        title=f"Reconstruction Purity vs. Reco Semi-Resolved top pT",
+    )
+    ax_srqq[1].set(
+        xlabel=r"Gen Semi-Resolved top pT (GeV)",
+        ylabel=r"Reconstruction Efficiency",
+        title=f"Reconstruction Efficiency vs. Gen Semi-Resolved top pT",
+    )
+    # semi-resolved bq
+    ax_srbq[0].set(
+        xlabel=r"Reco Semi-Resolved top pT (GeV)",
+        ylabel=r"Reconstruction Purity",
+        title=f"Reconstruction Purity vs. Reco Semi-Resolved top pT",
+    )
+    ax_srbq[1].set(
+        xlabel=r"Gen Semi-Resolved top pT (GeV)",
+        ylabel=r"Reconstruction Efficiency",
+        title=f"Reconstruction Efficiency vs. Gen Semi-Resolved top pT",
+    )
 
-    ## Make pur/eff plots ##
+
+    ## plot purities and efficiencies ##
+    for tag, pred_path in plot_dict.items():
+
+        tag_label = tag
+        if 'chi2' in tag:
+            tag_list = tag.split('_')
+            tag = tag_list[0]
+            chi2_cut = int(tag_list[1])
+
+            print("Processing", tag_label)
+            results = calc_pur_eff(target_path, pred_path, bins_dict, chi2_cut=chi2_cut)
+        else:
+            print("Processing", tag_label)
+            results = calc_pur_eff(target_path, pred_path, bins_dict)
+
+
+        # merged
+        ax_m[0].errorbar(x=bin_centers_dict['all'], y=results["pur_m"], xerr=xerr_dict['all'], yerr=results["purerr_m"], fmt="o", capsize=5, label=tag_label)
+        ax_m[1].errorbar(x=bin_centers_dict['all'], y=results["eff_m"], xerr=xerr_dict['all'], yerr=results["efferr_m"], fmt="o", capsize=5, label=tag_label)
+        # boosted
+        ax_b[0].errorbar(x=bin_centers_dict['FB'], y=results["pur_b"], xerr=xerr_dict['FB'], yerr=results["purerr_b"], fmt="o", capsize=5, label=tag_label)
+        ax_b[1].errorbar(x=bin_centers_dict['FB'], y=results["eff_b"], xerr=xerr_dict['FB'], yerr=results["efferr_b"], fmt="o", capsize=5, label=tag_label)
+        # resolved
+        ax_r[0].errorbar(x=bin_centers_dict['FR'], y=results["pur_r"], xerr=xerr_dict['FR'], yerr=results["purerr_r"], fmt="o", capsize=5, label=tag_label)
+        ax_r[1].errorbar(x=bin_centers_dict['FR'], y=results["eff_r"], xerr=xerr_dict['FR'], yerr=results["efferr_r"], fmt="o", capsize=5, label=tag_label)
+        # semi-resolved qq
+        ax_srqq[0].errorbar(x=bin_centers_dict['SRqq'], y=results["pur_srqq"], xerr=xerr_dict['SRqq'], yerr=results["purerr_srqq"], fmt="o", capsize=5, label=tag_label)
+        ax_srqq[1].errorbar(x=bin_centers_dict['SRqq'], y=results["eff_srqq"], xerr=xerr_dict['SRqq'], yerr=results["efferr_srqq"], fmt="o", capsize=5, label=tag_label)
+        # semi-resolved bq
+        ax_srbq[0].errorbar(x=bin_centers_dict['SRbq'], y=results["pur_srbq"], xerr=xerr_dict['SRbq'], yerr=results["purerr_srbq"], fmt="o", capsize=5, label=tag_label)
+        ax_srbq[1].errorbar(x=bin_centers_dict['SRbq'], y=results["eff_srbq"], xerr=xerr_dict['SRbq'], yerr=results["efferr_srbq"], fmt="o", capsize=5, label=tag_label)
+
+
+    ## adjust limits and legends ##
+    # merged
+    ax_m[0].legend()
+    ax_m[1].legend()
+    ax_m[0].set_ylim([-0.1, 1.1])
+    ax_m[1].set_ylim([-0.1, 1.1])
+    # boosted
+    ax_b[0].legend()
+    ax_b[1].legend()
+    ax_b[0].set_ylim([-0.1, 1.1])
+    ax_b[1].set_ylim([-0.1, 1.1])
+    # resolved
+    ax_r[0].legend()
+    ax_r[1].legend()
+    ax_r[0].set_ylim([-0.1, 1.1])
+    ax_r[1].set_ylim([-0.1, 1.1])
+    # semi-resolved qq
+    ax_srqq[0].legend()
+    ax_srqq[1].legend()
+    ax_srqq[0].set_ylim([-0.1, 1.1])
+    ax_srqq[1].set_ylim([-0.1, 1.1])
+    # semi-resolved bq
+    ax_srbq[0].legend()
+    ax_srbq[1].legend()
+    ax_srbq[0].set_ylim([-0.1, 1.1])
+    ax_srbq[1].set_ylim([-0.1, 1.1])
+
+    plt.show()
+
+    if save_path is not None:
+        # merged
+        fig_m.savefig(os.path.join(save_path, proj_name+'_merged.pdf'))
+        # boosted
+        fig_b.savefig(os.path.join(save_path, proj_name+'_boosted.pdf'))
+        # resolved
+        fig_r.savefig(os.path.join(save_path, proj_name+'_resolved.pdf'))
+        # semi-resolved qq
+        fig_srqq.savefig(os.path.join(save_path, proj_name+'_semiresolved_qq.pdf'))
+        # semi-resolved bq
+        fig_srbq.savefig(os.path.join(save_path, proj_name+'_semiresolved_bq.pdf'))
+
+    return

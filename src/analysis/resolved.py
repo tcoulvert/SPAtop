@@ -177,6 +177,8 @@ def parse_resolved_w_target(
     testfile, predfile, 
     fjs_reco=None, chi2_cut=RESOLVED_CHI2_CUT
 ):
+    if not any('FR' in key for key in predfile["TARGETS"].keys()): return None, None
+
     # FRt pt
     if "pt" in testfile["TARGETS"]["FRt1"].keys():
         FRt1_pt = np.array(testfile["TARGETS"]["FRt1"]["pt"])
@@ -330,13 +332,6 @@ def parse_resolved_w_target(
     b_ps_selected, q1_ps_selected, q2_ps_selected = sel_pred_FRt_by_dp_ap(dps, aps, b_ps, q1_ps, q2_ps)
 
 
-    # find jets that are overlapped with reco boosted top
-    if fjs_reco is None:
-        goodJetIdx = ak.local_index(js)
-    else:
-        goodJetIdx = get_unoverlapped_jet_index(fjs_reco, js, dR_min=0.5)
-
-
     # generate look up tables
     LUT_pred = gen_pred_FRt_LUT(
         b_ps_selected, q1_ps_selected, q2_ps_selected, 
@@ -354,4 +349,4 @@ def parse_resolved_w_target(
     ).snapshot()
 
 
-    return LUT_pred, LUT_target, goodJetIdx
+    return LUT_pred, LUT_target

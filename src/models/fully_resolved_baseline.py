@@ -14,7 +14,7 @@ vec.register_awkward()
 # start = time.time()
 FILEPATH = os.path.abspath(__file__)
 DIRPATH = '/'.join(FILEPATH.split('/')[:-1])
-PLOT_DIRPATH = os.path.join(DIRPATH, 'v8/Chi2_FR')
+PLOT_DIRPATH = os.path.join(DIRPATH, 'v10/Chi2_FR')
 if not os.path.exists(PLOT_DIRPATH): os.makedirs(PLOT_DIRPATH)
 
 N_TOPS = 2
@@ -33,7 +33,7 @@ SAVE_H5 = False
 
 SPANET_TTBAR_CHI2_METHOD = True
 
-file_path = os.path.join(DIRPATH, "../../data/spatopvol/v8/tt_hadronic_testing2k_clean_jetmask_corr_valid_targets.h5")
+file_path = "/storage/af/user/tsievert/topNet/tt_hadronic_bqfixed.h5"
 # 1) Load arrays
 with h5py.File(file_path, "r") as f:
     pt   = f['INPUTS/Jets/pt'][:]
@@ -229,7 +229,7 @@ if PLOT_ROCS:
 
     # === Plot ROC ===
     def plot_roc(chi2_vals, label, plotlabel):
-        fpr, tpr, _ = roc_curve(label, 1/chi2_vals)  # -chi2_vals
+        fpr, tpr, _ = roc_curve(label, chi2_vals)  # -chi2_vals
         roc_auc = auc(fpr, tpr)
         plt.plot(fpr, tpr, label=f"{plotlabel} (AUC = {roc_auc:.3f})")
 
