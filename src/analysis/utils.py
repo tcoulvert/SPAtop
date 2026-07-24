@@ -5,16 +5,20 @@ import numpy as np
 from hist.intervals import clopper_pearson_interval
 
 
-def reset_collision_dp(dps, aps):
-    ap_filter = aps < 1 / (13 * 13)
-    dps_reset = dps
-    dps_reset[ap_filter] = 0
-    return dps_reset
+def n_alpha(string: str):
+    return len([c for c in string if c.isalpha()])
 
 
-def dp_to_TopNumProb(dps):
+# def reset_collision_dp(dps, aps):
+#     ap_filter = aps < 1 / (13 * 13)
+#     dps_reset = dps
+#     dps_reset[ap_filter] = 0
+#     return dps_reset
+
+
+def dp_to_TopNumProb(dps, Nmax: int):
     # get maximum number of targets
-    Nmax = dps.shape[-1]
+    Noptions = dps.shape[-1]
 
     # prepare a list for constructing [P_0t, P_1t, P_2t, ...]
     probs = []
@@ -22,22 +26,26 @@ def dp_to_TopNumProb(dps):
     # loop through all possible number of existing targets
     for N in range(Nmax + 1):
         # get all combinations of targets
-        combs = list(itertools.combinations(range(Nmax), N))
+        combs = list(itertools.combinations(range(Noptions), N))
 
         # calculate the probability of N particles existing for each combination
         P_exist_per_comb = [np.prod(dps[:, list(comb)], axis=-1) for comb in combs]
 
-        # calculate the probability fo Nmax-N particles not existing for each  combination
-        P_noexist_per_comb = [np.prod(1 - dps[:, list(set(range(Nmax)) - set(comb))], axis=-1) for comb in combs]
+        # calculate the probability of Nmax-N particles not existing for each  combination
+        P_noexist_per_comb = [np.prod(1 - dps[:, list(set(range(Noptions)) - set(comb))], axis=-1) for comb in combs]
 
         # concatenate each combination to array for further calculation
-        P_exist_per_comb = [np.reshape(P_comb_e, newshape=(-1, 1)) for P_comb_e in P_exist_per_comb]
-        P_exist_per_comb = np.concatenate(P_exist_per_comb, axis=1)
-        P_noexist_per_comb = [np.reshape(P_comb_e, newshape=(-1, 1)) for P_comb_e in P_noexist_per_comb]
-        P_noexist_per_comb = np.concatenate(P_noexist_per_comb, axis=1)
+        P_exist_per_comb = np.concatenate([
+            np.reshape(P_comb_e, newshape=(-1, 1)) 
+            for P_comb_e in P_exist_per_comb
+        ], axis=1)
+        P_noexist_per_comb = np.concatenate([
+            np.reshape(P_comb_e, newshape=(-1, 1)) 
+            for P_comb_e in P_noexist_per_comb
+        ], axis=1)
 
         # for each combination, calculate the joint probability
-        # of N particles existing and Nmax-N not existing
+        #  of N particles existing and Nmax-N not existing
         P_per_comb = P_exist_per_comb * P_noexist_per_comb
 
         # sum over all possible configurations of N existing and Nmax-N not existing

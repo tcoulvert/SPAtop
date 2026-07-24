@@ -4,22 +4,31 @@ import numpy as np
 import vector
 vector.register_awkward()
 
-from src.analysis.utils import dp_to_TopNumProb, reset_collision_dp
+# from src.analysis.utils import dp_to_TopNumProb, reset_collision_dp, nalpha
+from src.analysis.utils import dp_to_TopNumProb, n_alpha
 
 N_AK4_JETS = 10
 N_AK8_JETS = 2
 N_TOPS = 2
 
-def get_unoverlapped_jet_index(fjs, js, dR_min=0.5):
-    overlapped = ak.sum(js[:, np.newaxis].deltaR(fjs) < dR_min, axis=-2) > 0
-    jet_index_passed = ak.local_index(js).mask[~overlapped]
-    jet_index_passed = ak.drop_none(jet_index_passed)
-    return jet_index_passed
+# def get_unoverlapped_jet_index(fjs, js, dR_min=0.5):
+#     overlapped = ak.sum(js[:, np.newaxis].deltaR(fjs) < dR_min, axis=-2) > 0
+#     jet_index_passed = ak.local_index(js).mask[~overlapped]
+#     jet_index_passed = ak.drop_none(jet_index_passed)
+#     return jet_index_passed
 
 
-def sel_pred_SRt_by_dp_ap(dps, aps, q_ps, qq_ps):
+
+def sel_target_t_by_mask(target_jets, target_pts, target_masks):
+    selected_target_jets = target_jets.mask[target_masks]
+
+    selected_target_pts = target_pts.mask[target_masks]
+
+    return selected_target_jets, selected_target_pts
+
+def sel_pred_t_by_dp_ap(predicted_jets, dps, aps):
     # get most possible number of Top_reco by dps
-    TopNumProb = dp_to_TopNumProb(dps)
+    TopNumProb = dp_to_TopNumProb(dps, N_TOPS)
     TopNum = np.argmax(TopNumProb, axis=-1)
 
     # get the top N (dp x ap) jet assignment indices
@@ -29,36 +38,13 @@ def sel_pred_SRt_by_dp_ap(dps, aps, q_ps, qq_ps):
     idx_sel = [idx_e[:N_e] for idx_e, N_e in zip(idx_descend, TopNum)]
 
     # select the predicted q and qq assignment via the indices
-    q_ps_sel = q_ps[idx_sel]
-    qq_ps_sel = qq_ps[idx_sel]
+    selected_predicted_jets = predicted_jets[idx_sel]
 
-    # require q assignment is AK4 jet & qq assignment is AK8 jet
-    q_ak4_filter = q_ps_sel < N_AK4_JETS
-    qq_ak8_filter = (qq_ps_sel >= N_AK4_JETS) & ( qq_ps_sel < (N_AK4_JETS + N_AK8_JETS) )
-    filter = q_ak4_filter & qq_ak8_filter
+    # selected jets assigned to jets
+    filter = ak.all(~ak.is_none(selected_predicted_jets), axis=-1)
+    selected_predicted_jets = selected_predicted_jets.mask[filter]
 
-    q_ps_passed = q_ps_sel.mask[filter]
-    q_ps_passed = ak.drop_none(q_ps_passed)
-
-    qq_ps_passed = qq_ps_sel.mask[filter]
-    qq_ps_passed = ak.drop_none(qq_ps_passed)
-
-    return q_ps_passed, qq_ps_passed
-
-def sel_target_SRt_by_mask(q_ts, qq_ts, SRt_pts, SRt_overlap, SRt_masks):
-    q_ts_selected = q_ts.mask[SRt_masks]
-    q_ts_selected = ak.drop_none(q_ts_selected)
-
-    qq_ts_selected = qq_ts.mask[SRt_masks]
-    qq_ts_selected = ak.drop_none(qq_ts_selected)
-
-    SRt_selected_pts = SRt_pts.mask[SRt_masks]
-    SRt_selected_pts = ak.drop_none(SRt_selected_pts)
-
-    SRt_overlap_passed = SRt_overlap.mask[SRt_masks]
-    SRt_overlap_passed = ak.drop_none(SRt_overlap_passed)
-
-    return q_ts_selected, qq_ts_selected, SRt_selected_pts, SRt_overlap_passed
+    return selected_predicted_jets
 
 
 # A pred look up table is in shape
@@ -158,115 +144,81 @@ def gen_target_merged_LUT(
 
 
 def parse_merged_w_target(
-    testfile, predfile, method,
-    fjs_reco_bqq=None
-):
-    if not any(f'SR{method}' in key for key in predfile["TARGETS"].keys()): return None, None
+    testfile, predfile, reco_regex: str=''
+):  
+    reconstructions = [key for key in testfile["TARGETS"].keys() if reco_regex in key]
+    jet_labels = {reco: list(testfile["TARGETS"][reco].keys()) for reco in reconstructions}
 
-    # FRt pt
-    SRt1_pt = np.array(testfile["TARGETS"][f"SR{method}t1"]["pt"])
-    SRt2_pt = np.array(testfile["TARGETS"][f"SR{method}t2"]["pt"])
-    SRt_pts = np.concatenate((SRt1_pt.reshape(-1, 1), SRt2_pt.reshape(-1, 1)), axis=1)
-    SRt_pts = ak.Array(SRt_pts)
+    def get_numerical(file, key: str):
+        return ak.Array(
+            np.concatenate([
+                np.array(file["TARGETS"][reco][key]).reshape(-1, 1)
+                for reco in reconstructions
+            ], axis=1)
+        )
+    # def get_jet_idxs(file):
+    #     return ak.concatenate([
+    #         np.concatenate([
+    #             np.array(file["TARGETS"][reco][label]).reshape(-1, 1)
+    #             for label in jet_labels[reco]
+    #         ], axis=1).reshape(-1, 1, len(jet_labels[reco]))
+    #         for reco in reconstructions
+    #     ], axis=1)
+    def get_jets(file):
+        return ak.concatenate([
+            ak.concatenate([
+                ak.firsts(
+                    jets[ak.local_index(jets) == np.array(file["TARGETS"][reco][label])]
+                    if n_alpha(label) == 1 else
+                    fatjets[ak.local_index(fatjets) == np.array(file["TARGETS"][reco][label]) 
+                        | ak.local_index(fatjets) == (np.array(file["TARGETS"][reco][label]) - N_AK4_JETS)]
+                )[:, np.newaxis]
+                for label in jet_labels[reco]
+            ], axis=1).reshape(-1, 1, len(jet_labels[reco]))
+            for reco in reconstructions
+        ], axis=1)
 
+    # jet 4-momentums
+    jets = ak.from_regular(ak.zip({
+        "pt": np.array(testfile["INPUTS"]["Jets"]["pt"]),
+        "eta": np.array(testfile["INPUTS"]["Jets"]["eta"]),
+        "phi": np.array(testfile["INPUTS"]["Jets"]["phi"]),
+        "mass": np.array(testfile["INPUTS"]["Jets"]["mass"])
+    },  with_name="Momentum4D"))
+    fatjets = ak.from_regular(ak.zip({
+        "pt": np.array(testfile["INPUTS"]["BoostedJets"]["fj_pt"]),
+        "eta": np.array(testfile["INPUTS"]["BoostedJets"]["fj_eta"]),
+        "phi": np.array(testfile["INPUTS"]["BoostedJets"]["fj_phi"]),
+        "mass": np.array(testfile["INPUTS"]["BoostedJets"]["fj_mass"])
+    }, with_name="Momentum4D"))
 
-    # resolved MASK
-    SRt1_mask = np.array(testfile["TARGETS"][f"SR{method}t1"]["MASK"])
-    SRt2_mask = np.array(testfile["TARGETS"][f"SR{method}t2"]["MASK"])
-    SRt_masks = np.concatenate((SRt1_mask.reshape(-1, 1), SRt2_mask.reshape(-1, 1)), axis=1)
-    SRt_masks = ak.Array(SRt_masks)
+    # target pt
+    target_pts = get_numerical(testfile, "pt")
 
+    # target MASK
+    target_masks = get_numerical(testfile, "MASK")
 
     # target jets
-    q_SRt1_t = np.array(testfile["TARGETS"][f"SR{method}t1"][f"{'b' if method == 'qq' else 'q'}"])
-    q_SRt2_t = np.array(testfile["TARGETS"][f"SR{method}t2"][f"{'b' if method == 'qq' else 'q'}"])
+    target_jets = get_jets(testfile)
 
-    qq_SRt1_t = np.array(testfile["TARGETS"][f"SR{method}t1"][f"{method}"])
-    qq_SRt2_t = np.array(testfile["TARGETS"][f"SR{method}t2"][f"{method}"])
+    # predicted jets
+    predicted_jets = get_jets(predfile)
 
-    q_ts = np.concatenate(
-        (q_SRt1_t.reshape(-1, 1), q_SRt2_t.reshape(-1, 1)), axis=1
-    )
-    q_ts = ak.Array(q_ts)
-    qq_ts = np.concatenate(
-        (qq_SRt1_t.reshape(-1, 1), qq_SRt2_t.reshape(-1, 1)), axis=1
-    )
-    qq_ts = ak.Array(qq_ts)
+    # predicted probabilities
+    dps = get_numerical(predfile, "detection_probability")
+    aps = get_numerical(predfile, "assignment_probability")
+    # # convert some numpy arrays to ak arrays
+    # dps = reset_collision_dp(dps, aps)
 
-
-    # pred jets
-    q_SRt1_p = np.array(predfile["TARGETS"][f"SR{method}t1"][f"{'b' if method == 'qq' else 'q'}"])
-    q_SRt2_p = np.array(predfile["TARGETS"][f"SR{method}t2"][f"{'b' if method == 'qq' else 'q'}"])
-
-    qq_SRt1_p = np.array(predfile["TARGETS"][f"SR{method}t1"][f"{method}"])
-    qq_SRt2_p = np.array(predfile["TARGETS"][f"SR{method}t2"][f"{method}"])
-
-    q_ps = np.concatenate(
-        (q_SRt1_p.reshape(-1, 1), q_SRt2_p.reshape(-1, 1)), axis=1
-    )
-    q_ps = ak.Array(q_ps)
-    qq_ps = np.concatenate(
-        (qq_SRt1_p.reshape(-1, 1), qq_SRt2_p.reshape(-1, 1)), axis=1
-    )
-    qq_ps = ak.Array(qq_ps)
-
-    try:
-        # jet detection probability
-        dp_SRt1 = np.array(predfile["TARGETS"][f"SR{method}t1"]["detection_probability"])
-        dp_SRt2 = np.array(predfile["TARGETS"][f"SR{method}t2"]["detection_probability"])
-        # jet assignment probability
-        ap_SRt1 = np.array(predfile["TARGETS"][f"SR{method}t1"]["assignment_probability"])
-        ap_SRt2 = np.array(predfile["TARGETS"][f"SR{method}t2"]["assignment_probability"])
-    except:
-        # semi-boosted top detection probability
-        dp_SRt1 = np.array(predfile["TARGETS"][f"SR{method}t1"]["MASK"]).astype("float")
-        dp_SRt2 = np.array(predfile["TARGETS"][f"SR{method}t2"]["MASK"]).astype("float")
-
-        # jet/fatjet assignment probability
-        ap_SRt1 = np.array(predfile["TARGETS"][f"SR{method}t1"]["MASK"]).astype("float")
-        ap_SRt2 = np.array(predfile["TARGETS"][f"SR{method}t2"]["MASK"]).astype("float")
-
-    dps = np.concatenate((dp_SRt1.reshape(-1, 1), dp_SRt2.reshape(-1, 1)), axis=1)
-    aps = np.concatenate((ap_SRt1.reshape(-1, 1), ap_SRt2.reshape(-1, 1)), axis=1)
-    # convert some numpy arrays to ak arrays
-    dps = reset_collision_dp(dps, aps)
-
-
-    # reconstruct jet 4-momentum objects
-    j_pt = np.array(testfile["INPUTS"]["Jets"]["pt"])
-    j_eta = np.array(testfile["INPUTS"]["Jets"]["eta"])
-    j_phi = np.array(testfile["INPUTS"]["Jets"]["phi"])
-    j_mass = np.array(testfile["INPUTS"]["Jets"]["mass"])
-    js = ak.zip(
-        {
-            "pt": j_pt,
-            "eta": j_eta,
-            "phi": j_phi,
-            "mass": j_mass,
-        },
-        with_name="Momentum4D",
-    )
-
-    fj_pt = np.array(testfile["INPUTS"]["BoostedJets"]["fj_pt"])
-    fj_eta = np.array(testfile["INPUTS"]["BoostedJets"]["fj_eta"])
-    fj_phi = np.array(testfile["INPUTS"]["BoostedJets"]["fj_phi"])
-    fj_mass = np.array(testfile["INPUTS"]["BoostedJets"]["fj_mass"])
-    fjs = ak.zip(
-        {
-            "pt": fj_pt,
-            "eta": fj_eta,
-            "phi": fj_phi,
-            "mass": fj_mass,
-        },
-        with_name="Momentum4D",
-    )
 
 
     # select predictions and targets
-    q_ts_selected, qq_ts_selected, SRt_selected_pts, overlap_selected = sel_target_SRt_by_mask(
-        q_ts, qq_ts, SRt_pts, SRt_overlap, SRt_masks
+    selected_target_jets, selected_target_pts = sel_target_t_by_mask(
+        target_jets, target_pts, target_masks
     )
-    q_ps_selected, qq_ps_selected = sel_pred_SRt_by_dp_ap(dps, aps, q_ps, qq_ps)
+    selected_predicted_jets = sel_pred_t_by_dp_ap(
+        predicted_jets, dps, aps
+    )
 
 
     # generate look up tables
