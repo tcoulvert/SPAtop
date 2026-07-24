@@ -26,7 +26,7 @@ def sel_target_t_by_mask(target_jets, target_pts, target_masks):
 
     return selected_target_jets, selected_target_pts
 
-def sel_pred_t_by_dp_ap(predicted_jets, dps, aps):
+def sel_pred_t_by_dp_ap(predicted_jets, predicted_pts, dps, aps):
     # get most possible number of Top_reco by dps
     TopNumProb = dp_to_TopNumProb(dps, N_TOPS)
     TopNum = np.argmax(TopNumProb, axis=-1)
@@ -39,12 +39,14 @@ def sel_pred_t_by_dp_ap(predicted_jets, dps, aps):
 
     # select the predicted q and qq assignment via the indices
     selected_predicted_jets = predicted_jets[idx_sel]
+    selected_predicted_pts = predicted_pts[idx_sel]
 
     # selected jets assigned to jets
     filter = ak.all(~ak.is_none(selected_predicted_jets), axis=-1)
     selected_predicted_jets = selected_predicted_jets.mask[filter]
+    selected_predicted_pts = selected_predicted_pts[filter]
 
-    return selected_predicted_jets
+    return selected_predicted_jets, selected_predicted_pts
 
 
 # A pred look up table is in shape
@@ -109,33 +111,28 @@ def gen_pred_merged_LUT(
 #        target_FBt_assign,
 #           [retrieved, targetSRt_pt, can_boost_reco]]
 @nb.njit
-def gen_target_merged_LUT(
-    q_ps_passed, qq_ps_passed,
-    q_ts_selected, qq_ts_selected,
-    SRt_pts, FBt_overlap_selected, 
+def generate_LUT(
+    selected_jets1, selected_jets2,
+    selected_toppt,
     builder
 ):
     # for each event
-    for q_ps_e, qq_ps_e, q_ts_e, qq_ts_e, SRt_pts_e, FBt_overlap_e in zip(
-        q_ps_passed, qq_ps_passed,
-        q_ts_selected, qq_ts_selected,
-        SRt_pts, FBt_overlap_selected
+    for jets1_event, jets2_event, toppt_event in zip(
+        selected_jets1, selected_jets2,
+        selected_toppt
     ):
         # for each target fatjet, check if the predictions have a p fatject same with the t fatjet
         builder.begin_list()
 
-        for q_t, qq_t, SRt_pt, FBt_overlap in zip(q_ts_e, qq_ts_e, SRt_pts_e, FBt_overlap_e):
-            
+        for jets1, toppt in zip(jets1_event, toppt_event):
             retrieved = 0
-            can_boost_reco = FBt_overlap
-            for q_p, qq_p in zip(q_ps_e, qq_ps_e):
-                if set((q_p, qq_p - N_AK4_JETS)) == set((q_t, qq_t)):
-                    retrieved = 1
+            for jets2 in jets2_event:
+                for jet1, jet2 in zip(jets1, jets2):
+                    if jet1["index"] == jet2["index"]: retrieved += 1
 
             builder.begin_list()
-            builder.append(retrieved)
-            builder.append(SRt_pt)
-            builder.append(can_boost_reco)
+            builder.append(retrieved == len(jets1))
+            builder.append(toppt)
             builder.end_list()
 
         builder.end_list()
@@ -156,14 +153,6 @@ def parse_merged_w_target(
                 for reco in reconstructions
             ], axis=1)
         )
-    # def get_jet_idxs(file):
-    #     return ak.concatenate([
-    #         np.concatenate([
-    #             np.array(file["TARGETS"][reco][label]).reshape(-1, 1)
-    #             for label in jet_labels[reco]
-    #         ], axis=1).reshape(-1, 1, len(jet_labels[reco]))
-    #         for reco in reconstructions
-    #     ], axis=1)
     def get_jets(file):
         return ak.concatenate([
             ak.concatenate([
@@ -171,7 +160,7 @@ def parse_merged_w_target(
                     jets[ak.local_index(jets) == np.array(file["TARGETS"][reco][label])]
                     if n_alpha(label) == 1 else
                     fatjets[ak.local_index(fatjets) == np.array(file["TARGETS"][reco][label]) 
-                        | ak.local_index(fatjets) == (np.array(file["TARGETS"][reco][label]) - N_AK4_JETS)]
+                        | fatjets["index"] == np.array(file["TARGETS"][reco][label])]
                 )[:, np.newaxis]
                 for label in jet_labels[reco]
             ], axis=1).reshape(-1, 1, len(jet_labels[reco]))
@@ -185,12 +174,14 @@ def parse_merged_w_target(
         "phi": np.array(testfile["INPUTS"]["Jets"]["phi"]),
         "mass": np.array(testfile["INPUTS"]["Jets"]["mass"])
     },  with_name="Momentum4D"))
+    jets["index"] = ak.local_index(jets)
     fatjets = ak.from_regular(ak.zip({
         "pt": np.array(testfile["INPUTS"]["BoostedJets"]["fj_pt"]),
         "eta": np.array(testfile["INPUTS"]["BoostedJets"]["fj_eta"]),
         "phi": np.array(testfile["INPUTS"]["BoostedJets"]["fj_phi"]),
         "mass": np.array(testfile["INPUTS"]["BoostedJets"]["fj_mass"])
     }, with_name="Momentum4D"))
+    fatjets["index"] = ak.local_index(fatjets) + N_AK4_JETS
 
     # target pt
     target_pts = get_numerical(testfile, "pt")
@@ -203,6 +194,7 @@ def parse_merged_w_target(
 
     # predicted jets
     predicted_jets = get_jets(predfile)
+    predicted_pts = ak.sum(predicted_jets, axis=-1).pt
 
     # predicted probabilities
     dps = get_numerical(predfile, "detection_probability")
@@ -213,21 +205,14 @@ def parse_merged_w_target(
 
 
     # select predictions and targets
-    selected_target_jets, selected_target_pts = sel_target_t_by_mask(
-        target_jets, target_pts, target_masks
-    )
-    selected_predicted_jets = sel_pred_t_by_dp_ap(
-        predicted_jets, dps, aps
-    )
+    selected_target_jets, selected_target_pts = sel_target_t_by_mask(target_jets, target_pts, target_masks)
+    selected_predicted_jets, selected_predicted_pts = sel_pred_t_by_dp_ap(predicted_jets, predicted_pts, dps, aps)
 
 
     # generate look up tables
-    LUT_pred = gen_pred_SRt_LUT(
-        q_ps_selected, qq_ps_selected,
-        q_ts_selected, qq_ts_selected,
-        js, goodJetIdx, 
-        fjs, goodFatJetIdx,
-        overlap_selected, 
+    LUT_pred = generate_LUT(
+        selected_predicted_jets, selected_target_jets,
+        selected_predicted_pts,
         ak.ArrayBuilder()
     ).snapshot()
     LUT_target = gen_target_SRt_LUT(
