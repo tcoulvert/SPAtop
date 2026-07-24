@@ -10,20 +10,7 @@ N_AK4_JETS = 10
 N_AK8_JETS = 2
 N_TOPS = 2
 
-RESOLVED_CHI2_CUT = 20  # taken by-eye from boosted chi2 plots
-
-
-def get_unoverlapped_jet_index(fjs, js, dR_min=0.5):
-    if type(fjs) is not list:
-        fjs = [fjs]
-
-    overlapped = ak.sum(js[:, np.newaxis].deltaR(fjs[0]) < dR_min, axis=-2) > 0
-    for i in range(1, len(fjs)):
-        overlapped = overlapped | ak.sum(js[:, np.newaxis].deltaR(fjs[i]) < dR_min, axis=-2) > 0
-
-    jet_index_passed = ak.local_index(js).mask[~overlapped]
-    jet_index_passed = ak.drop_none(jet_index_passed)
-    return jet_index_passed
+RESOLVED_CHI2_CUT = 45  # taken by-eye from boosted chi2 plots
 
 
 def sel_pred_FRt_by_dp_ap(dps, aps, b_ps, q1_ps, q2_ps):
@@ -59,7 +46,7 @@ def sel_pred_FRt_by_dp_ap(dps, aps, b_ps, q1_ps, q2_ps):
 
     return b_ps_passed, q1_ps_passed, q2_ps_passed
 
-def sel_target_FRt_by_mask(b_ts, q1_ts, q2_ts, FRt_pts, FRt_overlap, FRt_masks):
+def sel_target_FRt_by_mask(b_ts, q1_ts, q2_ts, FRt_pts, FRt_masks):
     b_ts_selected = b_ts.mask[FRt_masks]
     b_ts_selected = ak.drop_none(b_ts_selected)
 
@@ -72,10 +59,7 @@ def sel_target_FRt_by_mask(b_ts, q1_ts, q2_ts, FRt_pts, FRt_overlap, FRt_masks):
     FRt_selected_pts = FRt_pts.mask[FRt_masks]
     FRt_selected_pts = ak.drop_none(FRt_selected_pts)
 
-    FRt_overlap_passed = FRt_overlap.mask[FRt_masks]
-    FRt_overlap_passed = ak.drop_none(FRt_overlap_passed)
-
-    return b_ts_selected, q1_ts_selected, q2_ts_selected, FRt_selected_pts, FRt_overlap_passed
+    return b_ts_selected, q1_ts_selected, q2_ts_selected, FRt_selected_pts
 
 
 # A pred look up table is in shape
@@ -86,42 +70,28 @@ def sel_target_FRt_by_mask(b_ts, q1_ts, q2_ts, FRt_pts, FRt_overlap, FRt_masks):
 def gen_pred_FRt_LUT(
     b_ps_passed, q1_ps_passed, q2_ps_passed, 
     b_ts_selected, q1_ts_selected, q2_ts_selected, 
-    js, goodJetIdx, FBt_overlap_selected, 
+    js,
     builder
 ):
     # for each event
-    for b_ps_e, q1_ps_e, q2_ps_e, b_ts_e, q1_ts_e, q2_ts_e, jets_e, goodJetIdx_e, FBt_overlap_e in zip(
+    for b_ps_e, q1_ps_e, q2_ps_e, b_ts_e, q1_ts_e, q2_ts_e, jets_e in zip(
         b_ps_passed, q1_ps_passed, q2_ps_passed, 
         b_ts_selected, q1_ts_selected, q2_ts_selected, 
-        js, goodJetIdx, FBt_overlap_selected
+        js
     ):
         # for each predicted FRt assignment, check if any target t have a same FBt assignment
         builder.begin_list()
 
         for b_p, q1_p, q2_p in zip(b_ps_e, q1_ps_e, q2_ps_e):
 
-            if (b_p in goodJetIdx_e) and (q1_p in goodJetIdx_e) and (q2_p in goodJetIdx_e):
-                overlap = 0
-            else:
-                overlap = 1
             correct = 0
-            has_t_FBt = -1
-            FBt = -1
-
             predFRt_pt = (jets_e[b_p] + jets_e[q1_p] + jets_e[q2_p]).pt
-
-            for i, (b_t, q1_t, q2_t, FBt_overlap) in enumerate(zip(b_ts_e, q1_ts_e, q2_ts_e, FBt_overlap_e)):
-                if set((b_p, q1_p, q2_p)) == set((b_t, q1_t, q2_t)):
-                    correct = 1
-                    has_t_FBt = FBt_overlap
-                    FBt = i
+            for b_t, q1_t, q2_t in zip(b_ts_e, q1_ts_e, q2_ts_e):
+                if set((b_p, q1_p, q2_p)) == set((b_t, q1_t, q2_t)): correct = 1
 
             builder.begin_list()
             builder.append(correct)
             builder.append(predFRt_pt)
-            builder.append(overlap)
-            builder.append(has_t_FBt)
-            builder.append(FBt)
             builder.append(b_p)
             builder.append(q1_p)
             builder.append(q2_p)
@@ -141,30 +111,27 @@ def gen_pred_FRt_LUT(
 def gen_target_FRt_LUT(
     b_ps_passed, q1_ps_passed, q2_ps_passed, 
     b_ts_selected, q1_ts_selected, q2_ts_selected, 
-    FRt_pts, FBt_overlap_selected, 
+    FRt_pts, 
     builder
 ):
     # for each event
-    for b_ps_e, q1_ps_e, q2_ps_e, b_ts_e, q1_ts_e, q2_ts_e, FRt_pts_e, FBt_overlap_e in zip(
+    for b_ps_e, q1_ps_e, q2_ps_e, b_ts_e, q1_ts_e, q2_ts_e, FRt_pts_e in zip(
         b_ps_passed, q1_ps_passed, q2_ps_passed, 
         b_ts_selected, q1_ts_selected, q2_ts_selected, 
-        FRt_pts, FBt_overlap_selected
+        FRt_pts
     ):
         # for each target fatjet, check if the predictions have a p fatject same with the t fatjet
         builder.begin_list()
 
-        for b_t, q1_t, q2_t, FRt_pt, FBt_overlap in zip(b_ts_e, q1_ts_e, q2_ts_e, FRt_pts_e, FBt_overlap_e):
+        for b_t, q1_t, q2_t, FRt_pt in zip(b_ts_e, q1_ts_e, q2_ts_e, FRt_pts_e):
             
             retrieved = 0
-            can_boost_reco = FBt_overlap
             for b_p, q1_p, q2_p in zip(b_ps_e, q1_ps_e, q2_ps_e):
-                if set((b_p, q1_p, q2_p)) == set((b_t, q1_t, q2_t)):
-                    retrieved = 1
+                if set((b_p, q1_p, q2_p)) == set((b_t, q1_t, q2_t)): retrieved = 1
 
             builder.begin_list()
             builder.append(retrieved)
             builder.append(FRt_pt)
-            builder.append(can_boost_reco)
             builder.end_list()
 
         builder.end_list()
@@ -175,17 +142,13 @@ def gen_target_FRt_LUT(
 
 def parse_resolved_w_target(
     testfile, predfile, 
-    fjs_reco=None, chi2_cut=RESOLVED_CHI2_CUT
+    chi2_cut=RESOLVED_CHI2_CUT
 ):
     if not any('FR' in key for key in predfile["TARGETS"].keys()): return None, None
 
     # FRt pt
-    if "pt" in testfile["TARGETS"]["FRt1"].keys():
-        FRt1_pt = np.array(testfile["TARGETS"]["FRt1"]["pt"])
-        FRt2_pt = np.array(testfile["TARGETS"]["FRt2"]["pt"])
-    else:
-        FRt1_pt = 100 * np.ones_like(np.array(testfile["TARGETS"]["FRt1"]["MASK"]))
-        FRt2_pt = 100 * np.ones_like(np.array(testfile["TARGETS"]["FRt2"]["MASK"]))
+    FRt1_pt = np.array(testfile["TARGETS"]["FRt1"]["pt"])
+    FRt2_pt = np.array(testfile["TARGETS"]["FRt2"]["pt"])
     FRt_pts = np.concatenate((FRt1_pt.reshape(-1, 1), FRt2_pt.reshape(-1, 1)), axis=1)
     FRt_pts = ak.Array(FRt_pts)
 
@@ -195,32 +158,6 @@ def parse_resolved_w_target(
     FRt2_mask = np.array(testfile["TARGETS"]["FRt2"]["MASK"])
     FRt_masks = np.concatenate((FRt1_mask.reshape(-1, 1), FRt2_mask.reshape(-1, 1)), axis=1)
     FRt_masks = ak.Array(FRt_masks)
-
-
-    FRt_overlap = FRt_masks
-    # boosted MASK
-    if "FBt1" in testfile["TARGETS"].keys():
-        # FB
-        FBt1_mask = np.array(testfile["TARGETS"]["FBt1"]["MASK"])
-        FBt2_mask = np.array(testfile["TARGETS"]["FBt2"]["MASK"])
-        FBt_masks = np.concatenate((FBt1_mask.reshape(-1, 1), FBt2_mask.reshape(-1, 1)), axis=1)
-        FBt_masks = ak.Array(FBt_masks)
-        FRt_overlap = FRt_overlap & FBt_masks
-    if "SRqqt1" in testfile["TARGETS"].keys():
-        # SRqq
-        SRqqt1_mask = np.array(testfile["TARGETS"]["SRqqt1"]["MASK"])
-        SRqqt2_mask = np.array(testfile["TARGETS"]["SRqqt2"]["MASK"])
-        SRqqt_masks = np.concatenate((SRqqt1_mask.reshape(-1, 1), SRqqt2_mask.reshape(-1, 1)), axis=1)
-        SRqqt_masks = ak.Array(SRqqt_masks)
-        FRt_overlap = FRt_overlap & SRqqt_masks
-    if "SRbqt1" in testfile["TARGETS"].keys():
-        # SRbq
-        SRbqt1_mask = np.array(testfile["TARGETS"]["SRbqt1"]["MASK"])
-        SRbqt2_mask = np.array(testfile["TARGETS"]["SRbqt2"]["MASK"])
-        SRbqt_masks = np.concatenate((SRbqt1_mask.reshape(-1, 1), SRbqt2_mask.reshape(-1, 1)), axis=1)
-        SRbqt_masks = ak.Array(SRbqt_masks)
-        FRt_overlap = FRt_overlap & SRbqt_masks
-    FRt_overlap = ak.Array(ak.to_numpy(FRt_overlap).astype(float))  # necessary for downstream analysis, b/c NumPy requires uniform typing
 
 
     # target jets
@@ -280,28 +217,20 @@ def parse_resolved_w_target(
         ap_FRt2 = np.array(predfile["TARGETS"]["FRt2"]["assignment_probability"])
     except:
         # resolved top detection probability
-        dp_FRt1 = np.array(predfile["TARGETS"]["FRt1"]["MASK"]).astype("float")
-        dp_FRt2 = np.array(predfile["TARGETS"]["FRt2"]["MASK"]).astype("float")
+        dp_FRt1 = np.logical_and(
+            np.array(predfile["TARGETS"]["FRt1"]["MASK"]), np.array(predfile["TARGETS"]["FRt1"]["chi2"]) < chi2_cut
+        ).astype("float")
+        dp_FRt2 = np.logical_and(
+            np.array(predfile["TARGETS"]["FRt2"]["MASK"]), np.array(predfile["TARGETS"]["FRt2"]["chi2"]) < chi2_cut
+        ).astype("float")
 
         # jet assignment probability
-        ap_FRt1 = np.array(predfile["TARGETS"]["FRt1"]["MASK"]).astype("float")
-        ap_FRt2 = np.array(predfile["TARGETS"]["FRt2"]["MASK"]).astype("float")
-        if chi2_cut != 0:
-            # resolved top detection probability
-            dp_FRt1 = np.logical_and(
-                dp_FRt1, np.array(predfile["TARGETS"]["FRt1"]["chi2"]) < chi2_cut
-            ).astype("float")
-            dp_FRt2 = np.logical_and(
-                dp_FRt2, np.array(predfile["TARGETS"]["FRt2"]["chi2"]) < chi2_cut
-            ).astype("float")
-
-            # jet assignment probability
-            ap_FRt1 = np.logical_and(
-                ap_FRt1, np.array(predfile["TARGETS"]["FRt1"]["chi2"]) < chi2_cut
-            ).astype("float")
-            ap_FRt2 = np.logical_and(
-                ap_FRt2, np.array(predfile["TARGETS"]["FRt2"]["chi2"]) < chi2_cut
-            ).astype("float")
+        ap_FRt1 = np.logical_and(
+            np.array(predfile["TARGETS"]["FRt1"]["MASK"]), np.array(predfile["TARGETS"]["FRt1"]["chi2"]) < chi2_cut
+        ).astype("float")
+        ap_FRt2 = np.logical_and(
+            np.array(predfile["TARGETS"]["FRt2"]["MASK"]), np.array(predfile["TARGETS"]["FRt2"]["chi2"]) < chi2_cut
+        ).astype("float")
 
     dps = np.concatenate((dp_FRt1.reshape(-1, 1), dp_FRt2.reshape(-1, 1)), axis=1)
     aps = np.concatenate((ap_FRt1.reshape(-1, 1), ap_FRt2.reshape(-1, 1)), axis=1)
@@ -326,8 +255,8 @@ def parse_resolved_w_target(
 
 
     # select predictions and targets
-    b_ts_selected, q1_ts_selected, q2_ts_selected, FRt_selected_pts, overlap_selected = sel_target_FRt_by_mask(
-        b_ts, q1_ts, q2_ts, FRt_pts, FRt_overlap, FRt_masks
+    b_ts_selected, q1_ts_selected, q2_ts_selected, FRt_selected_pts = sel_target_FRt_by_mask(
+        b_ts, q1_ts, q2_ts, FRt_pts, FRt_masks
     )
     b_ps_selected, q1_ps_selected, q2_ps_selected = sel_pred_FRt_by_dp_ap(dps, aps, b_ps, q1_ps, q2_ps)
 
@@ -336,15 +265,13 @@ def parse_resolved_w_target(
     LUT_pred = gen_pred_FRt_LUT(
         b_ps_selected, q1_ps_selected, q2_ps_selected, 
         b_ts_selected, q1_ts_selected, q2_ts_selected, 
-        js, goodJetIdx, 
-        overlap_selected, 
+        js, 
         ak.ArrayBuilder()
     ).snapshot()
     LUT_target = gen_target_FRt_LUT(
         b_ps_selected, q1_ps_selected, q2_ps_selected,
         b_ts_selected, q1_ts_selected, q2_ts_selected, 
         FRt_selected_pts, 
-        overlap_selected,
         ak.ArrayBuilder(),
     ).snapshot()
 

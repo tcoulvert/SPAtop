@@ -10,11 +10,6 @@ N_AK4_JETS = 10
 N_AK8_JETS = 2
 N_TOPS = 2
 
-def get_unoverlapped_jet_index(fjs, js, dR_min=0.5):
-    overlapped = ak.sum(js[:, np.newaxis].deltaR(fjs) < dR_min, axis=-2) > 0
-    jet_index_passed = ak.local_index(js).mask[~overlapped]
-    jet_index_passed = ak.drop_none(jet_index_passed)
-    return jet_index_passed
 
 
 def sel_pred_SRt_by_dp_ap(dps, aps, q_ps, qq_ps):
@@ -45,7 +40,7 @@ def sel_pred_SRt_by_dp_ap(dps, aps, q_ps, qq_ps):
 
     return q_ps_passed, qq_ps_passed
 
-def sel_target_SRt_by_mask(q_ts, qq_ts, SRt_pts, SRt_overlap, SRt_masks):
+def sel_target_SRt_by_mask(q_ts, qq_ts, SRt_pts, SRt_masks):
     q_ts_selected = q_ts.mask[SRt_masks]
     q_ts_selected = ak.drop_none(q_ts_selected)
 
@@ -55,10 +50,7 @@ def sel_target_SRt_by_mask(q_ts, qq_ts, SRt_pts, SRt_overlap, SRt_masks):
     SRt_selected_pts = SRt_pts.mask[SRt_masks]
     SRt_selected_pts = ak.drop_none(SRt_selected_pts)
 
-    SRt_overlap_passed = SRt_overlap.mask[SRt_masks]
-    SRt_overlap_passed = ak.drop_none(SRt_overlap_passed)
-
-    return q_ts_selected, qq_ts_selected, SRt_selected_pts, SRt_overlap_passed
+    return q_ts_selected, qq_ts_selected, SRt_selected_pts
 
 
 # A pred look up table is in shape
@@ -69,45 +61,28 @@ def sel_target_SRt_by_mask(q_ts, qq_ts, SRt_pts, SRt_overlap, SRt_masks):
 def gen_pred_SRt_LUT(
     q_ps_passed, qq_ps_passed,
     q_ts_selected, qq_ts_selected,
-    js, goodJetIdx, 
-    fjs, goodFatJetIdx, FBt_overlap_selected, 
+    js, fjs, 
     builder
 ):
     # for each event
-    for q_ps_e, qq_ps_e, q_ts_e, qq_ts_e, jets_e, goodJetIdx_e, fatjets_e, goodFatJetIdx_e, FBt_overlap_e in zip(
+    for q_ps_e, qq_ps_e, q_ts_e, qq_ts_e, jets_e, fatjets_e in zip(
         q_ps_passed, qq_ps_passed,
         q_ts_selected, qq_ts_selected,
-        js, goodJetIdx, 
-        fjs, goodFatJetIdx,
-        FBt_overlap_selected
+        js, fjs,
     ):
         # for each predicted FRt assignment, check if any target t have a same FBt assignment
         builder.begin_list()
 
         for q_p, qq_p in zip(q_ps_e, qq_ps_e):
 
-            if (q_p in goodJetIdx_e) and (qq_p - N_AK4_JETS in goodFatJetIdx_e):
-                overlap = 0
-            else:
-                overlap = 1
             correct = 0
-            has_t_FBt = -1
-            FBt = -1
-
             predFRt_pt = (jets_e[q_p] + fatjets_e[qq_p - N_AK4_JETS]).pt
-
-            for i, (q_t, qq_t, FBt_overlap) in enumerate(zip(q_ts_e, qq_ts_e, FBt_overlap_e)):
-                if set((q_p, qq_p - N_AK4_JETS)) == set((q_t, qq_t)):
-                    correct = 1
-                    has_t_FBt = FBt_overlap
-                    FBt = i
+            for q_t, qq_t in zip(q_ts_e, qq_ts_e):
+                if set((q_p, qq_p - N_AK4_JETS)) == set((q_t, qq_t)): correct = 1
 
             builder.begin_list()
             builder.append(correct)
             builder.append(predFRt_pt)
-            builder.append(overlap)
-            builder.append(has_t_FBt)
-            builder.append(FBt)
             builder.append(q_p)
             builder.append(qq_p)
             builder.end_list()
@@ -126,30 +101,27 @@ def gen_pred_SRt_LUT(
 def gen_target_SRt_LUT(
     q_ps_passed, qq_ps_passed,
     q_ts_selected, qq_ts_selected,
-    SRt_pts, FBt_overlap_selected, 
+    SRt_pts, 
     builder
 ):
     # for each event
-    for q_ps_e, qq_ps_e, q_ts_e, qq_ts_e, SRt_pts_e, FBt_overlap_e in zip(
+    for q_ps_e, qq_ps_e, q_ts_e, qq_ts_e, SRt_pts_e in zip(
         q_ps_passed, qq_ps_passed,
         q_ts_selected, qq_ts_selected,
-        SRt_pts, FBt_overlap_selected
+        SRt_pts
     ):
         # for each target fatjet, check if the predictions have a p fatject same with the t fatjet
         builder.begin_list()
 
-        for q_t, qq_t, SRt_pt, FBt_overlap in zip(q_ts_e, qq_ts_e, SRt_pts_e, FBt_overlap_e):
+        for q_t, qq_t, SRt_pt in zip(q_ts_e, qq_ts_e, SRt_pts_e):
             
             retrieved = 0
-            can_boost_reco = FBt_overlap
             for q_p, qq_p in zip(q_ps_e, qq_ps_e):
-                if set((q_p, qq_p - N_AK4_JETS)) == set((q_t, qq_t)):
-                    retrieved = 1
+                if set((q_p, qq_p - N_AK4_JETS)) == set((q_t, qq_t)): retrieved = 1
 
             builder.begin_list()
             builder.append(retrieved)
             builder.append(SRt_pt)
-            builder.append(can_boost_reco)
             builder.end_list()
 
         builder.end_list()
@@ -159,7 +131,6 @@ def gen_target_SRt_LUT(
 
 def parse_semi_resolved_w_target(
     testfile, predfile, method,
-    fjs_reco_bqq=None
 ):
     if not any(f'SR{method}' in key for key in predfile["TARGETS"].keys()): return None, None
 
@@ -209,22 +180,13 @@ def parse_semi_resolved_w_target(
         (qq_SRt1_p.reshape(-1, 1), qq_SRt2_p.reshape(-1, 1)), axis=1
     )
     qq_ps = ak.Array(qq_ps)
-
-    try:
-        # jet detection probability
-        dp_SRt1 = np.array(predfile["TARGETS"][f"SR{method}t1"]["detection_probability"])
-        dp_SRt2 = np.array(predfile["TARGETS"][f"SR{method}t2"]["detection_probability"])
-        # jet assignment probability
-        ap_SRt1 = np.array(predfile["TARGETS"][f"SR{method}t1"]["assignment_probability"])
-        ap_SRt2 = np.array(predfile["TARGETS"][f"SR{method}t2"]["assignment_probability"])
-    except:
-        # semi-boosted top detection probability
-        dp_SRt1 = np.array(predfile["TARGETS"][f"SR{method}t1"]["MASK"]).astype("float")
-        dp_SRt2 = np.array(predfile["TARGETS"][f"SR{method}t2"]["MASK"]).astype("float")
-
-        # jet/fatjet assignment probability
-        ap_SRt1 = np.array(predfile["TARGETS"][f"SR{method}t1"]["MASK"]).astype("float")
-        ap_SRt2 = np.array(predfile["TARGETS"][f"SR{method}t2"]["MASK"]).astype("float")
+    
+    # jet detection probability
+    dp_SRt1 = np.array(predfile["TARGETS"][f"SR{method}t1"]["detection_probability"])
+    dp_SRt2 = np.array(predfile["TARGETS"][f"SR{method}t2"]["detection_probability"])
+    # jet assignment probability
+    ap_SRt1 = np.array(predfile["TARGETS"][f"SR{method}t1"]["assignment_probability"])
+    ap_SRt2 = np.array(predfile["TARGETS"][f"SR{method}t2"]["assignment_probability"])
 
     dps = np.concatenate((dp_SRt1.reshape(-1, 1), dp_SRt2.reshape(-1, 1)), axis=1)
     aps = np.concatenate((ap_SRt1.reshape(-1, 1), ap_SRt2.reshape(-1, 1)), axis=1)
@@ -263,8 +225,8 @@ def parse_semi_resolved_w_target(
 
 
     # select predictions and targets
-    q_ts_selected, qq_ts_selected, SRt_selected_pts, overlap_selected = sel_target_SRt_by_mask(
-        q_ts, qq_ts, SRt_pts, SRt_overlap, SRt_masks
+    q_ts_selected, qq_ts_selected, SRt_selected_pts = sel_target_SRt_by_mask(
+        q_ts, qq_ts, SRt_pts, SRt_masks
     )
     q_ps_selected, qq_ps_selected = sel_pred_SRt_by_dp_ap(dps, aps, q_ps, qq_ps)
 
@@ -273,16 +235,13 @@ def parse_semi_resolved_w_target(
     LUT_pred = gen_pred_SRt_LUT(
         q_ps_selected, qq_ps_selected,
         q_ts_selected, qq_ts_selected,
-        js, goodJetIdx, 
-        fjs, goodFatJetIdx,
-        overlap_selected, 
+        js, fjs, 
         ak.ArrayBuilder()
     ).snapshot()
     LUT_target = gen_target_SRt_LUT(
         q_ps_selected, qq_ps_selected,
         q_ts_selected, qq_ts_selected,
-        SRt_selected_pts, 
-        overlap_selected,
+        SRt_selected_pts,
         ak.ArrayBuilder(),
     ).snapshot()
 

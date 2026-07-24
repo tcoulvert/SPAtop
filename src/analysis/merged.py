@@ -66,7 +66,7 @@ def sel_target_SRt_by_mask(q_ts, qq_ts, SRt_pts, SRt_overlap, SRt_masks):
 #    pred_SRt,
 #       [correct_or_not, pred_pt, overlap_w_SRt_reco, has_boost_FBt_target, which_SRt_target]]
 @nb.njit
-def gen_pred_SRt_LUT(
+def gen_pred_merged_LUT(
     q_ps_passed, qq_ps_passed,
     q_ts_selected, qq_ts_selected,
     js, goodJetIdx, 
@@ -123,7 +123,7 @@ def gen_pred_SRt_LUT(
 #        target_FBt_assign,
 #           [retrieved, targetSRt_pt, can_boost_reco]]
 @nb.njit
-def gen_target_SRt_LUT(
+def gen_target_merged_LUT(
     q_ps_passed, qq_ps_passed,
     q_ts_selected, qq_ts_selected,
     SRt_pts, FBt_overlap_selected, 
@@ -157,7 +157,7 @@ def gen_target_SRt_LUT(
     return builder
 
 
-def parse_semi_resolved_w_target(
+def parse_merged_w_target(
     testfile, predfile, method,
     fjs_reco_bqq=None
 ):
