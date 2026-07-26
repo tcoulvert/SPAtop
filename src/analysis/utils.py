@@ -9,16 +9,19 @@ def n_alpha(string: str):
     return len([c for c in string if c.isalpha()])
 
 
-# def reset_collision_dp(dps, aps):
-#     ap_filter = aps < 1 / (13 * 13)
-#     dps_reset = dps
-#     dps_reset[ap_filter] = 0
-#     return dps_reset
+def reset_collision_dp(dps, aps):
+    ap_filter = aps < 1 / (13 * 13)
+    return ak.where(ap_filter, 0, dps)
+
+def best_reco_order(dps, aps):
+    ps = dps * aps
+    idx_descend = np.flip(np.argsort(ps, axis=-1), axis=-1)
+    return idx_descend
 
 
 def dp_to_TopNumProb(dps, Nmax: int):
     # get maximum number of targets
-    Noptions = dps.shape[-1]
+    Noptions = ak.max(ak.num(dps, axis=-1), axis=None)
 
     # prepare a list for constructing [P_0t, P_1t, P_2t, ...]
     probs = []

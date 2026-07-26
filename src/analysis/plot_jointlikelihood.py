@@ -4,14 +4,11 @@ import h5py as h5
 import matplotlib.pyplot as plt
 import numpy as np
 
-from src.analysis.boosted import parse_boosted_w_target
-from src.analysis.resolved import parse_resolved_w_target
-from src.analysis.semi_resolved import parse_semi_resolved_w_target
 from src.analysis.merged import parse_merged_w_target
 from src.analysis.utils import calc_eff, calc_pur
 
 
-def calc_pur_eff(target_path, pred_path, bins_dict, chi2_cut=45, mode: str='pur_eff'):
+def calc_pur_eff(target_path, pred_path, bins_dict, mode: str='pur_eff'):
     # open files
     pred_h5 = h5.File(pred_path, "a")
     target_h5 = h5.File(target_path)
@@ -23,16 +20,16 @@ def calc_pur_eff(target_path, pred_path, bins_dict, chi2_cut=45, mode: str='pur_
 
     ## generate look up tables ##
     # boosted
-    LUT_boosted_pred, LUT_boosted_target = parse_boosted_w_target(target_h5, pred_h5)
+    LUT_boosted_pred, LUT_boosted_target = parse_merged_w_target(target_h5, pred_h5, reco_regex='FB')
 
     # semi-resolved
     # qq
-    LUT_semiresolved_qq_pred, LUT_semiresolved_qq_target = parse_semi_resolved_w_target(target_h5, pred_h5, 'qq')
+    LUT_semiresolved_qq_pred, LUT_semiresolved_qq_target = parse_merged_w_target(target_h5, pred_h5, reco_regex='SRqq')
     # bq
-    LUT_semiresolved_bq_pred, LUT_semiresolved_bq_target = parse_semi_resolved_w_target(target_h5, pred_h5, 'bq')
+    LUT_semiresolved_bq_pred, LUT_semiresolved_bq_target = parse_merged_w_target(target_h5, pred_h5, reco_regex='SRbq')
 
     # resolved
-    LUT_resolved_pred, LUT_resolved_target = parse_resolved_w_target(target_h5, pred_h5, chi2_cut=chi2_cut)
+    LUT_resolved_pred, LUT_resolved_target = parse_merged_w_target(target_h5, pred_h5, reco_regex='FR')
 
     # merged
     LUT_merged_pred, LUT_merged_target = parse_merged_w_target(target_h5, pred_h5)
@@ -54,6 +51,7 @@ def calc_pur_eff(target_path, pred_path, bins_dict, chi2_cut=45, mode: str='pur_
         results["eff_srbq"], results["efferr_srbq"] = calc_pur(LUT_semiresolved_bq_target, bins_dict['SRbq'])
 
 
+    print("Number of Any Prediction:", np.array([pred for event in LUT_merged_pred for pred in event]).shape[0])
     print("Number of Boosted Prediction:", np.array([pred for event in LUT_boosted_pred for pred in event]).shape[0])
     print("Number of Resolved Prediction:", np.array([pred for event in LUT_resolved_pred for pred in event]).shape[0])
     print("Number of Semi-Resolved-qq Prediction:", np.array([pred for event in LUT_semiresolved_qq_pred for pred in event]).shape[0])
@@ -157,35 +155,25 @@ def plot_pur_eff_w_dict(
 
     ## plot purities and efficiencies ##
     for tag, pred_path in plot_dict.items():
-
-        tag_label = tag
-        if 'chi2' in tag:
-            tag_list = tag.split('_')
-            tag = tag_list[0]
-            chi2_cut = int(tag_list[1])
-
-            print("Processing", tag_label)
-            results = calc_pur_eff(target_path, pred_path, bins_dict, chi2_cut=chi2_cut)
-        else:
-            print("Processing", tag_label)
-            results = calc_pur_eff(target_path, pred_path, bins_dict)
+        print("Processing", tag)
+        results = calc_pur_eff(target_path, pred_path, bins_dict)
 
 
         # merged
-        ax_m[0].errorbar(x=bin_centers_dict['all'], y=results["pur_m"], xerr=xerr_dict['all'], yerr=results["purerr_m"], fmt="o", capsize=5, label=tag_label)
-        ax_m[1].errorbar(x=bin_centers_dict['all'], y=results["eff_m"], xerr=xerr_dict['all'], yerr=results["efferr_m"], fmt="o", capsize=5, label=tag_label)
+        ax_m[0].errorbar(x=bin_centers_dict['all'], y=results["pur_m"], xerr=xerr_dict['all'], yerr=results["purerr_m"], fmt="o", capsize=5, label=tag)
+        ax_m[1].errorbar(x=bin_centers_dict['all'], y=results["eff_m"], xerr=xerr_dict['all'], yerr=results["efferr_m"], fmt="o", capsize=5, label=tag)
         # boosted
-        ax_b[0].errorbar(x=bin_centers_dict['FB'], y=results["pur_b"], xerr=xerr_dict['FB'], yerr=results["purerr_b"], fmt="o", capsize=5, label=tag_label)
-        ax_b[1].errorbar(x=bin_centers_dict['FB'], y=results["eff_b"], xerr=xerr_dict['FB'], yerr=results["efferr_b"], fmt="o", capsize=5, label=tag_label)
+        ax_b[0].errorbar(x=bin_centers_dict['FB'], y=results["pur_b"], xerr=xerr_dict['FB'], yerr=results["purerr_b"], fmt="o", capsize=5, label=tag)
+        ax_b[1].errorbar(x=bin_centers_dict['FB'], y=results["eff_b"], xerr=xerr_dict['FB'], yerr=results["efferr_b"], fmt="o", capsize=5, label=tag)
         # resolved
-        ax_r[0].errorbar(x=bin_centers_dict['FR'], y=results["pur_r"], xerr=xerr_dict['FR'], yerr=results["purerr_r"], fmt="o", capsize=5, label=tag_label)
-        ax_r[1].errorbar(x=bin_centers_dict['FR'], y=results["eff_r"], xerr=xerr_dict['FR'], yerr=results["efferr_r"], fmt="o", capsize=5, label=tag_label)
+        ax_r[0].errorbar(x=bin_centers_dict['FR'], y=results["pur_r"], xerr=xerr_dict['FR'], yerr=results["purerr_r"], fmt="o", capsize=5, label=tag)
+        ax_r[1].errorbar(x=bin_centers_dict['FR'], y=results["eff_r"], xerr=xerr_dict['FR'], yerr=results["efferr_r"], fmt="o", capsize=5, label=tag)
         # semi-resolved qq
-        ax_srqq[0].errorbar(x=bin_centers_dict['SRqq'], y=results["pur_srqq"], xerr=xerr_dict['SRqq'], yerr=results["purerr_srqq"], fmt="o", capsize=5, label=tag_label)
-        ax_srqq[1].errorbar(x=bin_centers_dict['SRqq'], y=results["eff_srqq"], xerr=xerr_dict['SRqq'], yerr=results["efferr_srqq"], fmt="o", capsize=5, label=tag_label)
+        ax_srqq[0].errorbar(x=bin_centers_dict['SRqq'], y=results["pur_srqq"], xerr=xerr_dict['SRqq'], yerr=results["purerr_srqq"], fmt="o", capsize=5, label=tag)
+        ax_srqq[1].errorbar(x=bin_centers_dict['SRqq'], y=results["eff_srqq"], xerr=xerr_dict['SRqq'], yerr=results["efferr_srqq"], fmt="o", capsize=5, label=tag)
         # semi-resolved bq
-        ax_srbq[0].errorbar(x=bin_centers_dict['SRbq'], y=results["pur_srbq"], xerr=xerr_dict['SRbq'], yerr=results["purerr_srbq"], fmt="o", capsize=5, label=tag_label)
-        ax_srbq[1].errorbar(x=bin_centers_dict['SRbq'], y=results["eff_srbq"], xerr=xerr_dict['SRbq'], yerr=results["efferr_srbq"], fmt="o", capsize=5, label=tag_label)
+        ax_srbq[0].errorbar(x=bin_centers_dict['SRbq'], y=results["pur_srbq"], xerr=xerr_dict['SRbq'], yerr=results["purerr_srbq"], fmt="o", capsize=5, label=tag)
+        ax_srbq[1].errorbar(x=bin_centers_dict['SRbq'], y=results["eff_srbq"], xerr=xerr_dict['SRbq'], yerr=results["efferr_srbq"], fmt="o", capsize=5, label=tag)
 
 
     ## adjust limits and legends ##
