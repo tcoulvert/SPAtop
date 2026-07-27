@@ -6,7 +6,7 @@ import numpy as np
 import vector
 vector.register_awkward()
 
-from SPAtop.src.analysis.plot import plot_pur_eff_w_dict
+from src.analysis.plot import plot_pur_eff_w_dict
 
 if len(sys.argv) < 2: raise Exception('You need to provide path to config.')
 with open(sys.argv[1], 'r') as f:
