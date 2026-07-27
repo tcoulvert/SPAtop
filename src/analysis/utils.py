@@ -1,6 +1,7 @@
 import itertools
 
 import awkward as ak
+import numba as nb
 import numpy as np
 from hist.intervals import clopper_pearson_interval
 
@@ -13,10 +14,35 @@ def reset_collision_dp(dps, aps):
     ap_filter = aps < 1 / (13 * 13)
     return ak.where(ap_filter, 0, dps)
 
-def best_reco_order(dps, aps):
+
+def overlap(jets, idxs, ntops, deltaRs):
+    builder = []
+    for jets_event, idx_event, ntops_event in zip(jets, idxs, ntops):
+
+        good_idxs = []
+        for idx in idx_event:
+            if len(good_idxs) == ntops_event: break
+            elif jets_event[idx] is None: continue
+            else:
+                append = True
+                for k, jet in enumerate(jets_event[idx]):
+                    if jet is None: append = False; break
+                    for idx_ in good_idxs:
+                        for k_, jet_ in enumerate(jets_event[idx_]):
+                            deltaR = jet.deltaR(jet_)
+                            if deltaR < deltaRs[idx][k] or deltaR < deltaRs[idx_][k_]: append = False
+                if append: good_idxs.append(idx)
+
+        builder.append(good_idxs)
+
+    return builder
+
+def reco_reorder(predicted_jets, dps, aps, n_tops, deltaRs):
     ps = dps * aps
     idx_descend = np.flip(np.argsort(ps, axis=-1), axis=-1)
-    return idx_descend
+    idx_sel = overlap(predicted_jets, idx_descend, n_tops, deltaRs)
+
+    return idx_sel
 
 
 def dp_to_TopNumProb(dps, Nmax: int):
@@ -63,39 +89,16 @@ def dp_to_TopNumProb(dps, Nmax: int):
     return probs_arr
 
 
-# calculate efficiency
-# if bins=None, put all data in a single bin
-def calc_eff(LUT_pred, bins):
+# calculate purity/efficiency
+def calc_pureff(LUT, bins):
 
-    predTops = np.array([predTop for event in LUT_pred for predTop in event])
+    Tops = np.array([top for top in LUT])
 
-    predTops_inds = np.digitize(predTops[:, 1], bins)
-
-    correctTruth_per_bin = []
-    for bin_i in range(1, len(bins) + 1):
-        correctTruth_per_bin.append(predTops[:, 0][predTops_inds == bin_i])
-    correctTruth_per_bin = ak.Array(correctTruth_per_bin)
-
-    means = ak.mean(correctTruth_per_bin, axis=-1)
-
-    errs = np.abs(
-        clopper_pearson_interval(num=ak.sum(correctTruth_per_bin, axis=-1), denom=ak.num(correctTruth_per_bin, axis=-1))
-        - means
-    )
-
-    return means, errs
-
-
-# calculate purity
-def calc_pur(LUT_target, bins):
-
-    targetTops = np.array([targetTop for event in LUT_target for targetTop in event])
-
-    targetTops_inds = np.digitize(targetTops[:, 1], bins)
+    Tops_inds = np.digitize(Tops[:, 1], bins)  # index 1 is pt
 
     correctTruth_per_bin = []
     for bin_i in range(1, len(bins) + 1):
-        correctTruth_per_bin.append(targetTops[:, 0][targetTops_inds == bin_i])
+        correctTruth_per_bin.append(Tops[:, 0][Tops_inds == bin_i])  # index 0 is correct prediction
     correctTruth_per_bin = ak.Array(correctTruth_per_bin)
 
     means = ak.mean(correctTruth_per_bin, axis=-1)

@@ -4,13 +4,11 @@ import h5py as h5
 import matplotlib.pyplot as plt
 import numpy as np
 
-from src.analysis.boosted import parse_boosted_w_target
-from src.analysis.resolved import parse_resolved_w_target
-from src.analysis.semi_resolved import parse_semi_resolved_w_target
-from src.analysis.utils import calc_eff, calc_pur
+from src.analysis.merged import parse_merged_w_target
+from src.analysis.utils import calc_pureff
 
 
-def calc_pur_eff(target_path, pred_path, bins_dict, chi2_cuts=[45, 20], mode: str='pur_eff'):
+def calc_pur_eff(target_path, pred_path, bins_dict, mode: str='pur_eff'):
     # open files
     pred_h5 = h5.File(pred_path, "a")
     target_h5 = h5.File(target_path)
@@ -20,416 +18,47 @@ def calc_pur_eff(target_path, pred_path, bins_dict, chi2_cuts=[45, 20], mode: st
         pred_h5["INPUTS"] = pred_h5["SpecialKey.Inputs"]
         pred_h5["TARGETS"] = pred_h5["SpecialKey.Targets"]
 
-    FR_condition = any("FR" in key for key in pred_h5["TARGETS"].keys())
-    FB_condition = any("FB" in key for key in pred_h5["TARGETS"].keys())
-    SRqq_condition = any("SRqq" in key for key in pred_h5["TARGETS"].keys())
-    SRbq_condition = any("SRbq" in key for key in pred_h5["TARGETS"].keys())
-
     ## generate look up tables ##
     # boosted
-    if FB_condition:
-        LUT_boosted_pred, LUT_boosted_target, fjs_reco_bqq = parse_boosted_w_target(
-            target_h5, pred_h5
-        )
-    else:
-        LUT_boosted_pred, LUT_boosted_target = None, None
+    LUT_boosted_pred, LUT_boosted_target = parse_merged_w_target(target_h5, pred_h5, reco_regex='FB')
 
     # semi-resolved
     # qq
-    if SRqq_condition and FB_condition:
-        LUT_semiresolved_qq_pred, LUT_semiresolved_qq_target, fjs_reco_qq = parse_semi_resolved_w_target(target_h5, pred_h5, 'qq', fjs_reco_bqq=None)
-        LUT_semiresolved_qq_wOR_pred, LUT_semiresolved_qq_wOR_target, _ = parse_semi_resolved_w_target(target_h5, pred_h5, 'qq', fjs_reco_bqq=fjs_reco_bqq)
-    elif SRqq_condition:
-        LUT_semiresolved_qq_pred, LUT_semiresolved_qq_target, fjs_reco_qq = parse_semi_resolved_w_target(target_h5, pred_h5, 'qq', fjs_reco_bqq=None)
-        LUT_semiresolved_qq_wOR_pred, LUT_semiresolved_qq_wOR_target = None, None
-    else:
-        LUT_semiresolved_qq_pred, LUT_semiresolved_qq_target = None, None
-        LUT_semiresolved_qq_wOR_pred, LUT_semiresolved_qq_wOR_target = None, None
+    LUT_semiresolved_qq_pred, LUT_semiresolved_qq_target = parse_merged_w_target(target_h5, pred_h5, reco_regex='SRqq')
     # bq
-    if SRbq_condition and FB_condition:
-        LUT_semiresolved_bq_pred, LUT_semiresolved_bq_target, fjs_reco_bq = parse_semi_resolved_w_target(target_h5, pred_h5, 'bq', fjs_reco_bqq=None)
-        LUT_semiresolved_bq_wOR_pred, LUT_semiresolved_bq_wOR_target, _ = parse_semi_resolved_w_target(target_h5, pred_h5, 'bq', fjs_reco_bqq=fjs_reco_bqq)
-    elif SRbq_condition:
-        LUT_semiresolved_bq_pred, LUT_semiresolved_bq_target, fjs_reco_bq = parse_semi_resolved_w_target(target_h5, pred_h5, 'bq', fjs_reco_bqq=None)
-        LUT_semiresolved_bq_wOR_pred, LUT_semiresolved_bq_wOR_target = None, None
-    else:
-        LUT_semiresolved_bq_pred, LUT_semiresolved_bq_target = None, None
-        LUT_semiresolved_bq_wOR_pred, LUT_semiresolved_bq_wOR_target = None, None
+    LUT_semiresolved_bq_pred, LUT_semiresolved_bq_target = parse_merged_w_target(target_h5, pred_h5, reco_regex='SRbq')
 
     # resolved
-    if FR_condition:
-        LUT_resolved_pred, LUT_resolved_target, _ = parse_resolved_w_target(
-            target_h5, pred_h5, 
-            fjs_reco=None, 
-            chi2_cut=chi2_cuts[0]
-        )
-        if SRqq_condition and SRbq_condition and FB_condition:
-            LUT_resolved_wOR_pred, LUT_resolved_wOR_target, _ = parse_resolved_w_target(
-                target_h5, pred_h5, 
-                fjs_reco=[fjs_reco_bqq, fjs_reco_qq, fjs_reco_bq], 
-                chi2_cut=chi2_cuts[0]
-            )
-        elif SRqq_condition and FB_condition:
-            LUT_resolved_wOR_pred, LUT_resolved_wOR_target, _ = parse_resolved_w_target(
-                target_h5, pred_h5, 
-                fjs_reco=[fjs_reco_bqq, fjs_reco_qq], 
-                chi2_cut=chi2_cuts[0]
-            )
-        elif SRbq_condition and FB_condition:
-            LUT_resolved_wOR_pred, LUT_resolved_wOR_target, _ = parse_resolved_w_target(
-                target_h5, pred_h5, 
-                fjs_reco=[fjs_reco_bqq, fjs_reco_bq], 
-                chi2_cut=chi2_cuts[0]
-            )
-        elif FB_condition:
-            LUT_resolved_wOR_pred, LUT_resolved_wOR_target, _ = parse_resolved_w_target(
-                target_h5, pred_h5, 
-                fjs_reco=fjs_reco_bqq,
-                chi2_cut=chi2_cuts[0]
-            )
-        else:
-            LUT_resolved_wOR_pred, LUT_resolved_wOR_target = None, None
-    else:
-        LUT_resolved_pred, LUT_resolved_target = None, None
-        LUT_resolved_wOR_pred, LUT_resolved_wOR_target = None, None
+    LUT_resolved_pred, LUT_resolved_target = parse_merged_w_target(target_h5, pred_h5, reco_regex='FR')
 
-
-    # make no_OR LUTs
-    if FR_condition and (FB_condition or SRqq_condition or SRbq_condition):
-        LUT_resolved_pred_no_OR = []
-        for event in LUT_resolved_wOR_pred:
-            event_no_OR = []
-            for predFRt in event:
-                if predFRt[2] == 0:
-                    event_no_OR.append(predFRt)
-            LUT_resolved_pred_no_OR.append(event_no_OR)
-
-        LUT_resolved_target_no_OR = []
-        for event in LUT_resolved_wOR_target:
-            event_no_OR = []
-            for targetFRt in event:
-                if targetFRt[2] == 0:
-                    event_no_OR.append(targetFRt)
-            LUT_resolved_target_no_OR.append(event_no_OR)
-    else:
-        LUT_resolved_pred_no_OR, LUT_resolved_target_no_OR = None, None
-
-    if SRqq_condition and FB_condition:
-        LUT_semiresolved_qq_pred_no_OR = []
-        for event in LUT_semiresolved_qq_wOR_pred:
-            event_no_OR = []
-            for predSRt in event:
-                if predSRt[2] == 0:
-                    event_no_OR.append(predSRt)
-            LUT_semiresolved_qq_pred_no_OR.append(event_no_OR)
-
-        LUT_semiresolved_qq_target_no_OR = []
-        for event in LUT_semiresolved_qq_wOR_target:
-            event_no_OR = []
-            for targetSRt in event:
-                if targetSRt[2] == 0:
-                    event_no_OR.append(targetSRt)
-            LUT_semiresolved_qq_target_no_OR.append(event_no_OR)
-    else:
-        LUT_semiresolved_qq_pred_no_OR, LUT_semiresolved_qq_target_no_OR = None, None
-
-    if SRbq_condition and FB_condition:
-        LUT_semiresolved_bq_pred_no_OR = []
-        for event in LUT_semiresolved_bq_wOR_pred:
-            event_no_OR = []
-            for predSRt in event:
-                if predSRt[2] == 0:
-                    event_no_OR.append(predSRt)
-            LUT_semiresolved_bq_pred_no_OR.append(event_no_OR)
-
-        LUT_semiresolved_bq_target_no_OR = []
-        for event in LUT_semiresolved_bq_wOR_target:
-            event_no_OR = []
-            for targetSRt in event:
-                if targetSRt[2] == 0:
-                    event_no_OR.append(targetSRt)
-            LUT_semiresolved_bq_target_no_OR.append(event_no_OR)
-    else:
-        LUT_semiresolved_bq_pred_no_OR, LUT_semiresolved_bq_target_no_OR = None, None
+    # merged
+    LUT_merged_pred, LUT_merged_target = parse_merged_w_target(target_h5, pred_h5)
 
 
     ## calculate efficiencies and purities for b+r, b, and r (and srqq, srbq if available) ##
     results = {}
-    # merged
-    if FB_condition:
-        if 'pur' in mode.lower():
-            results["pur_m"], results["purerr_m"] = calc_eff(LUT_boosted_pred, LUT_semiresolved_qq_wOR_pred, LUT_semiresolved_bq_wOR_pred, LUT_resolved_wOR_pred, bins_dict['all'])
-        if 'eff' in mode.lower():
-            results["eff_m"], results["efferr_m"] = calc_pur(LUT_boosted_target, LUT_semiresolved_qq_wOR_target, LUT_semiresolved_bq_wOR_target, LUT_resolved_wOR_target, bins_dict['all'])
-        # boosted
-        if 'pur' in mode.lower():
-            results["pur_b"], results["purerr_b"] = calc_eff(LUT_boosted_pred, None, None, None, bins_dict['FB'])
-        if 'eff' in mode.lower():
-            results["eff_b"], results["efferr_b"] = calc_pur(LUT_boosted_target, None, None, None, bins_dict['FB'])
-    # resolved
-    if FR_condition:
-        if 'pur' in mode.lower():
-            results["pur_r"], results["purerr_r"] = calc_eff(None, None, None, LUT_resolved_pred, bins_dict['FR'])
-        if 'eff' in mode.lower():
-            results["eff_r"], results["efferr_r"] = calc_pur(None, None, None, LUT_resolved_target, bins_dict['FR'])
-        if FB_condition or SRqq_condition or SRbq_condition:
-            # resolved no OR
-            if 'pur' in mode.lower():
-                results["pur_r_or"], results["purerr_r_or"] = calc_eff(None, None, None, LUT_resolved_pred_no_OR, bins_dict['FR'])
-            if 'eff' in mode.lower():
-                results["eff_r_or"], results["efferr_r_or"] = calc_pur(None, None, None, LUT_resolved_target_no_OR, bins_dict['FR'])
-    # semi-resolved
-    # qq
-    if SRqq_condition:
-        # semi-resolved qq
-        if 'pur' in mode.lower():
-            results["pur_srqq"], results["purerr_srqq"] = calc_eff(None, LUT_semiresolved_qq_pred, None, None, bins_dict['SRqq'])
-        if 'eff' in mode.lower():
-            results["eff_srqq"], results["efferr_srqq"] = calc_pur(None, LUT_semiresolved_qq_target, None, None, bins_dict['SRqq'])
-        if FB_condition:
-            # semi-resolved qq no OR
-            if 'pur' in mode.lower():
-                results["pur_srqq_or"], results["purerr_srqq_or"] = calc_eff(None, LUT_semiresolved_qq_pred_no_OR, None, None, bins_dict['SRqq'])
-            if 'eff' in mode.lower():
-                results["eff_srqq_or"], results["efferr_srqq_or"] = calc_pur(None, LUT_semiresolved_qq_target_no_OR, None, None, bins_dict['SRqq'])
-    # bq
-    if SRbq_condition:
-        # semi-resolved bq
-        if 'pur' in mode.lower():
-            results["pur_srbq"], results["purerr_srbq"] = calc_eff(None, None, LUT_semiresolved_bq_pred, None, bins_dict['SRbq'])
-        if 'eff' in mode.lower():
-            results["eff_srbq"], results["efferr_srbq"] = calc_pur(None, None, LUT_semiresolved_bq_target, None, bins_dict['SRbq'])
-        if FB_condition:
-            # semi-resolved bq no OR
-            if 'pur' in mode.lower():
-                results["pur_srbq_or"], results["purerr_srbq_or"] = calc_eff(None, None, LUT_semiresolved_bq_pred_no_OR, None, bins_dict['SRbq'])
-            if 'eff' in mode.lower():
-                results["eff_srbq_or"], results["efferr_srbq_or"] = calc_pur(None, None, LUT_semiresolved_bq_target_no_OR, None, bins_dict['SRbq'])
+    if 'pur' in mode.lower():
+        results["pur_m"], results["purerr_m"] = calc_pureff(LUT_merged_pred, bins_dict['all'])
+        results["pur_b"], results["purerr_b"] = calc_pureff(LUT_boosted_pred, bins_dict['FB'])
+        results["pur_r"], results["purerr_r"] = calc_pureff(LUT_resolved_pred, bins_dict['FR'])
+        results["pur_srqq"], results["purerr_srqq"] = calc_pureff(LUT_semiresolved_qq_pred, bins_dict['SRqq'])
+        results["pur_srbq"], results["purerr_srbq"] = calc_pureff(LUT_semiresolved_bq_pred, bins_dict['SRbq'])
+    if 'eff' in mode.lower():
+        results["eff_m"], results["efferr_m"] = calc_pureff(LUT_merged_target, bins_dict['all'])
+        results["eff_b"], results["efferr_b"] = calc_pureff(LUT_boosted_target, bins_dict['FB'])
+        results["eff_r"], results["efferr_r"] = calc_pureff(LUT_resolved_target, bins_dict['FR'])
+        results["eff_srqq"], results["efferr_srqq"] = calc_pureff(LUT_semiresolved_qq_target, bins_dict['SRqq'])
+        results["eff_srbq"], results["efferr_srbq"] = calc_pureff(LUT_semiresolved_bq_target, bins_dict['SRbq'])
 
 
-    if FB_condition:
-        print("Number of Boosted Prediction:", np.array([pred for event in LUT_boosted_pred for pred in event]).shape[0])
-    if FR_condition:
-        print(
-            "Number of Resolved Prediction before OR:",
-            np.array([pred for event in LUT_resolved_pred for pred in event]).shape[0],
-        )
-        if FB_condition or SRqq_condition or SRbq_condition:
-            print(
-                "Number of Resolved Prediction after OR:",
-                np.array([pred for event in LUT_resolved_pred_no_OR for pred in event]).shape[0],
-            )
-    if SRqq_condition:
-        print(
-            "Number of Semi-Resolved-qq Prediction before OR:",
-            np.array([pred for event in LUT_semiresolved_qq_pred for pred in event]).shape[0],
-        )
-        if FB_condition:
-            print(
-                "Number of Semi-Resolved-qq Prediction after OR:",
-                np.array([pred for event in LUT_semiresolved_qq_pred_no_OR for pred in event]).shape[0],
-            )
-    if SRbq_condition:
-        print(
-            "Number of Semi-Resolved-bq Prediction before OR:",
-            np.array([pred for event in LUT_semiresolved_bq_pred for pred in event]).shape[0],
-        )
-        if FB_condition:
-            print(
-                "Number of Semi-Resolved-bq Prediction after OR:",
-                np.array([pred for event in LUT_semiresolved_bq_pred_no_OR for pred in event]).shape[0],
-            )
+    print("Number of Any Prediction:", np.array([pred for event in LUT_merged_pred for pred in event]).shape[0])
+    print("Number of Boosted Prediction:", np.array([pred for event in LUT_boosted_pred for pred in event]).shape[0])
+    print("Number of Resolved Prediction:", np.array([pred for event in LUT_resolved_pred for pred in event]).shape[0])
+    print("Number of Semi-Resolved-qq Prediction:", np.array([pred for event in LUT_semiresolved_qq_pred for pred in event]).shape[0])
+    print("Number of Semi-Resolved-bq Prediction:", np.array([pred for event in LUT_semiresolved_bq_pred for pred in event]).shape[0])
 
-    return results, FB_condition, SRqq_condition, SRbq_condition, FR_condition
+    return results
 
-
-# I started to use "efficiency" for describing how many gen tops were reconstructed
-# and "purity" for desrcribing how many reco tops are actually gen tops
-def plot_pur_w_dict(
-    plot_dict, target_path, save_path=None, proj_name=None, 
-    bins_dict={
-        'FR': np.arange(0, 300, 10),
-        'SRqq': np.arange(100, 400, 10),
-        'SRbq': np.arange(100, 400, 10),
-        'FB': np.arange(200, 1000, 50),
-        'all': np.arange(0, 1000, 50),
-    }
-):
-
-    plot_bins_dict = {
-        key: np.append(bins, 2 * bins[-1] - bins[-2])
-        for key, bins in bins_dict.items()
-    }
-    bin_centers_dict = {
-        key: [(plot_bins[i] + plot_bins[i + 1]) / 2 for i in range(plot_bins.size - 1)]
-        for key, plot_bins in plot_bins_dict.items()
-    }
-    xerr_dict = {
-        key: (plot_bins[1] - plot_bins[0]) / 2 * np.ones(plot_bins.shape[0] - 1)
-        for key, plot_bins in plot_bins_dict.items()
-    }
-
-    # m: merged (b+r w OR)
-    # b: boosted
-    # r: resolved
-    fig_m, ax_m = plt.subplots(1, 1, figsize=(6, 5))
-    fig_b, ax_b = plt.subplots(1, 1, figsize=(6, 5))
-    fig_r, ax_r = plt.subplots(1, 1, figsize=(6, 5))
-    fig_r_or, ax_r_or = plt.subplots(1, 1, figsize=(6, 5))
-    fig_srqq, ax_srqq = plt.subplots(1, 1, figsize=(6, 5))
-    fig_srqq_or, ax_srqq_or = plt.subplots(1, 1, figsize=(6, 5))
-    fig_srbq, ax_srbq = plt.subplots(1, 1, figsize=(6, 5))
-    fig_srbq_or, ax_srbq_or = plt.subplots(1, 1, figsize=(6, 5))
-
-    ## preset figure labels, titles, limits, etc. ##
-    # merged
-    ax_m.set(
-        xlabel=r"All categories Reco top pT (GeV)",
-        ylabel=r"Reconstruction Purity",
-        title=f"Reconstruction Purity vs. All category Reco top pT",
-    )
-    # boosted
-    ax_b.set(
-        xlabel=r"Reco Boosted top pT (GeV)",
-        ylabel=r"Reconstruction Purity",
-        title=f"Reconstruction Purity vs. Reco Boosted top pT",
-    )
-    # resolved
-    ax_r.set(
-        xlabel=r"Reco Resolved top pT (GeV)",
-        ylabel=r"Reconstruction Purity",
-        title=f"Reconstruction Purity vs. Reco Resolved top pT",
-    )
-    ax_r_or.set(
-        xlabel=r"Reco Resolved top pT (GeV)",
-        ylabel=r"Reconstruction Purity",
-        title=f"Resolved Purity After OR  vs. Reco Resolved top pT",
-    )
-    # semi-resolved qq
-    ax_srqq.set(
-        xlabel=r"Reco Semi-Resolved top pT (GeV)",
-        ylabel=r"Reconstruction Purity",
-        title=f"Reconstruction Purity vs. Reco Semi-Resolved top pT",
-    )
-    ax_srqq_or.set(
-        xlabel=r"Reco Semi-Resolved top pT (GeV)",
-        ylabel=r"Reconstruction Purity",
-        title=f"Semi-Resolved Purity After OR  vs. Reco Semi-Resolved top pT",
-    )
-    # semi-resolved bq
-    ax_srbq.set(
-        xlabel=r"Reco Semi-Resolved top pT (GeV)",
-        ylabel=r"Reconstruction Purity",
-        title=f"Reconstruction Purity vs. Reco Semi-Resolved top pT",
-    )
-    ax_srbq_or.set(
-        xlabel=r"Reco Semi-Resolved top pT (GeV)",
-        ylabel=r"Reconstruction Purity",
-        title=f"Semi-Resolved Purity After OR  vs. Reco Semi-Resolved top pT",
-    )
-
-
-    SRqq_condition, SRbq_condition = False, False
-    ## plot purities and efficiencies ##
-    for tag, pred_path in plot_dict.items():
-
-        tag_label = tag
-        if 'chi2' in tag.lower():
-            tag_list = tag.split('_')
-            tag = tag_list[0]
-            chi2_cuts = [int(cut) for cut in tag_list[1:]]
-
-            print("Processing", tag_label)
-            results, FB_condition, SRqq_condition, SRbq_condition, FR_condition = calc_pur_eff(target_path, pred_path, bins_dict, chi2_cuts=chi2_cuts, mode='pur')
-        else:
-            print("Processing", tag_label)
-            results, FB_condition, SRqq_condition, SRbq_condition, FR_condition = calc_pur_eff(target_path, pred_path, bins_dict, mode='pur')
-
-
-        if FB_condition:
-            # merged
-            ax_m.errorbar(
-                x=bin_centers_dict['all'], y=results["pur_m"], xerr=xerr_dict['all'], yerr=results["purerr_m"], fmt="o", capsize=5, label=tag_label
-            )
-            # boosted
-            ax_b.errorbar(
-                x=bin_centers_dict['FB'], y=results["pur_b"], xerr=xerr_dict['FB'], yerr=results["purerr_b"], fmt="o", capsize=5, label=tag_label
-            )
-        # resolved
-        if FR_condition:
-            ax_r.errorbar(
-                x=bin_centers_dict['FR'], y=results["pur_r"], xerr=xerr_dict['FR'], yerr=results["purerr_r"], fmt="o", capsize=5, label=tag_label
-            )
-            if FB_condition or SRqq_condition or SRbq_condition:
-                ax_r_or.errorbar(
-                    x=bin_centers_dict['FR'], y=results["pur_r_or"], xerr=xerr_dict['FR'], yerr=results["purerr_r_or"], fmt="o", capsize=5, label=tag_label
-                )
-        # semi-resolved
-        # qq
-        if SRqq_condition:
-            # semi-resolved qq
-            ax_srqq.errorbar(
-                x=bin_centers_dict['SRqq'], y=results["pur_srqq"], xerr=xerr_dict['SRqq'], yerr=results["purerr_srqq"], fmt="o", capsize=5, label=tag_label
-            )
-            if FB_condition:
-                # qq
-                ax_srqq_or.errorbar(
-                    x=bin_centers_dict['SRqq'], y=results["pur_srqq_or"], xerr=xerr_dict['SRqq'], yerr=results["purerr_srqq_or"], fmt="o", capsize=5, label=tag_label
-                )
-        # bq
-        if SRbq_condition:
-            # semi-resolved bq
-            ax_srbq.errorbar(
-                x=bin_centers_dict['SRbq'], y=results["pur_srbq"], xerr=xerr_dict['SRbq'], yerr=results["purerr_srbq"], fmt="o", capsize=5, label=tag_label
-            )
-            if FB_condition:
-                # bq
-                ax_srbq_or.errorbar(
-                    x=bin_centers_dict['SRbq'], y=results["pur_srbq_or"], xerr=xerr_dict['SRbq'], yerr=results["purerr_srbq_or"], fmt="o", capsize=5, label=tag_label
-                )
-
-
-    ## adjust limits and legends ##
-    # merged
-    ax_m.legend()
-    ax_m.set_ylim([-0.1, 1.1])
-    # boosted
-    ax_b.legend()
-    ax_b.set_ylim([-0.1, 1.1])
-    # resolved
-    ax_r.legend()
-    ax_r.set_ylim([-0.1, 1.1])
-    ax_r_or.legend()
-    ax_r_or.set_ylim([-0.1, 1.1])
-    # semi-resolved qq
-    ax_srqq.legend()
-    ax_srqq.set_ylim([-0.1, 1.1])
-    ax_srqq_or.legend()
-    ax_srqq_or.set_ylim([-0.1, 1.1])
-    # semi-resolved bq
-    ax_srbq.legend()
-    ax_srbq.set_ylim([-0.1, 1.1])
-    ax_srbq_or.legend()
-    ax_srbq_or.set_ylim([-0.1, 1.1])
-
-    plt.show()
-
-    if save_path is not None:
-        # merged
-        fig_m.savefig(os.path.join(save_path, proj_name+'_merged.pdf'))
-        # boosted
-        fig_b.savefig(os.path.join(save_path, proj_name+'_boosted.pdf'))
-        # resolved
-        fig_r.savefig(os.path.join(save_path, proj_name+'_resolved.pdf'))
-        fig_r_or.savefig(os.path.join(save_path, proj_name+'_resolved_wOR.pdf'))
-        # semi-resolved qq
-        fig_srqq.savefig(os.path.join(save_path, proj_name+'_semiresolved_qq.pdf'))
-        fig_srqq_or.savefig(os.path.join(save_path, proj_name+'_semiresolved_qq_wOR.pdf'))
-        # semi-resolved bq
-        fig_srbq.savefig(os.path.join(save_path, proj_name+'_semiresolved_bq.pdf'))
-        fig_srbq_or.savefig(os.path.join(save_path, proj_name+'_semiresolved_bq_wOR.pdf'))
-
-    return
 
 # I started to use "efficiency" for describing how many gen tops were reconstructed
 # and "purity" for desrcribing how many reco tops are actually gen tops
@@ -457,17 +86,14 @@ def plot_pur_eff_w_dict(
         for key, plot_bins in plot_bins_dict.items()
     }
 
-    # m: merged (b+r w OR)
+    # m: merged (b++sr+r)
     # b: boosted
     # r: resolved
     fig_m, ax_m = plt.subplots(1, 2, figsize=(15, 5))
     fig_b, ax_b = plt.subplots(1, 2, figsize=(15, 5))
     fig_r, ax_r = plt.subplots(1, 2, figsize=(15, 5))
-    fig_r_or, ax_r_or = plt.subplots(1, 2, figsize=(15, 5))
     fig_srqq, ax_srqq = plt.subplots(1, 2, figsize=(15, 5))
-    fig_srqq_or, ax_srqq_or = plt.subplots(1, 2, figsize=(15, 5))
     fig_srbq, ax_srbq = plt.subplots(1, 2, figsize=(15, 5))
-    fig_srbq_or, ax_srbq_or = plt.subplots(1, 2, figsize=(15, 5))
 
     ## preset figure labels, titles, limits, etc. ##
     # merged
@@ -503,16 +129,6 @@ def plot_pur_eff_w_dict(
         ylabel=r"Reconstruction Efficiency",
         title=f"Reconstruction Efficiency vs. Gen Resolved top pT",
     )
-    ax_r_or[0].set(
-        xlabel=r"Reco Resolved top pT (GeV)",
-        ylabel=r"Reconstruction Purity",
-        title=f"Resolved Purity After OR  vs. Reco Resolved top pT",
-    )
-    ax_r_or[1].set(
-        xlabel=r"Gen Resolved top pT (GeV)",
-        ylabel=r"Reconstruction Efficiency",
-        title=f"Resolved Efficiency After OR vs. Gen Resolved top pT",
-    )
     # semi-resolved qq
     ax_srqq[0].set(
         xlabel=r"Reco Semi-Resolved top pT (GeV)",
@@ -523,16 +139,6 @@ def plot_pur_eff_w_dict(
         xlabel=r"Gen Semi-Resolved top pT (GeV)",
         ylabel=r"Reconstruction Efficiency",
         title=f"Reconstruction Efficiency vs. Gen Semi-Resolved top pT",
-    )
-    ax_srqq_or[0].set(
-        xlabel=r"Reco Semi-Resolved top pT (GeV)",
-        ylabel=r"Reconstruction Purity",
-        title=f"Semi-Resolved Purity After OR  vs. Reco Semi-Resolved top pT",
-    )
-    ax_srqq_or[1].set(
-        xlabel=r"Gen Semi-Resolved top pT (GeV)",
-        ylabel=r"Reconstruction Efficiency",
-        title=f"Semi-Resolved Efficiency After OR vs. Gen Semi-Resolved top pT",
     )
     # semi-resolved bq
     ax_srbq[0].set(
@@ -545,100 +151,29 @@ def plot_pur_eff_w_dict(
         ylabel=r"Reconstruction Efficiency",
         title=f"Reconstruction Efficiency vs. Gen Semi-Resolved top pT",
     )
-    ax_srbq_or[0].set(
-        xlabel=r"Reco Semi-Resolved top pT (GeV)",
-        ylabel=r"Reconstruction Purity",
-        title=f"Semi-Resolved Purity After OR  vs. Reco Semi-Resolved top pT",
-    )
-    ax_srbq_or[1].set(
-        xlabel=r"Gen Semi-Resolved top pT (GeV)",
-        ylabel=r"Reconstruction Efficiency",
-        title=f"Semi-Resolved Efficiency After OR vs. Gen Semi-Resolved top pT",
-    )
 
 
-    SRqq_condition, SRbq_condition = False, False
     ## plot purities and efficiencies ##
     for tag, pred_path in plot_dict.items():
-
-        tag_label = tag
-        if 'chi2' in tag:
-            tag_list = tag.split('_')
-            tag = tag_list[0]
-            chi2_cuts = [int(cut) for cut in tag_list[1:]]
-
-            print("Processing", tag_label)
-            results, FB_condition, SRqq_condition, SRbq_condition, FR_condition = calc_pur_eff(target_path, pred_path, bins_dict, chi2_cuts=chi2_cuts)
-        else:
-            print("Processing", tag_label)
-            results, FB_condition, SRqq_condition, SRbq_condition, FR_condition = calc_pur_eff(target_path, pred_path, bins_dict)
+        print("Processing", tag)
+        results = calc_pur_eff(target_path, pred_path, bins_dict)
 
 
-        if FB_condition:
-            # merged
-            ax_m[0].errorbar(
-                x=bin_centers_dict['all'], y=results["pur_m"], xerr=xerr_dict['all'], yerr=results["purerr_m"], fmt="o", capsize=5, label=tag_label
-            )
-            ax_m[1].errorbar(
-                x=bin_centers_dict['all'], y=results["eff_m"], xerr=xerr_dict['all'], yerr=results["efferr_m"], fmt="o", capsize=5, label=tag_label
-            )
-            # boosted
-            ax_b[0].errorbar(
-                x=bin_centers_dict['FB'], y=results["pur_b"], xerr=xerr_dict['FB'], yerr=results["purerr_b"], fmt="o", capsize=5, label=tag_label
-            )
-            ax_b[1].errorbar(
-                x=bin_centers_dict['FB'], y=results["eff_b"], xerr=xerr_dict['FB'], yerr=results["efferr_b"], fmt="o", capsize=5, label=tag_label
-            )
+        # merged
+        ax_m[0].errorbar(x=bin_centers_dict['all'], y=results["pur_m"], xerr=xerr_dict['all'], yerr=results["purerr_m"], fmt="o", capsize=5, label=tag)
+        ax_m[1].errorbar(x=bin_centers_dict['all'], y=results["eff_m"], xerr=xerr_dict['all'], yerr=results["efferr_m"], fmt="o", capsize=5, label=tag)
+        # boosted
+        ax_b[0].errorbar(x=bin_centers_dict['FB'], y=results["pur_b"], xerr=xerr_dict['FB'], yerr=results["purerr_b"], fmt="o", capsize=5, label=tag)
+        ax_b[1].errorbar(x=bin_centers_dict['FB'], y=results["eff_b"], xerr=xerr_dict['FB'], yerr=results["efferr_b"], fmt="o", capsize=5, label=tag)
         # resolved
-        if FR_condition:
-            ax_r[0].errorbar(
-                x=bin_centers_dict['FR'], y=results["pur_r"], xerr=xerr_dict['FR'], yerr=results["purerr_r"], fmt="o", capsize=5, label=tag_label
-            )
-            ax_r[1].errorbar(
-                x=bin_centers_dict['FR'], y=results["eff_r"], xerr=xerr_dict['FR'], yerr=results["efferr_r"], fmt="o", capsize=5, label=tag_label
-            )
-            if FB_condition or SRqq_condition or SRbq_condition:
-                ax_r_or[0].errorbar(
-                    x=bin_centers_dict['FR'], y=results["pur_r_or"], xerr=xerr_dict['FR'], yerr=results["purerr_r_or"], fmt="o", capsize=5, label=tag_label
-                )
-                ax_r_or[1].errorbar(
-                    x=bin_centers_dict['FR'], y=results["eff_r_or"], xerr=xerr_dict['FR'], yerr=results["efferr_r_or"], fmt="o", capsize=5, label=tag_label
-                )
-        # semi-resolved
-        # qq
-        if SRqq_condition:
-            # semi-resolved qq
-            ax_srqq[0].errorbar(
-                x=bin_centers_dict['SRqq'], y=results["pur_srqq"], xerr=xerr_dict['SRqq'], yerr=results["purerr_srqq"], fmt="o", capsize=5, label=tag_label
-            )
-            ax_srqq[1].errorbar(
-                x=bin_centers_dict['SRqq'], y=results["eff_srqq"], xerr=xerr_dict['SRqq'], yerr=results["efferr_srqq"], fmt="o", capsize=5, label=tag_label
-            )
-            if FB_condition:
-                # qq
-                ax_srqq_or[0].errorbar(
-                    x=bin_centers_dict['SRqq'], y=results["pur_srqq_or"], xerr=xerr_dict['SRqq'], yerr=results["purerr_srqq_or"], fmt="o", capsize=5, label=tag_label
-                )
-                ax_srqq_or[1].errorbar(
-                    x=bin_centers_dict['SRqq'], y=results["eff_srqq_or"], xerr=xerr_dict['SRqq'], yerr=results["efferr_srqq_or"], fmt="o", capsize=5, label=tag_label
-                )
-        # bq
-        if SRbq_condition:
-            # semi-resolved bq
-            ax_srbq[0].errorbar(
-                x=bin_centers_dict['SRbq'], y=results["pur_srbq"], xerr=xerr_dict['SRbq'], yerr=results["purerr_srbq"], fmt="o", capsize=5, label=tag_label
-            )
-            ax_srbq[1].errorbar(
-                x=bin_centers_dict['SRbq'], y=results["eff_srbq"], xerr=xerr_dict['SRbq'], yerr=results["efferr_srbq"], fmt="o", capsize=5, label=tag_label
-            )
-            if FB_condition:
-                # bq
-                ax_srbq_or[0].errorbar(
-                    x=bin_centers_dict['SRbq'], y=results["pur_srbq_or"], xerr=xerr_dict['SRbq'], yerr=results["purerr_srbq_or"], fmt="o", capsize=5, label=tag_label
-                )
-                ax_srbq_or[1].errorbar(
-                    x=bin_centers_dict['SRbq'], y=results["eff_srbq_or"], xerr=xerr_dict['SRbq'], yerr=results["efferr_srbq_or"], fmt="o", capsize=5, label=tag_label
-                )
+        ax_r[0].errorbar(x=bin_centers_dict['FR'], y=results["pur_r"], xerr=xerr_dict['FR'], yerr=results["purerr_r"], fmt="o", capsize=5, label=tag)
+        ax_r[1].errorbar(x=bin_centers_dict['FR'], y=results["eff_r"], xerr=xerr_dict['FR'], yerr=results["efferr_r"], fmt="o", capsize=5, label=tag)
+        # semi-resolved qq
+        ax_srqq[0].errorbar(x=bin_centers_dict['SRqq'], y=results["pur_srqq"], xerr=xerr_dict['SRqq'], yerr=results["purerr_srqq"], fmt="o", capsize=5, label=tag)
+        ax_srqq[1].errorbar(x=bin_centers_dict['SRqq'], y=results["eff_srqq"], xerr=xerr_dict['SRqq'], yerr=results["efferr_srqq"], fmt="o", capsize=5, label=tag)
+        # semi-resolved bq
+        ax_srbq[0].errorbar(x=bin_centers_dict['SRbq'], y=results["pur_srbq"], xerr=xerr_dict['SRbq'], yerr=results["purerr_srbq"], fmt="o", capsize=5, label=tag)
+        ax_srbq[1].errorbar(x=bin_centers_dict['SRbq'], y=results["eff_srbq"], xerr=xerr_dict['SRbq'], yerr=results["efferr_srbq"], fmt="o", capsize=5, label=tag)
 
 
     ## adjust limits and legends ##
@@ -657,28 +192,16 @@ def plot_pur_eff_w_dict(
     ax_r[1].legend()
     ax_r[0].set_ylim([-0.1, 1.1])
     ax_r[1].set_ylim([-0.1, 1.1])
-    ax_r_or[0].legend()
-    ax_r_or[1].legend()
-    ax_r_or[0].set_ylim([-0.1, 1.1])
-    ax_r_or[1].set_ylim([-0.1, 1.1])
     # semi-resolved qq
     ax_srqq[0].legend()
     ax_srqq[1].legend()
     ax_srqq[0].set_ylim([-0.1, 1.1])
     ax_srqq[1].set_ylim([-0.1, 1.1])
-    ax_srqq_or[0].legend()
-    ax_srqq_or[1].legend()
-    ax_srqq_or[0].set_ylim([-0.1, 1.1])
-    ax_srqq_or[1].set_ylim([-0.1, 1.1])
     # semi-resolved bq
     ax_srbq[0].legend()
     ax_srbq[1].legend()
     ax_srbq[0].set_ylim([-0.1, 1.1])
     ax_srbq[1].set_ylim([-0.1, 1.1])
-    ax_srbq_or[0].legend()
-    ax_srbq_or[1].legend()
-    ax_srbq_or[0].set_ylim([-0.1, 1.1])
-    ax_srbq_or[1].set_ylim([-0.1, 1.1])
 
     plt.show()
 
@@ -689,12 +212,9 @@ def plot_pur_eff_w_dict(
         fig_b.savefig(os.path.join(save_path, proj_name+'_boosted.pdf'))
         # resolved
         fig_r.savefig(os.path.join(save_path, proj_name+'_resolved.pdf'))
-        fig_r_or.savefig(os.path.join(save_path, proj_name+'_resolved_wOR.pdf'))
         # semi-resolved qq
         fig_srqq.savefig(os.path.join(save_path, proj_name+'_semiresolved_qq.pdf'))
-        fig_srqq_or.savefig(os.path.join(save_path, proj_name+'_semiresolved_qq_wOR.pdf'))
         # semi-resolved bq
         fig_srbq.savefig(os.path.join(save_path, proj_name+'_semiresolved_bq.pdf'))
-        fig_srbq_or.savefig(os.path.join(save_path, proj_name+'_semiresolved_bq_wOR.pdf'))
 
     return

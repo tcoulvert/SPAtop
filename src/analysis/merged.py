@@ -3,37 +3,27 @@ import numba as nb
 import numpy as np
 import vector
 vector.register_awkward()
-import time
 
-from src.analysis.utils import best_reco_order, reset_collision_dp, dp_to_TopNumProb, n_alpha
+from src.analysis.utils import reco_reorder, reset_collision_dp, dp_to_TopNumProb, n_alpha
 
 N_AK5_JETS = 10
 N_AK8_JETS = 2
 N_TOPS = 2
 
-def sel_target_t_by_mask(target_jets, target_pts, target_masks, dps, aps):
-    # get the best (dp x ap) jet assignment indices
-    idx_descend = best_reco_order(dps, aps)
-    idx_sel = [idx_e for idx_e in idx_descend]
-
-    selected_target_jets = target_jets[idx_sel]
-    selected_target_pts = target_pts[idx_sel]
-
-    filter = (ak.all(~ak.is_none(selected_target_jets, axis=-1), axis=-1) & target_masks)
-    selected_target_jets = ak.mask(selected_target_jets, filter)
-    selected_target_pts = ak.where(filter, selected_target_pts, -999)
+def sel_target_t_by_mask(target_jets, target_pts, target_masks):
+    filter = target_masks
+    selected_target_jets = ak.mask(target_jets, filter)
+    selected_target_pts = ak.where(filter, target_pts, -999)
 
     return selected_target_jets, selected_target_pts
 
-def sel_pred_t_by_dp_ap(predicted_jets, predicted_pts, dps, aps):
+def sel_pred_t_by_prob(predicted_jets, predicted_pts, dps, aps, deltaRs):
     # get most possible number of Top_reco by dps
     TopNumProb = dp_to_TopNumProb(dps, N_TOPS)
     TopNum = np.argmax(TopNumProb, axis=-1)
 
     # get the best N (dp x ap) jet assignment indices
-    idx_descend = best_reco_order(dps, aps)
-    idx_sel = [idx_e[:N_e] for idx_e, N_e in zip(idx_descend, TopNum)]
-
+    idx_sel = reco_reorder(predicted_jets, dps, aps, TopNum, deltaRs)
     selected_predicted_jets = predicted_jets[idx_sel]
     selected_predicted_pts = predicted_pts[idx_sel]
 
@@ -46,49 +36,97 @@ def sel_pred_t_by_dp_ap(predicted_jets, predicted_pts, dps, aps):
 
 
 # A look up table is in shape
-# [event,
-#    valid_jets1,
+# [event x valid_predjets,
 #        [retrieved, pt]]
+def generate_pred_LUT(predicted_jets, target_jets, predicted_toppt):
+    return generate_one_pred_LUT(
+        predicted_jets, target_jets, predicted_toppt,
+        ak.ArrayBuilder()
+    ).snapshot()
+
 @nb.njit
-def generate_LUT(
-    selected_jets1, selected_jets2,
-    selected_toppt,
+def generate_one_pred_LUT(
+    predicted_jets, target_jets, predicted_toppt,
     builder
 ):
     # for each event
-    for jets1_event, jets2_event, toppt_event in zip(
-        selected_jets1, selected_jets2,
-        selected_toppt
+    for pjets_event, tjets_event, toppt_event in zip(
+        predicted_jets, target_jets,
+        predicted_toppt
     ):
-        # for each target fatjet, check if the predictions have a p fatject same with the t fatjet
-        builder.begin_list()
-
         matched_idxs = set()
-        for jets1, toppt in zip(jets1_event, toppt_event):
-            if jets1 is None: continue
+        for pjets, toppt in zip(pjets_event, toppt_event):
+            if pjets is None: continue
 
             retrieved = 0
-            for i, jets2 in enumerate(jets2_event):
-                if jets2 is None: continue
+            for i, tjets in enumerate(tjets_event):
+                if tjets is None: continue
                 if i in matched_idxs: continue
 
-                n_jet1s = 0; n_matched = 0
-                for jet1 in jets1:
-                    n_jet1s += 1
-                    for jet2 in jets2:
+                n_pjets = 0; n_matched = 0
+                for pjet in pjets:
+                    n_pjets += 1
+                    for tjet in tjets:
                         if (
-                            jet1.pt == jet2.pt and jet1.eta == jet2.eta 
-                            and jet1.phi == jet2.phi and jet1.mass == jet2.mass
+                            pjet.pt == tjet.pt and pjet.eta == tjet.eta 
+                            and pjet.phi == tjet.phi and pjet.mass == tjet.mass
                         ): n_matched += 1
 
-                if n_matched == n_jet1s: retrieved = 1; matched_idxs.add(i); break
+                if n_matched == n_pjets: retrieved = 1; matched_idxs.add(i); break
 
             builder.begin_list()
             builder.append(retrieved)
             builder.append(toppt)
             builder.end_list()
 
-        builder.end_list()
+    return builder
+
+# A look up table is in shape
+# [event x valid_targjets,
+#        [retrieved, pt]]
+def generate_target_LUT(
+    target_jets, predicted_jets, target_toppt,
+):
+    return ak.concatenate([
+        generate_one_target_LUT(
+            target_jets[:, i::N_TOPS], predicted_jets, target_toppt[:, i::N_TOPS], ak.ArrayBuilder()
+        ).snapshot() for i in range(N_TOPS)
+    ], axis=0)
+
+@nb.njit
+def generate_one_target_LUT(
+    target_jets, predicted_jets, target_toppt,
+    builder
+):
+    # for each event
+    for tjets_event, pjets_event, toppt_event in zip(
+        target_jets, predicted_jets,
+        target_toppt
+    ):
+        retrieved = 0; toppt = -999.0
+        for tjets, toppt_ in zip(tjets_event, toppt_event):
+            if tjets is None: continue
+            toppt = toppt_
+
+            for pjets in pjets_event:
+                if pjets is None: continue
+
+                n_tjets = 0; n_matched = 0
+                for tjet in tjets:
+                    n_tjets += 1
+                    for pjet in pjets:
+                        if (
+                            tjet.pt == pjet.pt and tjet.eta == pjet.eta 
+                            and tjet.phi == pjet.phi and tjet.mass == pjet.mass
+                        ): n_matched += 1
+
+                if n_matched == n_tjets: retrieved = 1; break
+
+        if toppt > 0:
+            builder.begin_list()
+            builder.append(retrieved)
+            builder.append(toppt)
+            builder.end_list()
 
     return builder
 
@@ -101,6 +139,7 @@ def parse_merged_w_target(
     N_TOPS = np.max([int(k) for key in reconstructions for k in key if k.isdigit()])
     print(f"Number of tops: {N_TOPS}")
     jet_labels = {reco: [key for key in predfile["TARGETS"][reco].keys() if 'prob' not in key] for reco in reconstructions}
+    deltaRs = [[0.8 if n_alpha(label) > 1 else 0.5 for label in jet_labels[reco]] for reco in reconstructions]
 
     def get_numerical(file, key: str):
         return ak.Array(
@@ -163,21 +202,12 @@ def parse_merged_w_target(
 
 
     # select predictions and targets
-    selected_target_jets, selected_target_pts = sel_target_t_by_mask(target_jets, target_pts, target_masks, dps, aps)
-    selected_predicted_jets, selected_predicted_pts = sel_pred_t_by_dp_ap(predicted_jets, predicted_pts, dps, aps)
+    selected_target_jets, selected_target_pts = sel_target_t_by_mask(target_jets, target_pts, target_masks)
+    selected_predicted_jets, selected_predicted_pts = sel_pred_t_by_prob(predicted_jets, predicted_pts, dps, aps, deltaRs)
 
 
     # generate look up tables
-    LUT_pred = generate_LUT(
-        selected_predicted_jets, selected_target_jets,
-        selected_predicted_pts,
-        ak.ArrayBuilder()
-    ).snapshot()
-    LUT_target = generate_LUT(
-        selected_target_jets, selected_predicted_jets,
-        selected_target_pts,
-        ak.ArrayBuilder()
-    ).snapshot()
-
+    LUT_pred = generate_pred_LUT(selected_predicted_jets, selected_target_jets, selected_predicted_pts)
+    LUT_target = generate_target_LUT(selected_target_jets, selected_predicted_jets, selected_target_pts)
 
     return LUT_pred, LUT_target
