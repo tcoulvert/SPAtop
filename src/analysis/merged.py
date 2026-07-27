@@ -3,6 +3,7 @@ import numba as nb
 import numpy as np
 import vector
 vector.register_awkward()
+import time
 
 from src.analysis.utils import best_reco_order, reset_collision_dp, dp_to_TopNumProb, n_alpha
 
@@ -11,27 +12,16 @@ N_AK8_JETS = 2
 N_TOPS = 2
 
 def sel_target_t_by_mask(target_jets, target_pts, target_masks, dps, aps):
-    print("Target jets and pts shapes before probs reco reordering")
-    print(ak.type(target_jets))
-    print(ak.type(target_pts))
-
-    # get the top N (dp x ap) jet assignment indices
+    # get the best (dp x ap) jet assignment indices
     idx_descend = best_reco_order(dps, aps)
+    idx_sel = [idx_e for idx_e in idx_descend]
 
-    selected_target_jets = target_jets[idx_descend]
-    selected_target_pts = target_pts[idx_descend]
-
-    print("Target jets and pts shapes before target mask filtering")
-    print(ak.type(target_jets))
-    print(ak.type(target_pts))
+    selected_target_jets = target_jets[idx_sel]
+    selected_target_pts = target_pts[idx_sel]
 
     filter = (ak.all(~ak.is_none(selected_target_jets, axis=-1), axis=-1) & target_masks)
-    selected_target_jets = ak.mask(target_jets, ~filter)
-    selected_target_pts = ak.where(~filter, -999, target_pts)
-
-    print("Target jets and pts shapes after target mask filtering")
-    print(ak.type(target_jets))
-    print(ak.type(target_pts))
+    selected_target_jets = ak.mask(selected_target_jets, filter)
+    selected_target_pts = ak.where(filter, selected_target_pts, -999)
 
     return selected_target_jets, selected_target_pts
 
@@ -40,31 +30,17 @@ def sel_pred_t_by_dp_ap(predicted_jets, predicted_pts, dps, aps):
     TopNumProb = dp_to_TopNumProb(dps, N_TOPS)
     TopNum = np.argmax(TopNumProb, axis=-1)
 
-    # get the top N (dp x ap) jet assignment indices
+    # get the best N (dp x ap) jet assignment indices
     idx_descend = best_reco_order(dps, aps)
-
     idx_sel = [idx_e[:N_e] for idx_e, N_e in zip(idx_descend, TopNum)]
-
-    # select the predicted q and qq assignment via the indices
-    print("Predicted jets and pts shapes before Ntop filtering")
-    print(ak.type(predicted_jets))
-    print(ak.type(predicted_pts))
 
     selected_predicted_jets = predicted_jets[idx_sel]
     selected_predicted_pts = predicted_pts[idx_sel]
 
-    print("Predicted jets and pts shapes after Ntop filtering")
-    print(ak.type(selected_predicted_jets))
-    print(ak.type(selected_predicted_pts))
-
     # selected jets assigned to jets
     filter = ak.all(~ak.is_none(selected_predicted_jets, axis=-1), axis=-1)
-    selected_predicted_jets = ak.mask(selected_predicted_jets, ~filter)
-    selected_predicted_pts = ak.where(~filter, -999, selected_predicted_pts)
-
-    print("Predicted jets and pts shapes after 'all predictions not None' filtering")
-    print(ak.type(selected_predicted_jets))
-    print(ak.type(selected_predicted_pts))
+    selected_predicted_jets = ak.mask(selected_predicted_jets, filter)
+    selected_predicted_pts = ak.where(filter, selected_predicted_pts, -999)
 
     return selected_predicted_jets, selected_predicted_pts
 
@@ -120,6 +96,7 @@ def generate_LUT(
 def parse_merged_w_target(
     testfile, predfile, reco_regex: str=''
 ):  
+    print(f"Processing reco: {reco_regex}")
     reconstructions = [key for key in testfile["TARGETS"].keys() if reco_regex in key]
     N_TOPS = np.max([int(k) for key in reconstructions for k in key if k.isdigit()])
     print(f"Number of tops: {N_TOPS}")
