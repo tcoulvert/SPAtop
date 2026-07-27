@@ -33,7 +33,7 @@ SAVE_H5 = False
 
 SPANET_TTBAR_CHI2_METHOD = True
 
-file_path = "/storage/af/user/tsievert/topNet/tt_hadronic_bqfixed.h5"
+file_path = "/storage/af/user/tsievert/topNet/tt_hadronic_fixed_test.h5"
 # 1) Load arrays
 with h5py.File(file_path, "r") as f:
     pt   = f['INPUTS/Jets/pt'][:]
@@ -211,8 +211,8 @@ if PLOT_CHI2_HISTS:
 
 # Plot resolved baseline ROC curve
 if PLOT_ROCS:
-    correct_t1 = correct_mask(top_dict[f'FRt{1}_b'], top_dict[f'FRt{1}_q1'], top_dict[f'FRt{1}_q2'], topidx=1)
-    correct_t2 = correct_mask(top_dict[f'FRt{2}_b'], top_dict[f'FRt{2}_q1'], top_dict[f'FRt{2}_q2'], topidx=2)
+    correct_t1 = correct_mask(top_dict[f'FRt{1}_b'], top_dict[f'FRt{1}_q1'], top_dict[f'FRt{1}_q2'], top_idx=1)
+    correct_t2 = correct_mask(top_dict[f'FRt{2}_b'], top_dict[f'FRt{2}_q1'], top_dict[f'FRt{2}_q2'], top_idx=2)
     
     valid_t1 = ~ak.is_none(correct_t1) & (top_dict[f'FRt1_chi2'] < 500) & tgt_t1_mask
     valid_t2 = ~ak.is_none(correct_t2) & (top_dict[f'FRt2_chi2'] < 500) & tgt_t2_mask

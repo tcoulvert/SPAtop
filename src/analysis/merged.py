@@ -130,8 +130,7 @@ def parse_merged_w_target(
         "phi": np.array(testfile["INPUTS"]["Jets"]["phi"]),
         "mass": np.array(testfile["INPUTS"]["Jets"]["mass"])
     },  with_name="Momentum4D"))
-    # jets["index"] = ak.local_index(jets)
-    jets = ak.with_field(jets, ak.local_index(jets, axis=1), "index")
+    jets["index"] = ak.local_index(jets)
     N_AK5_JETS = ak.max(ak.local_index(jets), axis=None) + 1
     print(f"Number of AK5 jets: {N_AK5_JETS}")
     fatjets = ak.from_regular(ak.zip({
@@ -140,8 +139,7 @@ def parse_merged_w_target(
         "phi": np.array(testfile["INPUTS"]["BoostedJets"]["fj_phi"]),
         "mass": np.array(testfile["INPUTS"]["BoostedJets"]["fj_mass"])
     }, with_name="Momentum4D"))
-    # fatjets["index"] = ak.local_index(fatjets) + N_AK5_JETS
-    fatjets = ak.with_field(fatjets, ak.local_index(fatjets, axis=1) + N_AK5_JETS, "index")
+    fatjets["index"] = ak.local_index(fatjets) + N_AK5_JETS
     N_AK8_JETS = ak.max(ak.local_index(fatjets), axis=None) + 1
     print(f"Number of AK8 jets: {N_AK8_JETS}")
 
