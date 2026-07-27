@@ -1,7 +1,6 @@
 import itertools
 
 import awkward as ak
-import numba as nb
 import numpy as np
 from hist.intervals import clopper_pearson_interval
 

@@ -14,7 +14,7 @@ vec.register_awkward()
 # start = time.time()
 FILEPATH = os.path.abspath(__file__)
 DIRPATH = '/'.join(FILEPATH.split('/')[:-1])
-PLOT_DIRPATH = os.path.join(DIRPATH, 'v10/Chi2_FR')
+PLOT_DIRPATH = os.path.join(DIRPATH, 'v10/Chi2_FR_test')
 if not os.path.exists(PLOT_DIRPATH): os.makedirs(PLOT_DIRPATH)
 
 N_TOPS = 2
