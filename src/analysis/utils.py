@@ -1,7 +1,6 @@
 import itertools
 
 import awkward as ak
-import numba as nb
 import numpy as np
 from hist.intervals import clopper_pearson_interval
 
@@ -15,13 +14,13 @@ def reset_collision_dp(dps, aps):
     return ak.where(ap_filter, 0, dps)
 
 
-def overlap(jets, idxs, ntops, deltaRs):
+def overlap(jets, idxs, nrecos, ntops, deltaRs):
     builder = []
-    for jets_event, idx_event, ntops_event in zip(jets, idxs, ntops):
+    for jets_event, idx_event, nrecos_event in zip(jets, idxs, nrecos):
 
         good_idxs = []
-        for idx in idx_event:
-            if len(good_idxs) == ntops_event: break
+        for idx in idx_event[:nrecos_event]:
+            if len(good_idxs) == ntops: break
             elif jets_event[idx] is None: continue
             else:
                 append = True
@@ -37,15 +36,15 @@ def overlap(jets, idxs, ntops, deltaRs):
 
     return builder
 
-def reco_reorder(predicted_jets, dps, aps, n_tops, deltaRs):
+def reco_reorder(predicted_jets, dps, aps, n_recos, n_tops, deltaRs):
     ps = dps * aps
     idx_descend = np.flip(np.argsort(ps, axis=-1), axis=-1)
-    idx_sel = overlap(predicted_jets, idx_descend, n_tops, deltaRs)
+    idx_sel = overlap(predicted_jets, idx_descend, n_recos, n_tops, deltaRs)
 
     return idx_sel
 
 
-def dp_to_TopNumProb(dps, Nmax: int):
+def dp_to_TopNumProb(dps):
     # get maximum number of targets
     Noptions = ak.max(ak.num(dps, axis=-1), axis=None)
 
@@ -53,7 +52,7 @@ def dp_to_TopNumProb(dps, Nmax: int):
     probs = []
 
     # loop through all possible number of existing targets
-    for N in range(Nmax + 1):
+    for N in range(Noptions + 1):
         # get all combinations of targets
         combs = list(itertools.combinations(range(Noptions), N))
 

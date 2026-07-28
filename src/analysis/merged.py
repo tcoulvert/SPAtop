@@ -19,11 +19,11 @@ def sel_target_t_by_mask(target_jets, target_pts, target_masks):
 
 def sel_pred_t_by_prob(predicted_jets, predicted_pts, dps, aps, deltaRs):
     # get most possible number of Top_reco by dps
-    TopNumProb = dp_to_TopNumProb(dps, N_TOPS)
+    TopNumProb = dp_to_TopNumProb(dps)
     TopNum = np.argmax(TopNumProb, axis=-1)
 
     # get the best N (dp x ap) jet assignment indices
-    idx_sel = reco_reorder(predicted_jets, dps, aps, TopNum, deltaRs)
+    idx_sel = reco_reorder(predicted_jets, dps, aps, TopNum, N_TOPS, deltaRs)
     selected_predicted_jets = predicted_jets[idx_sel]
     selected_predicted_pts = predicted_pts[idx_sel]
 
@@ -135,7 +135,7 @@ def parse_merged_w_target(
     testfile, predfile, reco_regex: str=''
 ):  
     print(f"Processing reco: {reco_regex}")
-    reconstructions = [key for key in testfile["TARGETS"].keys() if reco_regex in key]
+    reconstructions = sorted([key for key in testfile["TARGETS"].keys() if reco_regex in key])
     N_TOPS = np.max([int(k) for key in reconstructions for k in key if k.isdigit()])
     print(f"Number of tops: {N_TOPS}")
     jet_labels = {reco: [key for key in predfile["TARGETS"][reco].keys() if 'prob' not in key] for reco in reconstructions}
