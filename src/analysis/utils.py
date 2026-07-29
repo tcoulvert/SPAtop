@@ -1,6 +1,7 @@
 import itertools
 
 import awkward as ak
+import numba as nb
 import numpy as np
 from hist.intervals import clopper_pearson_interval
 
@@ -14,9 +15,24 @@ def reset_collision_dp(dps, aps):
     return ak.where(ap_filter, 0, dps)
 
 
-def overlap(jets, idxs, nrecos, ntops, deltaRs):
-    builder = []
+@nb.njit
+def deltaR(jet1, jet2):
+    if jet1 is None or jet2 is None: return 999
+
+    deltaPhi = jet1.phi - jet2.phi
+    if deltaPhi < -np.pi: deltaPhi = deltaPhi + 2*np.pi
+    elif deltaPhi > np.pi: deltaPhi = deltaPhi - 2*np.pi
+
+    deltaEta = jet1.eta - jet2.eta
+    if deltaEta < 0: deltaEta = -1 * deltaEta
+
+    deltaR = (deltaPhi**2 + deltaEta**2)**0.5
+    return deltaR
+
+@nb.njit
+def overlap(jets, idxs, nrecos, ntops, deltaRs, builder):
     for jets_event, idx_event, nrecos_event in zip(jets, idxs, nrecos):
+        builder.begin_list()
 
         good_idxs = []
         for idx in idx_event[:nrecos_event]:
@@ -28,18 +44,19 @@ def overlap(jets, idxs, nrecos, ntops, deltaRs):
                     if jet is None: append = False; break
                     for idx_ in good_idxs:
                         for k_, jet_ in enumerate(jets_event[idx_]):
-                            deltaR = jet.deltaR(jet_)
-                            if deltaR < deltaRs[idx][k] or deltaR < deltaRs[idx_][k_]: append = False
+                            delR = deltaR(jet, jet_)
+                            if delR < deltaRs[idx][k] or delR < deltaRs[idx_][k_]: append = False; break
                 if append: good_idxs.append(idx)
 
-        builder.append(good_idxs)
+        for good_idx in good_idxs: builder.append(good_idx)
+        builder.end_list()
 
     return builder
 
 def reco_reorder(predicted_jets, dps, aps, n_recos, n_tops, deltaRs):
     ps = dps * aps
     idx_descend = np.flip(np.argsort(ps, axis=-1), axis=-1)
-    idx_sel = overlap(predicted_jets, idx_descend, n_recos, n_tops, deltaRs)
+    idx_sel = overlap(predicted_jets, idx_descend, n_recos, n_tops, [np.array(deltaR) for deltaR in deltaRs], ak.ArrayBuilder()).snapshot()
 
     return idx_sel
 
@@ -90,6 +107,7 @@ def dp_to_TopNumProb(dps):
 
 # calculate purity/efficiency
 def calc_pureff(LUT, bins):
+    if LUT is None: return None, None
 
     Tops = np.array([top for top in LUT])
 

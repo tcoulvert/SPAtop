@@ -135,7 +135,8 @@ def parse_merged_w_target(
     testfile, predfile, reco_regex: str=''
 ):  
     print(f"Processing reco: {reco_regex}")
-    reconstructions = sorted([key for key in testfile["TARGETS"].keys() if reco_regex in key])
+    reconstructions = sorted([key for key in predfile["TARGETS"].keys() if reco_regex in key])
+    if len(reconstructions) == 0: return None, None
     N_TOPS = np.max([int(k) for key in reconstructions for k in key if k.isdigit()])
     print(f"Number of tops: {N_TOPS}")
     jet_labels = {reco: [key for key in predfile["TARGETS"][reco].keys() if 'prob' not in key] for reco in reconstructions}

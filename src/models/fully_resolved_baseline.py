@@ -25,8 +25,11 @@ W_SIGMA = 14.
 
 FILL_VALUE = 1e5
 
-PLOT_CHI2_HISTS = True
-PLOT_ROCS = True
+# PLOT_CHI2_HISTS = True
+# PLOT_ROCS = True
+# SAVE_H5 = True
+PLOT_CHI2_HISTS = False
+PLOT_ROCS = False
 SAVE_H5 = False
 
 file_path = "/storage/af/user/tsievert/topNet/tt_hadronic_fixed_test.h5"
@@ -156,9 +159,15 @@ def chi2_to_prob(chi2):
     prob = np.where(chi2 != FILL_VALUE, prob, 0)
     return prob
 
+
+for i in range(2):
+    print(f'top {i+1} \n', '-'*60)
+    print(f'  chi2 - ', top_dict[f'FRt{i+1}_chi2'])
+    print(f'  prob - ', chi2_to_prob(top_dict[f'FRt{i+1}_chi2']))
+
 # Save out new h5 file
 if SAVE_H5:
-    out_filepath = os.path.join(DIRPATH, "../../data/spatopvol/tt_hadronic_predict2k_clean_jetmask_corr_valid_targets_fr_baseline.h5")
+    out_filepath = os.path.join(DIRPATH, "tt_hadronic_chi2.h5")
     with h5py.File(out_filepath, 'a') as f:
         with h5py.File(file_path, 'r') as test_f:
             for jet_class in test_f['INPUTS'].keys():
