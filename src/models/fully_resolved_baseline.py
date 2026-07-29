@@ -25,12 +25,9 @@ W_SIGMA = 14.
 
 FILL_VALUE = 1e5
 
-# PLOT_CHI2_HISTS = True
-# PLOT_ROCS = True
-# SAVE_H5 = True
-PLOT_CHI2_HISTS = False
-PLOT_ROCS = False
-SAVE_H5 = False
+PLOT_CHI2_HISTS = True
+PLOT_ROCS = True
+SAVE_H5 = True
 
 file_path = "/storage/af/user/tsievert/topNet/tt_hadronic_fixed_test.h5"
 ################################################
@@ -130,11 +127,22 @@ tt = ak.combinations(t, 2, axis=1, fields=["t1", "t2"])
 
 ################################################
 # 5) Build ch2 for two tops simultaneously
+t_mask = (
+    (t.b.index != t.w.j1.index) &
+    (t.b.index != t.w.j2.index) & (t.w.j1.index != t.w.j2.index)
+)
+print('Any tops have overlapping jets? ', ak.any(~t_mask))
+tt_mask = (
+    (tt.t1.b.index != tt.t2.b.index) &
+    (tt.t1.w.j1.index != tt.t2.w.j1.index) & (tt.t1.w.j1.index != tt.t2.w.j2.index) &
+    (tt.t1.w.j2.index != tt.t2.w.j1.index) & (tt.t1.w.j2.index != tt.t2.w.j2.index)
+)
 chi2 = (
-    ( (tt.t1.mass - tt.t2.mass) / TOP_SIGMA )**2 
+    ( (tt.t1.mass - tt.t2.mass) / TOP_SIGMA )**2
     + ( (tt.t1.w.mass - W_MASS) / W_SIGMA )**2
     + ( (tt.t2.w.mass - W_MASS) / W_SIGMA )**2
 )
+chi2 = ak.where(tt_mask, chi2, FILL_VALUE)
 
 
 ################################################
@@ -151,7 +159,24 @@ for i in range(2):
     top_dict[f'FRt{i+1}_q2'] = ak.where(chi2_mask, best_tt[f"t{i+1}"].w.j2.index, -1)
     top_dict[f'FRt{i+1}_pt'] = ak.where(chi2_mask, best_tt[f"t{i+1}"].pt, -1)
     top_dict[f'FRt{i+1}_chi2'] = ak.where(chi2_mask, best_chi2, FILL_VALUE)
-    
+
+
+################################################
+# 6b) Select jets by randomly selecting valid tt pair as a comparison
+valid_tt, valid_chi2 = tt[tt_mask], chi2[tt_mask]
+n_events, n_validtts = ak.num(valid_tt, axis=0), ak.num(valid_tt, axis=1)[0]
+random_idxs = np.random.choice(n_validtts, size=n_events)
+random_tt, random_chi2 = ak.firsts(valid_tt[ak.local_index(valid_tt) == random_idxs], axis=1), ak.firsts(valid_chi2[ak.local_index(valid_chi2) == random_idxs], axis=1)
+
+rand_dict = {}
+for i in range(2):
+    rand_dict[f'FRt{i+1}_mask'] = chi2_mask
+    rand_dict[f'FRt{i+1}_b'] = ak.where(chi2_mask, random_tt[f"t{i+1}"].b.index, -1)
+    rand_dict[f'FRt{i+1}_q1'] = ak.where(chi2_mask, random_tt[f"t{i+1}"].w.j1.index, -1)
+    rand_dict[f'FRt{i+1}_q2'] = ak.where(chi2_mask, random_tt[f"t{i+1}"].w.j2.index, -1)
+    rand_dict[f'FRt{i+1}_pt'] = ak.where(chi2_mask, random_tt[f"t{i+1}"].pt, -1)
+    rand_dict[f'FRt{i+1}_chi2'] = ak.where(chi2_mask, random_chi2, FILL_VALUE)
+
 
 ################################################
 def chi2_to_prob(chi2):
@@ -159,11 +184,6 @@ def chi2_to_prob(chi2):
     prob = np.where(chi2 != FILL_VALUE, prob, 0)
     return prob
 
-
-for i in range(2):
-    print(f'top {i+1} \n', '-'*60)
-    print(f'  chi2 - ', top_dict[f'FRt{i+1}_chi2'])
-    print(f'  prob - ', chi2_to_prob(top_dict[f'FRt{i+1}_chi2']))
 
 # Save out new h5 file
 if SAVE_H5:
@@ -176,7 +196,7 @@ if SAVE_H5:
                         f[f'INPUTS/{jet_class}/{variable}'] = test_f[f'INPUTS/{jet_class}/{variable}'][:]
 
         for i in range(N_TOPS):
-            f[f'TARGETS/FRt{i+1}/detection_probability'] = ak.to_numpy(top_dict[f'FRt{i+1}_mask'], allow_missing=False)
+            f[f'TARGETS/FRt{i+1}/detection_probability'] = ak.to_numpy(top_dict[f'FRt{i+1}_mask'] & (top_dict[f'FRt{i+1}_chi2'] < 45), allow_missing=False)
             f[f'TARGETS/FRt{i+1}/b'] = ak.to_numpy(top_dict[f'FRt{i+1}_b'], allow_missing=False)
             f[f'TARGETS/FRt{i+1}/q1'] = ak.to_numpy(top_dict[f'FRt{i+1}_q1'], allow_missing=False)
             f[f'TARGETS/FRt{i+1}/q2'] = ak.to_numpy(top_dict[f'FRt{i+1}_q2'], allow_missing=False)
@@ -208,20 +228,6 @@ def correct_mask(pred_b, pred_q1, pred_q2, top_idx=1):
 if PLOT_CHI2_HISTS:
     # Plot Top χ² histograms
     for i in range(N_TOPS):
-        valid_t = (tgt_t1_mask if i == 0 else tgt_t2_mask)
-        chi2_vals_1 = ak.ravel(top_dict[f'FRt{i+1}_chi2'][valid_t])
-        plt.figure()
-        plt.hist(chi2_vals_1, range=(0, 500), bins=100)
-        plt.xlabel(f"χ² (Top{i+1})")
-        plt.ylabel("Frequency")
-        plt.yscale('log')
-        plt.title(f"Chi-Squared Distribution for Top{i+1} Candidates")
-        plt.grid(True)
-        plt.legend()
-        plt.savefig(os.path.join(PLOT_DIRPATH, f"fully_resolved_chisq_top{i+1}.pdf"))
-
-    # Plot Top χ² histograms
-    for i in range(N_TOPS):
         correct_t = correct_mask(top_dict[f'FRt{i+1}_b'], top_dict[f'FRt{i+1}_q1'], top_dict[f'FRt{i+1}_q2'], top_idx=i+1)
         valid_t = (tgt_t1_mask if i == 0 else tgt_t2_mask)
         corr_chi2_t_vals = ak.ravel(top_dict[f'FRt{i+1}_chi2'][correct_t & valid_t])
@@ -236,33 +242,56 @@ if PLOT_CHI2_HISTS:
         plt.legend()
         plt.savefig(os.path.join(PLOT_DIRPATH, f"fully_resolved_chisqCorr_top{i+1}.pdf"))
 
+    # Plot Top χ² histograms
+    for i in range(N_TOPS):
+        correct_t = correct_mask(rand_dict[f'FRt{i+1}_b'], rand_dict[f'FRt{i+1}_q1'], rand_dict[f'FRt{i+1}_q2'], top_idx=i+1)
+        valid_t = (tgt_t1_mask if i == 0 else tgt_t2_mask)
+        corr_chi2_t_vals = ak.ravel(rand_dict[f'FRt{i+1}_chi2'][correct_t & valid_t])
+        incorr_chi2_t_vals = ak.ravel(rand_dict[f'FRt{i+1}_chi2'][~correct_t & valid_t])
+        plt.figure()
+        plt.hist([corr_chi2_t_vals, incorr_chi2_t_vals], range=(0, 500), bins=100, label=['Correct top assignment', 'Incorrect top assignment'], stacked=True)
+        plt.xlabel(f"χ² (Top{i+1})")
+        plt.ylabel("Frequency")
+        plt.yscale('log')
+        plt.title(f"Chi-Squared Distribution for Randomly chosen Top{i+1} Candidates")
+        plt.grid(True)
+        plt.legend()
+        plt.savefig(os.path.join(PLOT_DIRPATH, f"fully_resolved_RandchisqCorr_top{i+1}.pdf"))
+
 # Plot resolved baseline ROC curve
 if PLOT_ROCS:
     correct_t1 = correct_mask(top_dict[f'FRt{1}_b'], top_dict[f'FRt{1}_q1'], top_dict[f'FRt{1}_q2'], top_idx=1)
     correct_t2 = correct_mask(top_dict[f'FRt{2}_b'], top_dict[f'FRt{2}_q1'], top_dict[f'FRt{2}_q2'], top_idx=2)
-    
-    valid_t1 = tgt_t1_mask
-    valid_t2 = tgt_t2_mask
+    chi2_t1 = ak.to_numpy(top_dict[f'FRt{1}_chi2'][tgt_t1_mask], allow_missing=False)
+    chi2_t2 = ak.to_numpy(top_dict[f'FRt{2}_chi2'][tgt_t2_mask], allow_missing=False)
+    label_t1 = ak.to_numpy(correct_t1[tgt_t1_mask], allow_missing=False)
+    label_t2 = ak.to_numpy(correct_t2[tgt_t2_mask], allow_missing=False)
 
-    print(f"num valid t1 = {ak.sum(valid_t1)} out of {ak.num(valid_t1, axis=0)}")
-    print(f"num valid t2 = {ak.sum(valid_t2)} out of {ak.num(valid_t2, axis=0)}")
-    print(f"num correct and valid t1 = {ak.sum(correct_t1[valid_t1])} out of {ak.num(correct_t1[valid_t1], axis=0)}")
-    print(f"num correct and valid t2 = {ak.sum(correct_t2[valid_t2])} out of {ak.num(correct_t2[valid_t2], axis=0)}")
+    correct_t1_rand = correct_mask(rand_dict[f'FRt{1}_b'], rand_dict[f'FRt{1}_q1'], rand_dict[f'FRt{1}_q2'], top_idx=1)
+    correct_t2_rand = correct_mask(rand_dict[f'FRt{2}_b'], rand_dict[f'FRt{2}_q1'], rand_dict[f'FRt{2}_q2'], top_idx=2)
+    chi2_t1_rand = ak.to_numpy(rand_dict[f'FRt{1}_chi2'][tgt_t1_mask], allow_missing=False)
+    chi2_t2_rand = ak.to_numpy(rand_dict[f'FRt{2}_chi2'][tgt_t2_mask], allow_missing=False)
+    label_t1_rand = ak.to_numpy(correct_t1_rand[tgt_t1_mask], allow_missing=False)
+    label_t2_rand = ak.to_numpy(correct_t2_rand[tgt_t2_mask], allow_missing=False)
 
-    chi2_t1 = ak.to_numpy(top_dict[f'FRt{1}_chi2'][valid_t1], allow_missing=False)
-    chi2_t2 = ak.to_numpy(top_dict[f'FRt{2}_chi2'][valid_t2], allow_missing=False)
-    label_t1 = ak.to_numpy(correct_t1[valid_t1], allow_missing=False)
-    label_t2 = ak.to_numpy(correct_t2[valid_t2], allow_missing=False)
+    print(f"num valid t1 = {ak.sum(tgt_t1_mask)} out of {ak.num(tgt_t1_mask, axis=0)}")
+    print(f"num valid t2 = {ak.sum(tgt_t2_mask)} out of {ak.num(tgt_t2_mask, axis=0)}")
+    print(f"num correct and valid t1 = {ak.sum(correct_t1[tgt_t1_mask])} out of {ak.num(correct_t1[tgt_t1_mask], axis=0)}")
+    print(f"num correct and valid t2 = {ak.sum(correct_t2[tgt_t2_mask])} out of {ak.num(correct_t2[tgt_t2_mask], axis=0)}")
+    print(f"num correct and valid random t1 = {ak.sum(correct_t1_rand[tgt_t1_mask])} out of {ak.num(correct_t1_rand[tgt_t1_mask], axis=0)}")
+    print(f"num correct and valid random t2 = {ak.sum(correct_t2_rand[tgt_t2_mask])} out of {ak.num(correct_t2_rand[tgt_t2_mask], axis=0)}")
 
     # === Plot ROC ===
     def plot_roc(chi2_vals, label, plotlabel):
-        fpr, tpr, _ = roc_curve(label, chi2_vals)  # -chi2_vals
+        fpr, tpr, _ = roc_curve(label, chi2_vals)
         roc_auc = auc(fpr, tpr)
         plt.plot(fpr, tpr, label=f"{plotlabel} (AUC = {roc_auc:.3f})")
 
     plt.figure(figsize=(7, 6))
     plot_roc(chi2_t1, label_t1, "Top1")
     plot_roc(chi2_t2, label_t2, "Top2")
+    plot_roc(chi2_t1_rand, label_t1_rand, "Random Top1")
+    plot_roc(chi2_t2_rand, label_t2_rand, "Random Top2")
     plt.plot([0, 1], [0, 1], 'k--', lw=1)
     plt.xlabel("False Positive Rate")
     plt.ylabel("True Positive Rate")

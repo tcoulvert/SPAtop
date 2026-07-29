@@ -8,7 +8,7 @@ from src.analysis.merged import parse_merged_w_target
 from src.analysis.utils import calc_pureff
 
 
-def calc_pur_eff(target_path, pred_path, bins_dict, mode: str='pur_eff'):
+def calc_pur_eff(target_path, pred_path, bins_dict, mode: str='pur_eff', chi2: bool=False):
     # open files
     pred_h5 = h5.File(pred_path, "a")
     target_h5 = h5.File(target_path)
@@ -20,19 +20,19 @@ def calc_pur_eff(target_path, pred_path, bins_dict, mode: str='pur_eff'):
 
     ## generate look up tables ##
     # boosted
-    LUT_boosted_pred, LUT_boosted_target = parse_merged_w_target(target_h5, pred_h5, reco_regex='FB')
+    LUT_boosted_pred, LUT_boosted_target = parse_merged_w_target(target_h5, pred_h5, reco_regex='FB', chi2=chi2)
 
     # semi-resolved
     # qq
-    LUT_semiresolved_qq_pred, LUT_semiresolved_qq_target = parse_merged_w_target(target_h5, pred_h5, reco_regex='SRqq')
+    LUT_semiresolved_qq_pred, LUT_semiresolved_qq_target = parse_merged_w_target(target_h5, pred_h5, reco_regex='SRqq', chi2=chi2)
     # bq
-    LUT_semiresolved_bq_pred, LUT_semiresolved_bq_target = parse_merged_w_target(target_h5, pred_h5, reco_regex='SRbq')
+    LUT_semiresolved_bq_pred, LUT_semiresolved_bq_target = parse_merged_w_target(target_h5, pred_h5, reco_regex='SRbq', chi2=chi2)
 
     # resolved
-    LUT_resolved_pred, LUT_resolved_target = parse_merged_w_target(target_h5, pred_h5, reco_regex='FR')
+    LUT_resolved_pred, LUT_resolved_target = parse_merged_w_target(target_h5, pred_h5, reco_regex='FR', chi2=chi2)
 
     # merged
-    LUT_merged_pred, LUT_merged_target = parse_merged_w_target(target_h5, pred_h5)
+    LUT_merged_pred, LUT_merged_target = parse_merged_w_target(target_h5, pred_h5, chi2=chi2)
 
 
     ## calculate efficiencies and purities for b+r, b, and r (and srqq, srbq if available) ##
@@ -149,7 +149,9 @@ def plot_pur_eff_w_dict(
     ## plot purities and efficiencies ##
     for tag, pred_path in plot_dict.items():
         print("Processing", tag)
-        results = calc_pur_eff(target_path, pred_path, bins_dict)
+        if 'chi2' in tag.lower(): chi2 = True
+        else: chi2 = False
+        results = calc_pur_eff(target_path, pred_path, bins_dict, chi2=chi2)
 
         # merged
         ax_m[0].errorbar(x=bin_centers_dict['all'], y=results["pur_m"], xerr=xerr_dict['all'], yerr=results["purerr_m"], fmt="o", capsize=5, label=tag)

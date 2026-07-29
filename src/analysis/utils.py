@@ -15,6 +15,27 @@ def reset_collision_dp(dps, aps):
     return ak.where(ap_filter, 0, dps)
 
 
+def get_symmetries(recos, jet_labels):
+    symmetries = []
+    for reco in recos:
+        unique_matches = [(i, i) for i, label in enumerate(jet_labels[reco]) if label.isalpha()]
+        sym_matches = [i for i, label in enumerate(jet_labels[reco]) if not label.isalpha()]
+        reco_syms = np.array([
+            np.vstack([np.array(unique_matches, dtype=int), np.hstack([np.array(sym_matches, dtype=int)[:, np.newaxis], np.array(sym_combo, dtype=int)[:, np.newaxis]])])
+            for sym_combo in list(itertools.permutations(sym_matches, r=len(sym_matches)))
+        ], dtype=int)
+        symmetries.append(reco_syms)
+    return symmetries
+
+
+@nb.njit
+def match_jet(jet1, jet2):
+    if jet1 is None or jet2 is None: return False
+    else: return (
+        jet1.pt == jet2.pt and jet1.eta == jet2.eta 
+        and jet1.phi == jet2.phi and jet1.mass == jet2.mass
+    )
+
 @nb.njit
 def deltaR(jet1, jet2):
     if jet1 is None or jet2 is None: return 999
@@ -55,8 +76,8 @@ def overlap(jets, idxs, nrecos, ntops, deltaRs, builder):
 
 def reco_reorder(predicted_jets, dps, aps, n_recos, n_tops, deltaRs):
     ps = dps * aps
-    idx_descend = np.flip(np.argsort(ps, axis=-1), axis=-1)
-    idx_sel = overlap(predicted_jets, idx_descend, n_recos, n_tops, [np.array(deltaR) for deltaR in deltaRs], ak.ArrayBuilder()).snapshot()
+    idx_sort = np.flip(np.argsort(ps, axis=-1), axis=-1)
+    idx_sel = overlap(predicted_jets, idx_sort, n_recos, n_tops, ak.Array(deltaRs), ak.ArrayBuilder()).snapshot()
 
     return idx_sel
 
