@@ -1,21 +1,15 @@
+import copy
 import os
-import time
 
 import h5py
+import numba as nb
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.metrics import roc_curve, auc
 
 import awkward as ak
 import vector as vec
 vec.register_awkward()
-
-# start = time.time()
-FILEPATH = os.path.abspath(__file__)
-DIRPATH = '/'.join(FILEPATH.split('/')[:-1])
-PLOT_DIRPATH = os.path.join(DIRPATH, 'v10/Chi2_FR')
-if not os.path.exists(PLOT_DIRPATH): os.makedirs(PLOT_DIRPATH)
 
 N_TOPS = 2
 TOP_MASS = 172.52  # GeV
@@ -28,6 +22,13 @@ FILL_VALUE = 1e5
 PLOT_CHI2_HISTS = True
 PLOT_ROCS = True
 SAVE_H5 = True
+
+SPANET_CHI2_METHOD = False
+
+FILEPATH = os.path.abspath(__file__)
+DIRPATH = '/'.join(FILEPATH.split('/')[:-1])
+PLOT_DIRPATH = os.path.join(DIRPATH, f"v10/{'SPANET' if SPANET_CHI2_METHOD else 'SEQ'}Chi2_FR")
+if not os.path.exists(PLOT_DIRPATH): os.makedirs(PLOT_DIRPATH)
 
 file_path = "/storage/af/user/tsievert/topNet/tt_hadronic_fixed_test.h5"
 ################################################
@@ -58,8 +59,8 @@ jets = ak.zip({
     "mass": mass,
     "btag": btag
 }, with_name="Momentum4D")
-jets = ak.with_field(jets, ak.local_index(jets, axis=1), "index")
-jets = jets[ak.argsort(jets.btag, axis=1, ascending=False)]
+jets["index"] = ak.local_index(jets, axis=1)
+evt_order = np.arange(ak.num(jets, axis=0))
 
 
 ################################################
@@ -67,14 +68,19 @@ jets = jets[ak.argsort(jets.btag, axis=1, ascending=False)]
 # 3a) events with exactly 0 btagged jets
 ex0_bjet_candidates = (ak.sum(jets["btag"], axis=1) == 0)
 ex0_jets = jets[ex0_bjet_candidates][ak.argsort(jets[ex0_bjet_candidates].pt, axis=1, ascending=False)]
+ex0_evt_order = evt_order[ex0_bjet_candidates]
+
 ex0_bjets = ex0_jets[:, :2]
 ex0_bjets = ex0_bjets[ak.argsort(ex0_bjets.pt, axis=1, ascending=False)]
 ex0_ljets = ex0_jets[:, 2:6]
 ex0_ljets = ex0_ljets[ak.argsort(ex0_ljets.pt, axis=1, ascending=False)]
 
+
 # 3b) events with exactly 1 btagged jets
 ex1_bjet_candidates = (ak.sum(jets["btag"], axis=1) == 1)
-ex1_jets = jets[ex1_bjet_candidates]
+ex1_jets = jets[ex1_bjet_candidates][ak.argsort(jets[ex1_bjet_candidates].btag, axis=1, ascending=False)]
+ex1_evt_order = evt_order[ex1_bjet_candidates]
+
 ex1_bjets = ak.concatenate([
     ak.singletons(ex1_jets[:, 0]), ak.singletons(ex1_jets[:, 1:][ak.argsort(ex1_jets[:, 1:].pt, axis=1, ascending=False)][:, 0])
 ], axis=1)
@@ -82,17 +88,23 @@ ex1_bjets = ex1_bjets[ak.argsort(ex1_bjets.pt, axis=1, ascending=False)]
 ex1_ljets = ex1_jets[:, 1:][ak.argsort(ex1_jets[:, 1:].pt, axis=1, ascending=False)][:, 1:5]
 ex1_ljets = ex1_ljets[ak.argsort(ex1_ljets.pt, axis=1, ascending=False)]
 
+
 # 3c) events with exactly 2 btagged jets
 ex2_bjet_candidates = (ak.sum(jets["btag"], axis=1) == 2)
-ex2_jets = jets[ex2_bjet_candidates]
+ex2_jets = jets[ex2_bjet_candidates][ak.argsort(jets[ex2_bjet_candidates].btag, axis=1, ascending=False)]
+ex2_evt_order = evt_order[ex2_bjet_candidates]
+
 ex2_bjets = ex2_jets[:, :2]
 ex2_bjets = ex2_bjets[ak.argsort(ex2_bjets.pt, axis=1, ascending=False)]
 ex2_ljets = ex2_jets[:, 2:6]
 ex2_ljets = ex2_ljets[ak.argsort(ex2_ljets.pt, axis=1, ascending=False)]
 
+
 # 3d) events with more than 2 btagged jets
 gt2_bjet_candidates = (ak.sum(jets["btag"], axis=1) > 2)
-gt2_jets = jets[gt2_bjet_candidates]
+gt2_jets = jets[gt2_bjet_candidates][ak.argsort(jets[gt2_bjet_candidates].btag, axis=1, ascending=False)]
+gt2_evt_order = evt_order[gt2_bjet_candidates]
+
 gt2_bjets = gt2_jets[gt2_jets["btag"] == 1][ak.argsort(gt2_jets[gt2_jets["btag"] == 1].pt, axis=1, ascending=False)][:, :2]
 gt2_bjets = gt2_bjets[ak.argsort(gt2_bjets.pt, axis=1, ascending=False)]
 gt2_ljets = ak.concatenate([
@@ -101,11 +113,13 @@ gt2_ljets = ak.concatenate([
 ], axis=1)[:, :4]
 gt2_ljets = gt2_ljets[ak.argsort(gt2_ljets.pt, axis=1, ascending=False)]
 
-# 3e) merge different n bTag categories and require regular arrays for chi2
-bjets = ak.concatenate([ex0_bjets, ex1_bjets, ex2_bjets, gt2_bjets])
-ljets = ak.concatenate([ex0_ljets, ex1_ljets, ex2_ljets, gt2_ljets])
 
-chi2_mask = (ak.num(bjets, axis=1) == 2) & (ak.num(ljets, axis=1) == 4)
+# 3e) merge different n bTag categories and require regular arrays for chi2
+evt_reorder = ak.argsort(ak.concatenate([ex0_evt_order, ex1_evt_order, ex2_evt_order, gt2_evt_order]))
+bjets = ak.concatenate([ex0_bjets, ex1_bjets, ex2_bjets, gt2_bjets])[evt_reorder]
+ljets = ak.concatenate([ex0_ljets, ex1_ljets, ex2_ljets, gt2_ljets])[evt_reorder]
+
+chi2_mask = (ak.num(bjets, axis=1) == N_TOPS) & (ak.num(ljets, axis=1) == 2*N_TOPS)
 bjets = ak.to_regular(bjets[chi2_mask])
 ljets = ak.to_regular(ljets[chi2_mask])
 print('bjets: ', ak.type(bjets))
@@ -114,80 +128,171 @@ print('N invalid chi2 events = ', ak.sum(~chi2_mask))
 
 
 ################################################
-# 4) Build W and T combinations from bjets and ljets
-w = ak.combinations(ljets, 2, axis=1, fields=["j1", "j2"])
-w = ak.with_field(w, (w.j1 + w.j2).mass, "mass")
+# Perform Chi2
+@nb.njit
+def expand_chosen(mask, chosen_var, fill_value, builder):
+    chosen_idx = 0
+    for ismasked in mask:
+        if ismasked: builder.append(chosen_var[chosen_idx]); chosen_idx += 1
+        else: builder.append(fill_value)
+    return builder
 
-t = ak.cartesian({"w": w, "b": bjets}, axis=1)
-t = ak.with_field(t, (t.w.j1 + t.w.j2 + t.b).mass, "mass")
-t = ak.with_field(t, (t.w.j1 + t.w.j2 + t.b).pt, "pt")
+top_dict, rand_dict = {}, {}
+if SPANET_CHI2_METHOD:
+    ################################################
+    # 4) Build W and T combinations from bjets and ljets
+    w = ak.combinations(ljets, 2, axis=1, fields=["j1", "j2"])
+    w = ak.with_field(w, (w.j1 + w.j2).mass, "mass")
 
-tt = ak.combinations(t, 2, axis=1, fields=["t1", "t2"])
+    t = ak.cartesian({"w": w, "b": bjets}, axis=1)
+    t = ak.with_field(t, (t.w.j1 + t.w.j2 + t.b).mass, "mass")
+    t = ak.with_field(t, (t.w.j1 + t.w.j2 + t.b).pt, "pt")
+
+    tt = ak.combinations(t, 2, axis=1, fields=["t1", "t2"])
+
+    t_mask = (
+        (t.b.index != t.w.j1.index) &
+        (t.b.index != t.w.j2.index) & (t.w.j1.index != t.w.j2.index)
+    )
+    print('Any tops have overlapping jets (should be False)? ', ak.any(~t_mask))
+
+
+    ################################################
+    # 5) Build χ² for two tops simultaneously
+    tt_mask = (
+        (tt.t1.b.index != tt.t2.b.index) &
+        (tt.t1.w.j1.index != tt.t2.w.j1.index) & (tt.t1.w.j1.index != tt.t2.w.j2.index) &
+        (tt.t1.w.j2.index != tt.t2.w.j1.index) & (tt.t1.w.j2.index != tt.t2.w.j2.index)
+    )
+    chi2 = (
+        ( (tt.t1.mass - tt.t2.mass) / TOP_SIGMA )**2
+        + ( (tt.t1.w.mass - W_MASS) / W_SIGMA )**2
+        + ( (tt.t2.w.mass - W_MASS) / W_SIGMA )**2
+    )
+    chi2 = ak.where(tt_mask, chi2, FILL_VALUE)
+
+
+    ################################################
+    # 6) Select jets by minimizing χ² and build dict
+    best_idx = ak.argmin(chi2, axis=1)
+    best_chi2 = ak.firsts(chi2[ak.local_index(chi2) == best_idx])
+    best_tt = ak.firsts(tt[ak.local_index(tt) == best_idx])
+
+    for i in range(N_TOPS):
+        top_dict[f'FRt{i+1}_mask'] = chi2_mask
+        top_dict[f'FRt{i+1}_b'] = expand_chosen(chi2_mask, best_tt[f"t{i+1}"].b.index, -1, ak.ArrayBuilder()).snapshot()
+        top_dict[f'FRt{i+1}_q1'] = expand_chosen(chi2_mask, best_tt[f"t{i+1}"].w.j1.index, -1, ak.ArrayBuilder()).snapshot()
+        top_dict[f'FRt{i+1}_q2'] = expand_chosen(chi2_mask, best_tt[f"t{i+1}"].w.j2.index, -1, ak.ArrayBuilder()).snapshot()
+        top_dict[f'FRt{i+1}_pt'] = expand_chosen(chi2_mask, best_tt[f"t{i+1}"].pt, -1, ak.ArrayBuilder()).snapshot()
+        top_dict[f'FRt{i+1}_chi2'] = expand_chosen(chi2_mask, best_chi2, FILL_VALUE, ak.ArrayBuilder()).snapshot()
+
+    ################################################
+    # 6b) Select jets by randomly selecting valid tt pair as a comparison
+    valid_tt, valid_chi2 = tt[tt_mask], chi2[tt_mask]
+    n_events, n_validtts = ak.num(valid_tt, axis=0), ak.num(valid_tt, axis=1)[0]
+    random_idxs = np.random.choice(n_validtts, size=n_events)
+    random_tt, random_chi2 = ak.firsts(valid_tt[ak.local_index(valid_tt) == random_idxs], axis=1), ak.firsts(valid_chi2[ak.local_index(valid_chi2) == random_idxs], axis=1)
+
+    for i in range(N_TOPS):
+        rand_dict[f'FRt{i+1}_mask'] = chi2_mask
+        rand_dict[f'FRt{i+1}_b'] = expand_chosen(chi2_mask, random_tt[f"t{i+1}"].b.index, -1, ak.ArrayBuilder()).snapshot()
+        rand_dict[f'FRt{i+1}_q1'] = expand_chosen(chi2_mask, random_tt[f"t{i+1}"].w.j1.index, -1, ak.ArrayBuilder()).snapshot()
+        rand_dict[f'FRt{i+1}_q2'] = expand_chosen(chi2_mask, random_tt[f"t{i+1}"].w.j2.index, -1, ak.ArrayBuilder()).snapshot()
+        rand_dict[f'FRt{i+1}_pt'] = expand_chosen(chi2_mask, random_tt[f"t{i+1}"].pt, -1, ak.ArrayBuilder()).snapshot()
+        rand_dict[f'FRt{i+1}_chi2'] = expand_chosen(chi2_mask, random_chi2, FILL_VALUE, ak.ArrayBuilder()).snapshot()
+else:
+    for i in range(N_TOPS-1):
+        ################################################
+        # 4) Build W and T combinations from bjets and ljets
+        w = ak.combinations(ljets, 2, axis=1, fields=["j1", "j2"])
+        w = ak.with_field(w, (w.j1 + w.j2).mass, "mass")
+
+        t = ak.cartesian({"w": w, "b": bjets}, axis=1)
+        t = ak.with_field(t, (t.w.j1 + t.w.j2 + t.b).mass, "mass")
+        t = ak.with_field(t, (t.w.j1 + t.w.j2 + t.b).pt, "pt")
+
+        t_mask = (
+            (t.b.index != t.w.j1.index) &
+            (t.b.index != t.w.j2.index) & (t.w.j1.index != t.w.j2.index)
+        )
+        print('Any tops have overlapping jets (should be False)? ', ak.any(~t_mask))
+
+        ################################################
+        # 5) Build χ² for a single top at a time
+        chi2 = lambda t: ( (t.w.mass - W_MASS) / W_SIGMA )**2 + ( (t.mass - TOP_MASS) / TOP_SIGMA )**2
+
+        ################################################
+        # 6) Select jets by minimizing χ² and build dict
+        ti_chi2 = chi2(t)
+        best_idx = ak.argmin(ti_chi2, axis=1)
+        best_chi2 = ak.firsts(ti_chi2[ak.local_index(ti_chi2) == best_idx])
+        best_t = ak.firsts(t[ak.local_index(t) == best_idx])
+
+        top_dict[f'FRt{i+1}_mask'] = chi2_mask
+        top_dict[f'FRt{i+1}_b'] = expand_chosen(chi2_mask, best_t.b.index, -1, ak.ArrayBuilder()).snapshot()
+        top_dict[f'FRt{i+1}_q1'] = expand_chosen(chi2_mask, best_t.w.j1.index, -1, ak.ArrayBuilder()).snapshot()
+        top_dict[f'FRt{i+1}_q2'] = expand_chosen(chi2_mask, best_t.w.j2.index, -1, ak.ArrayBuilder()).snapshot()
+        top_dict[f'FRt{i+1}_pt'] = expand_chosen(chi2_mask, best_t.pt, -1, ak.ArrayBuilder()).snapshot()
+        top_dict[f'FRt{i+1}_chi2'] = expand_chosen(chi2_mask, best_chi2, FILL_VALUE, ak.ArrayBuilder()).snapshot()
+
+        ################################################
+        # 6b) Select jets by randomly selecting valid tt pair as a comparison
+        n_events, n_ts = ak.num(t, axis=0), ak.num(t, axis=1)[0]
+        random_idxs = np.random.choice(n_ts, size=n_events)
+        random_t, random_chi2 = ak.firsts(t[ak.local_index(t) == random_idxs], axis=1), ak.firsts(ti_chi2[ak.local_index(ti_chi2) == random_idxs], axis=1)
+
+        rand_dict[f'FRt{i+1}_mask'] = chi2_mask
+        rand_dict[f'FRt{i+1}_b'] = expand_chosen(chi2_mask, random_t.b.index, -1, ak.ArrayBuilder()).snapshot()
+        rand_dict[f'FRt{i+1}_q1'] = expand_chosen(chi2_mask, random_t.w.j1.index, -1, ak.ArrayBuilder()).snapshot()
+        rand_dict[f'FRt{i+1}_q2'] = expand_chosen(chi2_mask, random_t.w.j2.index, -1, ak.ArrayBuilder()).snapshot()
+        rand_dict[f'FRt{i+1}_pt'] = expand_chosen(chi2_mask, random_t.pt, -1, ak.ArrayBuilder()).snapshot()
+        rand_dict[f'FRt{i+1}_chi2'] = expand_chosen(chi2_mask, random_chi2, FILL_VALUE, ak.ArrayBuilder()).snapshot()
+
+        print(f'finished t{i+1} random')
+
+        # 7) Build ak arrays of unused jets
+        bjets, ljets = ak.from_regular(bjets), ak.from_regular(ljets)
+        bjets = ak.to_regular(bjets[bjets.index != best_t.b.index])
+        ljets = ak.to_regular(ljets[(ljets.index != best_t.w.j1.index) & (ljets.index != best_t.w.j2.index)])
+
+        # 9) Repeat until only 1 top is left
+    
+    w = ak.zip({"j1": ljets[:, 0], "j2":  ljets[:, 1]})
+    w = ak.with_field(w, (w.j1 + w.j2).mass, "mass")
+
+    t = ak.zip({"w": w, "b": bjets[:, 0]})
+    t = ak.with_field(t, (t.w.j1 + t.w.j2 + t.b).mass, "mass")
+    t = ak.with_field(t, (t.w.j1 + t.w.j2 + t.b).pt, "pt")
+
+    top_dict[f'FRt{N_TOPS}_mask'] = chi2_mask
+    top_dict[f'FRt{N_TOPS}_b'] = expand_chosen(chi2_mask, t.b.index, -1, ak.ArrayBuilder()).snapshot()
+    top_dict[f'FRt{N_TOPS}_q1'] = expand_chosen(chi2_mask, t.w.j1.index, -1, ak.ArrayBuilder()).snapshot()
+    top_dict[f'FRt{N_TOPS}_q2'] = expand_chosen(chi2_mask, t.w.j2.index, -1, ak.ArrayBuilder()).snapshot()
+    top_dict[f'FRt{N_TOPS}_pt'] = expand_chosen(chi2_mask, t.pt, -1, ak.ArrayBuilder()).snapshot()
+    top_dict[f'FRt{N_TOPS}_chi2'] = expand_chosen(chi2_mask, chi2(t), FILL_VALUE, ak.ArrayBuilder()).snapshot()
+
+    rand_dict[f'FRt{N_TOPS}_mask'] = copy.deepcopy(top_dict[f'FRt{N_TOPS}_mask'])
+    rand_dict[f'FRt{N_TOPS}_b'] = copy.deepcopy(top_dict[f'FRt{N_TOPS}_b'])
+    rand_dict[f'FRt{N_TOPS}_q1'] = copy.deepcopy(top_dict[f'FRt{N_TOPS}_q1'])
+    rand_dict[f'FRt{N_TOPS}_q2'] = copy.deepcopy(top_dict[f'FRt{N_TOPS}_q2'])
+    rand_dict[f'FRt{N_TOPS}_pt'] = copy.deepcopy(top_dict[f'FRt{N_TOPS}_pt'])
+    rand_dict[f'FRt{N_TOPS}_chi2'] = copy.deepcopy(top_dict[f'FRt{N_TOPS}_chi2'])
 
 
 ################################################
-# 5) Build ch2 for two tops simultaneously
-t_mask = (
-    (t.b.index != t.w.j1.index) &
-    (t.b.index != t.w.j2.index) & (t.w.j1.index != t.w.j2.index)
-)
-print('Any tops have overlapping jets? ', ak.any(~t_mask))
-tt_mask = (
-    (tt.t1.b.index != tt.t2.b.index) &
-    (tt.t1.w.j1.index != tt.t2.w.j1.index) & (tt.t1.w.j1.index != tt.t2.w.j2.index) &
-    (tt.t1.w.j2.index != tt.t2.w.j1.index) & (tt.t1.w.j2.index != tt.t2.w.j2.index)
-)
-chi2 = (
-    ( (tt.t1.mass - tt.t2.mass) / TOP_SIGMA )**2
-    + ( (tt.t1.w.mass - W_MASS) / W_SIGMA )**2
-    + ( (tt.t2.w.mass - W_MASS) / W_SIGMA )**2
-)
-chi2 = ak.where(tt_mask, chi2, FILL_VALUE)
-
-
+## Outputs ##
 ################################################
-# 6) Select jets by minimizing chi2 and build dict
-best_idx = ak.argmin(chi2, axis=1)
-best_chi2 = ak.firsts(chi2[ak.local_index(chi2) == best_idx])
-best_tt = ak.firsts(tt[ak.local_index(tt) == best_idx])
-
-top_dict = {}
-for i in range(2):
-    top_dict[f'FRt{i+1}_mask'] = chi2_mask
-    top_dict[f'FRt{i+1}_b'] = ak.where(chi2_mask, best_tt[f"t{i+1}"].b.index, -1)
-    top_dict[f'FRt{i+1}_q1'] = ak.where(chi2_mask, best_tt[f"t{i+1}"].w.j1.index, -1)
-    top_dict[f'FRt{i+1}_q2'] = ak.where(chi2_mask, best_tt[f"t{i+1}"].w.j2.index, -1)
-    top_dict[f'FRt{i+1}_pt'] = ak.where(chi2_mask, best_tt[f"t{i+1}"].pt, -1)
-    top_dict[f'FRt{i+1}_chi2'] = ak.where(chi2_mask, best_chi2, FILL_VALUE)
-
-
-################################################
-# 6b) Select jets by randomly selecting valid tt pair as a comparison
-valid_tt, valid_chi2 = tt[tt_mask], chi2[tt_mask]
-n_events, n_validtts = ak.num(valid_tt, axis=0), ak.num(valid_tt, axis=1)[0]
-random_idxs = np.random.choice(n_validtts, size=n_events)
-random_tt, random_chi2 = ak.firsts(valid_tt[ak.local_index(valid_tt) == random_idxs], axis=1), ak.firsts(valid_chi2[ak.local_index(valid_chi2) == random_idxs], axis=1)
-
-rand_dict = {}
-for i in range(2):
-    rand_dict[f'FRt{i+1}_mask'] = chi2_mask
-    rand_dict[f'FRt{i+1}_b'] = ak.where(chi2_mask, random_tt[f"t{i+1}"].b.index, -1)
-    rand_dict[f'FRt{i+1}_q1'] = ak.where(chi2_mask, random_tt[f"t{i+1}"].w.j1.index, -1)
-    rand_dict[f'FRt{i+1}_q2'] = ak.where(chi2_mask, random_tt[f"t{i+1}"].w.j2.index, -1)
-    rand_dict[f'FRt{i+1}_pt'] = ak.where(chi2_mask, random_tt[f"t{i+1}"].pt, -1)
-    rand_dict[f'FRt{i+1}_chi2'] = ak.where(chi2_mask, random_chi2, FILL_VALUE)
-
-
-################################################
+# Transforms χ² to probability for analysis
 def chi2_to_prob(chi2):
     prob = np.exp(-chi2)
     prob = np.where(chi2 != FILL_VALUE, prob, 0)
     return prob
 
-
+################################################
 # Save out new h5 file
 if SAVE_H5:
-    out_filepath = os.path.join(DIRPATH, "tt_hadronic_chi2.h5")
+    out_filepath = os.path.join(DIRPATH, f"tt_hadronic_{'SPANET' if SPANET_CHI2_METHOD else 'SEQ'}chi2.h5")
+    if os.path.exists(out_filepath): os.remove(out_filepath)
     with h5py.File(out_filepath, 'a') as f:
         with h5py.File(file_path, 'r') as test_f:
             for jet_class in test_f['INPUTS'].keys():
@@ -201,7 +306,6 @@ if SAVE_H5:
             f[f'TARGETS/FRt{i+1}/q1'] = ak.to_numpy(top_dict[f'FRt{i+1}_q1'], allow_missing=False)
             f[f'TARGETS/FRt{i+1}/q2'] = ak.to_numpy(top_dict[f'FRt{i+1}_q2'], allow_missing=False)
             f[f'TARGETS/FRt{i+1}/assignment_probability'] = chi2_to_prob(ak.to_numpy(top_dict[f'FRt{i+1}_chi2'], allow_missing=False))
-
 
 ################################################
 # Computes if χ² method found correct tops
@@ -223,7 +327,7 @@ def correct_mask(pred_b, pred_q1, pred_q2, top_idx=1):
             )
         )
 
-## Outputs ##
+################################################
 # Plot resolved baseline χ² distributions
 if PLOT_CHI2_HISTS:
     # Plot Top χ² histograms
@@ -240,7 +344,7 @@ if PLOT_CHI2_HISTS:
         plt.title(f"Chi-Squared Distribution for Top{i+1} Candidates")
         plt.grid(True)
         plt.legend()
-        plt.savefig(os.path.join(PLOT_DIRPATH, f"fully_resolved_chisqCorr_top{i+1}.pdf"))
+        plt.savefig(os.path.join(PLOT_DIRPATH, f"fully_resolved_{'SPANET' if SPANET_CHI2_METHOD else 'SEQ'}chisq_top{i+1}.pdf"))
 
     # Plot Top χ² histograms
     for i in range(N_TOPS):
@@ -256,8 +360,9 @@ if PLOT_CHI2_HISTS:
         plt.title(f"Chi-Squared Distribution for Randomly chosen Top{i+1} Candidates")
         plt.grid(True)
         plt.legend()
-        plt.savefig(os.path.join(PLOT_DIRPATH, f"fully_resolved_RandchisqCorr_top{i+1}.pdf"))
+        plt.savefig(os.path.join(PLOT_DIRPATH, f"fully_resolved_{'SPANET' if SPANET_CHI2_METHOD else 'SEQ'}chisqRand_top{i+1}.pdf"))
 
+################################################
 # Plot resolved baseline ROC curve
 if PLOT_ROCS:
     correct_t1 = correct_mask(top_dict[f'FRt{1}_b'], top_dict[f'FRt{1}_q1'], top_dict[f'FRt{1}_q2'], top_idx=1)
@@ -299,4 +404,4 @@ if PLOT_ROCS:
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig(os.path.join(PLOT_DIRPATH, "fully_resolved_chisq_ROC.pdf"))
+    plt.savefig(os.path.join(PLOT_DIRPATH, f"fully_resolved_{'SPANET' if SPANET_CHI2_METHOD else 'SEQ'}chisq_ROC.pdf"))
