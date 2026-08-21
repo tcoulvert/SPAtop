@@ -460,20 +460,31 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     # apply emulated TvsQCD and WvsQCD bools @ 1.0% QCD eff WPs
     for i in range(n_tops):
         top_fjet_mask = (ak.local_index(fjets) == top_fullyBoosted[f"top{i+1}_bqq"])
-        w_fjet_mask = ( ~top_fjet_mask & (ak.local_index(fjets) == top_semiResolved_qq[f"top{i+1}_qq"]) )
-        bq_fjet_mask = ( ~top_fjet_mask & (ak.local_index(fjets) == top_semiResolved_bq[f"top{i+1}_bq"]) )
-        qcd_fjet_mask = ( ~top_fjet_mask & ~w_fjet_mask & ~bq_fjet_mask )
+        w_fjet_mask = (ak.local_index(fjets) == top_semiResolved_qq[f"top{i+1}_qq"])
+        bq_fjet_mask = (ak.local_index(fjets) == top_semiResolved_bq[f"top{i+1}_bq"])
 
         # Emulate PNet AK8 T-tagger
-        fjets[top_fjet_mask]["Ttag"] = (fjets["TtagRN"][top_fjet_mask] < TVSQCD_EFFS['t'])
-        fjets[w_fjet_mask]["Ttag"] = (fjets["TtagRN"][w_fjet_mask] < TVSQCD_EFFS['W'])
-        fjets[bq_fjet_mask]["Ttag"] = (fjets["TtagRN"][bq_fjet_mask] < TVSQCD_EFFS['bq'])
-        fjets[qcd_fjet_mask]["Ttag"] = (fjets["TtagRN"][qcd_fjet_mask] < TVSQCD_EFFS['QCD'])
+        fjets["Ttag"] = ak.where(
+            top_fjet_mask, fjets["TtagRN"] < TVSQCD_EFFS['t'], 
+            ak.where(
+                w_fjet_mask, fjets["TtagRN"] < TVSQCD_EFFS['W'], 
+                ak.where(
+                    bq_fjet_mask, fjets["TtagRN"] < TVSQCD_EFFS['bq'],
+                    fjets["TtagRN"] < TVSQCD_EFFS['QCD']
+                )
+            )
+        )
         # Emulate PNet AK8 W-tagger
-        fjets[top_fjet_mask]["Wtag"] = (fjets["WtagRN"][top_fjet_mask] < WVSQCD_EFFS['t'])
-        fjets[w_fjet_mask]["Wtag"] = (fjets["WtagRN"][w_fjet_mask] < WVSQCD_EFFS['W'])
-        fjets[bq_fjet_mask]["Wtag"] = (fjets["WtagRN"][bq_fjet_mask] < WVSQCD_EFFS['bq'])
-        fjets[qcd_fjet_mask]["Wtag"] = (fjets["WtagRN"][qcd_fjet_mask] < WVSQCD_EFFS['QCD'])
+        fjets["Wtag"] = ak.where(
+            top_fjet_mask, fjets["WtagRN"] < WVSQCD_EFFS['t'], 
+            ak.where(
+                w_fjet_mask, fjets["WtagRN"] < WVSQCD_EFFS['W'], 
+                ak.where(
+                    bq_fjet_mask, fjets["WtagRN"] < WVSQCD_EFFS['bq'],
+                    fjets["WtagRN"] < WVSQCD_EFFS['QCD']
+                )
+            )
+        )
     fj_Ttag = fjets["Ttag"]
     fj_Wtag = fjets["Wtag"]
 
@@ -702,16 +713,19 @@ def save_file(filepath: str, dataset: dict):
 @click.argument("in-files", nargs=-1)
 @click.option(
     "--out-file",
+    "out_file",
     default=f"{PROJECT_DIR}/data/delphes/tt_training.h5",
     help="Output file.",
 )
 @click.option(
-    "--split_file_size",
+    "--split-file-size",
+    "split_file_size",
     default=-1,
     help="Size for output files in MB, default is \'-1\' which creates 1 merged output file",
 )
 @click.option(
-    "--file_limit",
+    "--file-limit",
+    "file_limit",
     default=-1,
     help="Number of output files to make, default is \'-1\' which creates all output files",
 )
@@ -727,7 +741,7 @@ def save_file(filepath: str, dataset: dict):
 @click.option("--multip", is_flag=True, help="Boolean to use multiprocessing.")
 @click.option("--condor", is_flag=True, help="Boolean to use condor processing.")
 @click.option(
-    "--condor_files_per_job",
+    "--condor-files-per-job",
     default=20,
     help="Number of input files per condor job",
 )
