@@ -30,7 +30,7 @@ DIRPATH = '/'.join(FILEPATH.split('/')[:-1])
 PLOT_DIRPATH = os.path.join(DIRPATH, f"v10/{'SPANET' if SPANET_CHI2_METHOD else 'SEQ'}Chi2_FR")
 if not os.path.exists(PLOT_DIRPATH): os.makedirs(PLOT_DIRPATH)
 
-file_path = "/storage/af/user/tsievert/topNet/tt_hadronic_fixed_test.h5"
+file_path = "/storage/af/user/tsievert/topNet/fjTag_testing.h5"
 ################################################
 # 1) Load arrays
 with h5py.File(file_path, "r") as f:

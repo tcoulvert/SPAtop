@@ -63,7 +63,8 @@ def plot_pur_eff_w_dict(
         'SRbq': np.arange(100, 400, 10),
         'FB': np.arange(200, 1000, 50),
         'all': np.arange(0, 1000, 50),
-    }
+    }, 
+    plot_emu_boost: bool=True, plot_emu_semi: bool=True
 ):
 
     plot_bins_dict = {
@@ -153,6 +154,9 @@ def plot_pur_eff_w_dict(
         else: chi2 = False
         results = calc_pur_eff(target_path, pred_path, bins_dict, chi2=chi2)
 
+        midpoint = lambda centers: centers[0] + (centers[-1] - centers[0]) / 2
+        width = lambda centers, xerr: (midpoint(centers) - centers[0]) + xerr[0]
+
         # merged
         ax_m[0].errorbar(x=bin_centers_dict['all'], y=results["pur_m"], xerr=xerr_dict['all'], yerr=results["purerr_m"], fmt="o", capsize=5, label=tag)
         ax_m[1].errorbar(x=bin_centers_dict['all'], y=results["eff_m"], xerr=xerr_dict['all'], yerr=results["efferr_m"], fmt="o", capsize=5, label=tag)
@@ -160,6 +164,10 @@ def plot_pur_eff_w_dict(
         if results["pur_b"] is not None:
             ax_b[0].errorbar(x=bin_centers_dict['FB'], y=results["pur_b"], xerr=xerr_dict['FB'], yerr=results["purerr_b"], fmt="o", capsize=5, label=tag)
             ax_b[1].errorbar(x=bin_centers_dict['FB'], y=results["eff_b"], xerr=xerr_dict['FB'], yerr=results["efferr_b"], fmt="o", capsize=5, label=tag)
+            if plot_emu_boost:
+                ax_b[0].errorbar(x=midpoint(bin_centers_dict['FB']), y=0.49, xerr=width(bin_centers_dict['FB'], xerr_dict['FB']), yerr=0.0047, fmt="o", capsize=5, label="PNet TvsQCD Emulation", color="magenta")
+                ax_b[1].errorbar(x=midpoint(bin_centers_dict['FB']), y=0.42, xerr=width(bin_centers_dict['FB'], xerr_dict['FB']), yerr=0.0040, fmt="o", capsize=5, label="PNet TvsQCD Emulation", color="magenta")
+                plot_emu_boost = False
         # resolved
         if results["pur_r"] is not None:
             ax_r[0].errorbar(x=bin_centers_dict['FR'], y=results["pur_r"], xerr=xerr_dict['FR'], yerr=results["purerr_r"], fmt="o", capsize=5, label=tag)
@@ -168,6 +176,10 @@ def plot_pur_eff_w_dict(
         if results["pur_srqq"] is not None:
             ax_srqq[0].errorbar(x=bin_centers_dict['SRqq'], y=results["pur_srqq"], xerr=xerr_dict['SRqq'], yerr=results["purerr_srqq"], fmt="o", capsize=5, label=tag)
             ax_srqq[1].errorbar(x=bin_centers_dict['SRqq'], y=results["eff_srqq"], xerr=xerr_dict['SRqq'], yerr=results["efferr_srqq"], fmt="o", capsize=5, label=tag)
+            if plot_emu_semi:
+                ax_srqq[0].errorbar(x=midpoint(bin_centers_dict['SRqq']), y=0.89, xerr=width(bin_centers_dict['SRqq'], xerr_dict['SRqq']), yerr=0.0048, fmt="o", capsize=5, label="PNet WvsQCD Emulation", color="magenta")
+                ax_srqq[1].errorbar(x=midpoint(bin_centers_dict['SRqq']), y=0.29, xerr=width(bin_centers_dict['SRqq'], xerr_dict['SRqq']), yerr=0.0013, fmt="o", capsize=5, label="PNet WvsQCD Emulation", color="magenta")
+                plot_emu_semi = False
         # semi-resolved bq
         if results["pur_srbq"] is not None:
             ax_srbq[0].errorbar(x=bin_centers_dict['SRbq'], y=results["pur_srbq"], xerr=xerr_dict['SRbq'], yerr=results["purerr_srbq"], fmt="o", capsize=5, label=tag)
