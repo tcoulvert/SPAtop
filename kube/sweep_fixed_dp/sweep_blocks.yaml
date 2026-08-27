@@ -1,0 +1,24 @@
+program: /data/spatop/sweep/dp_fixed/run_sweep_fixed_dp.py
+name: dp_fixed_pairwise_blocks
+method: bayes
+metric:
+  name: validation_average_jet_accuracy
+  goal: maximize
+early_terminate:
+  type: hyperband
+  min_iter: 15
+parameters:
+  learning_rate:
+    distribution: log_uniform_values
+    min: 0.0001
+    max: 0.001
+  hidden_dim:
+    values: [64, 128, 256]
+  dropout:
+    distribution: uniform
+    min: 0.1
+    max: 0.3
+  batch_size:
+    values: [512, 1024, 2048]
+  num_embedding_layers:
+    values: [6, 10, 14]
