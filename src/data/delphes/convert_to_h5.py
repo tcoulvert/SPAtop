@@ -103,7 +103,13 @@ def final_particle(particle_pdgid, mother_pdgid, particles, final_status=-1, int
     return intermediate_particles
 
 
-def get_datasets(arrays, n_tops):  # noqa: C901
+def get_targets(arrays, n_tops):
+    pass
+
+def get_inputs(arrays, n_tops):
+    pass
+
+def get_datasets(arrays, n_tops, no_targets: bool=False):  # noqa: C901
     print('='*60+'\n'+'='*60+'\n'+'='*60)
     print(f'num events = {len(arrays["Particle/Particle.PID"])}')
 
@@ -288,17 +294,8 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     ################################
     # Pre-selection cut(s) and ordering
     #  -> what cuts we apply depends on what phase-space (and benchmark) we're targeting
-
-    topquark_mask = (topquarks['pt'] > 0)  # In case we want cuts on quarks, for now cuts do nothing
-    bquark_mask = topquark_mask & (bquarks['pt'] > 0)
-    wboson_mask = topquark_mask & (wbosons['pt'] > 0)
-    w1quark_mask = topquark_mask & wboson_mask & (wquarks_d1['pt'] > 0)
-    w2quark_mask = topquark_mask & wboson_mask & (wquarks_d1['pt'] > 0)
     
-    event_mask = (
-        (ak.sum(topquark_mask & bquark_mask & wboson_mask & w1quark_mask & w2quark_mask, axis=1) > 0)
-        & (ak.num(pt[pt > MIN_JET_PT]) >= 3*n_tops)  # resolved-like training
-    )
+    event_mask = (ak.num(pt[pt > MIN_JET_PT]) >= 3*n_tops)  # resolved-like training
 
     jet_sort = ak.argsort(pt, ascending=False, axis=-1)
     jet_mask = (pt[event_mask] > MIN_JET_PT)
@@ -351,6 +348,42 @@ def get_datasets(arrays, n_tops):  # noqa: C901
     wbosons = wbosons[event_mask]
     wquarks_d1 = wquarks_d1[event_mask]
     wquarks_d2 = wquarks_d2[event_mask]
+
+
+    # Inputs
+    if no_targets:
+        datasets = {}
+        datasets["INPUTS/Jets/MASK"] = to_np_array(pt > 0, max_n=N_JETS).astype("bool")
+        datasets["INPUTS/Jets/pt"] = to_np_array(pt, max_n=N_JETS).astype("float32")
+        datasets["INPUTS/Jets/eta"] = to_np_array(eta, max_n=N_JETS).astype("float32")
+        datasets["INPUTS/Jets/phi"] = to_np_array(phi, max_n=N_JETS).astype("float32")
+        datasets["INPUTS/Jets/sinphi"] = to_np_array(np.sin(phi), max_n=N_JETS).astype("float32")
+        datasets["INPUTS/Jets/cosphi"] = to_np_array(np.cos(phi), max_n=N_JETS).astype("float32")
+        datasets["INPUTS/Jets/mass"] = to_np_array(mass, max_n=N_JETS).astype("float32")
+        datasets["INPUTS/Jets/btag"] = to_np_array(btag, max_n=N_JETS).astype("bool")
+        datasets["INPUTS/Jets/flavor"] = to_np_array(flavor, max_n=N_JETS).astype("float32")
+        datasets["INPUTS/Jets/matchedfj"] = to_np_array(matched_fjet_jet_idx, max_n=N_JETS).astype("int32")
+        datasets["INPUTS/Jets/deltaRfj"] = to_np_array(matched_fjet_jet_DR, max_n=N_JETS).astype("int32")
+
+        datasets["INPUTS/BoostedJets/MASK"] = to_np_array(fj_pt > 0, max_n=N_FJETS).astype("bool")
+        datasets["INPUTS/BoostedJets/fj_pt"] = to_np_array(fj_pt, max_n=N_FJETS).astype("float32")
+        datasets["INPUTS/BoostedJets/fj_eta"] = to_np_array(fj_eta, max_n=N_FJETS).astype("float32")
+        datasets["INPUTS/BoostedJets/fj_phi"] = to_np_array(fj_phi, max_n=N_FJETS).astype("float32")
+        datasets["INPUTS/BoostedJets/fj_sinphi"] = to_np_array(np.sin(fj_phi), max_n=N_FJETS).astype("float32")
+        datasets["INPUTS/BoostedJets/fj_cosphi"] = to_np_array(np.cos(fj_phi), max_n=N_FJETS).astype("float32")
+        datasets["INPUTS/BoostedJets/fj_mass"] = to_np_array(fj_mass, max_n=N_FJETS).astype("float32")
+        datasets["INPUTS/BoostedJets/fj_sdmass"] = to_np_array(fj_sdmass, max_n=N_FJETS).astype("float32")
+        datasets["INPUTS/BoostedJets/fj_Ttag"] = to_np_array(fj_Ttag, max_n=N_FJETS).astype("bool")
+        datasets["INPUTS/BoostedJets/fj_Wtag"] = to_np_array(fj_Wtag, max_n=N_FJETS).astype("bool")
+        datasets["INPUTS/BoostedJets/fj_tau21"] = to_np_array(fj_tau21, max_n=N_FJETS).astype("float32")
+        datasets["INPUTS/BoostedJets/fj_tau32"] = to_np_array(fj_tau32, max_n=N_FJETS).astype("float32")
+        datasets["INPUTS/BoostedJets/fj_charge"] = to_np_array(fj_charge, max_n=N_FJETS).astype("float32")
+        datasets["INPUTS/BoostedJets/fj_ehadovereem"] = to_np_array(fj_ehadovereem, max_n=N_FJETS).astype("float32")
+        datasets["INPUTS/BoostedJets/fj_neutralenergyfrac"] = to_np_array(fj_neutralenergyfrac, max_n=N_FJETS).astype("float32")
+        datasets["INPUTS/BoostedJets/fj_chargedenergyfrac"] = to_np_array(fj_chargedenergyfrac, max_n=N_FJETS).astype("float32")
+        datasets["INPUTS/BoostedJets/fj_nneutral"] = to_np_array(fj_nneutral, max_n=N_FJETS).astype("float32")
+        datasets["INPUTS/BoostedJets/fj_ncharged"] = to_np_array(fj_ncharged, max_n=N_FJETS).astype("float32")
+        return datasets
 
 
     ################################
@@ -656,6 +689,7 @@ def process_file(file_name, out_file, train_frac, n_tops):
             current_file_name = file_name
         with uproot.open(current_file_name) as in_file:
             events = in_file["Delphes"]
+            print('loaded Delphes tree')
             num_entries = events.num_entries
             if "training" in out_file:
                 entry_start = None
@@ -671,9 +705,12 @@ def process_file(file_name, out_file, train_frac, n_tops):
                 + [key for key in events.keys() if "GenJet/GenJet." in key and "fBits" not in key]
                 + [key for key in events.keys() if "GenFatJet/GenFatJet." in key and "fBits" not in key]
             )
+            print(f"keys: \n  {keys}")
             
             arrays = events.arrays(keys, entry_start=entry_start, entry_stop=entry_stop)
+            print('loaded arrays')
             datasets = get_datasets(arrays, n_tops)
+            print('finished dataset generation')
 
         if re.match('root://', file_name): subprocess.run(['rm', '-rf', current_file_name])
         return datasets
