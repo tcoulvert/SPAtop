@@ -64,7 +64,7 @@ def plot_pur_eff_w_dict(
         'FB': np.arange(200, 1000, 50),
         'all': np.arange(0, 1000, 50),
     }, 
-    plot_emu_boost: bool=True, plot_emu_semi: bool=True
+    plot_emu_boost: bool=False, plot_emu_semi: bool=False
 ):
 
     plot_bins_dict = {

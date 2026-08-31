@@ -133,9 +133,10 @@ def calc_pureff(LUT, bins):
     Tops = np.array([top for top in LUT])
 
     Tops_inds = np.digitize(Tops[:, 1], bins)  # index 1 is pt
+    Tops_inds = ak.where(Tops[:, 1] < bins[-1], Tops_inds, bins[-1]+1)
 
     correctTruth_per_bin = []
-    for bin_i in range(1, len(bins) + 1):
+    for bin_i in range(len(bins)):
         correctTruth_per_bin.append(Tops[:, 0][Tops_inds == bin_i])  # index 0 is correct prediction
     correctTruth_per_bin = ak.Array(correctTruth_per_bin)
 
