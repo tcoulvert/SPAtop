@@ -294,14 +294,20 @@ def get_datasets(arrays, n_tops, no_targets: bool=False):  # noqa: C901
     ################################
     # Pre-selection cut(s) and ordering
     #  -> what cuts we apply depends on what phase-space (and benchmark) we're targeting
-    
     event_mask = (ak.num(pt[pt > MIN_JET_PT]) >= 3*n_tops)  # resolved-like training
+    print('-'*60)
+    print(f'Nevts passing event selection: {ak.sum(event_mask, axis=0)}')
 
     jet_sort = ak.argsort(pt, ascending=False, axis=-1)
     jet_mask = (pt[event_mask] > MIN_JET_PT)
+    print(f'Unique Njets passing Jet object selection: {np.unique(ak.num(pt > MIN_JET_PT, axis=1))}')
+    print(f'Unique Njets passing event selection and Jet object selection: {np.unique(ak.num(jet_mask, axis=1))}')
 
     fjet_sort = ak.argsort(fj_pt, ascending=False, axis=-1)
     fjet_mask = (fj_pt[event_mask] > MIN_FJET_PT)
+    print(f'Unique Nfatjets passing FatJet object selection: {np.unique(ak.num(fj_pt > MIN_FJET_PT, axis=1))}')
+    print(f'Unique Nfatjets passing event selection and FatJet object selection: {np.unique(ak.num(fjet_mask, axis=1))}')
+    print('-'*60)
 
     N_JETS = 3*n_tops + 4
     N_FJETS = n_tops + 1
@@ -350,6 +356,10 @@ def get_datasets(arrays, n_tops, no_targets: bool=False):  # noqa: C901
     wquarks_d2 = wquarks_d2[event_mask]
 
 
+    # Jet-FatJet overlap
+    matched_fjet_jet_idx, matched_fjet_jet_DR  = match_fjet_to_jet(fjets, jets, ak.ArrayBuilder(), ak.ArrayBuilder())
+    matched_fjet_jet_idx, matched_fjet_jet_DR = matched_fjet_jet_idx.snapshot(), matched_fjet_jet_DR.snapshot()
+
     # Inputs
     if no_targets:
         datasets = {}
@@ -373,8 +383,8 @@ def get_datasets(arrays, n_tops, no_targets: bool=False):  # noqa: C901
         datasets["INPUTS/BoostedJets/fj_cosphi"] = to_np_array(np.cos(fj_phi), max_n=N_FJETS).astype("float32")
         datasets["INPUTS/BoostedJets/fj_mass"] = to_np_array(fj_mass, max_n=N_FJETS).astype("float32")
         datasets["INPUTS/BoostedJets/fj_sdmass"] = to_np_array(fj_sdmass, max_n=N_FJETS).astype("float32")
-        datasets["INPUTS/BoostedJets/fj_Ttag"] = to_np_array(fj_Ttag, max_n=N_FJETS).astype("bool")
-        datasets["INPUTS/BoostedJets/fj_Wtag"] = to_np_array(fj_Wtag, max_n=N_FJETS).astype("bool")
+        datasets["INPUTS/BoostedJets/fj_Ttag"] = to_np_array(fj_TtagRN < TVSQCD_EFFS['QCD'], max_n=N_FJETS).astype("bool")
+        datasets["INPUTS/BoostedJets/fj_Wtag"] = to_np_array(fj_WtagRN < WVSQCD_EFFS['QCD'], max_n=N_FJETS).astype("bool")
         datasets["INPUTS/BoostedJets/fj_tau21"] = to_np_array(fj_tau21, max_n=N_FJETS).astype("float32")
         datasets["INPUTS/BoostedJets/fj_tau32"] = to_np_array(fj_tau32, max_n=N_FJETS).astype("float32")
         datasets["INPUTS/BoostedJets/fj_charge"] = to_np_array(fj_charge, max_n=N_FJETS).astype("float32")
@@ -389,16 +399,10 @@ def get_datasets(arrays, n_tops, no_targets: bool=False):  # noqa: C901
     ################################
     # Recontrsuct tops
     def get_matched_jetfjets_idx(combo_arr, selected_idxs, field):
-        if field == '':
-            return ak.fill_none(
-                [ak.firsts(combo_arr[ak.local_index(combo_arr, axis=1) == selected_idxs[:, i]]['idx']) for i in range(n_tops)], 
-                -1
-            ).to_numpy().T
-        else:
-            return ak.fill_none(
-                [ak.firsts(combo_arr[ak.local_index(combo_arr, axis=1) == selected_idxs[:, i]][field]['idx']) for i in range(n_tops)], 
-                -1
-            ).to_numpy().T
+        return ak.fill_none(
+            [ak.firsts(combo_arr[ak.local_index(combo_arr, axis=1) == selected_idxs[:, i]][field]['idx']) for i in range(n_tops)], 
+            -1
+        ).to_numpy().T
 
     FR_3jets_idxs = ak.argcartesian([jets, jets, jets], axis=1)
     FR_3jet0, FR_3jet1, FR_3jet2 = ak.unzip(FR_3jets_idxs)
@@ -445,10 +449,6 @@ def get_datasets(arrays, n_tops, no_targets: bool=False):  # noqa: C901
         ak.ArrayBuilder()
     ).snapshot()
     FB_bqqfjet_idxs = get_matched_jetfjets_idx(FB_1fjet, FB_combo_fjet_idxs, 'fjet')
-    
-    # Jet-FatJet overlap
-    matched_fjet_jet_idx, matched_fjet_jet_DR  = match_fjet_to_jet(fjets, jets, ak.ArrayBuilder(), ak.ArrayBuilder())
-    matched_fjet_jet_idx, matched_fjet_jet_DR = matched_fjet_jet_idx.snapshot(), matched_fjet_jet_DR.snapshot()
 
 
     ################################
@@ -680,7 +680,7 @@ def get_datasets(arrays, n_tops, no_targets: bool=False):  # noqa: C901
 
     return datasets
 
-def process_file(file_name, out_file, train_frac, n_tops):
+def process_file(file_name, out_file, train_frac, n_tops, no_targets: bool):
     try:
         if re.match('root://', file_name):
             current_file_name = 'tmp_'+('train_' if 'training' in out_file else 'test_')+file_name.split('/')[-1]
@@ -705,12 +705,9 @@ def process_file(file_name, out_file, train_frac, n_tops):
                 + [key for key in events.keys() if "GenJet/GenJet." in key and "fBits" not in key]
                 + [key for key in events.keys() if "GenFatJet/GenFatJet." in key and "fBits" not in key]
             )
-            print(f"keys: \n  {keys}")
             
             arrays = events.arrays(keys, entry_start=entry_start, entry_stop=entry_stop)
-            print('loaded arrays')
-            datasets = get_datasets(arrays, n_tops)
-            print('finished dataset generation')
+            datasets = get_datasets(arrays, n_tops, no_targets=no_targets)
 
         if re.match('root://', file_name): subprocess.run(['rm', '-rf', current_file_name])
         return datasets
@@ -782,7 +779,8 @@ def save_file(filepath: str, dataset: dict):
     default=20,
     help="Number of input files per condor job",
 )
-def main(in_files, out_file, split_file_size, file_limit, train_frac, n_tops, plots, multip, condor, condor_files_per_job):
+@click.option("--no-targets", "no_targets", is_flag=True, help="Boolean to not run truth-matching for bkg samples")
+def main(in_files, out_file, split_file_size, file_limit, train_frac, n_tops, plots, multip, condor, condor_files_per_job, no_targets):
     if plots:
         PLOTS = True
     
@@ -806,7 +804,7 @@ def main(in_files, out_file, split_file_size, file_limit, train_frac, n_tops, pl
     new_outfile_with_idx = lambda outfile, idx: outfile[:outfile.rfind('.')]+str(idx)+outfile[outfile.rfind('.'):]
     if not multip and not condor:
         for file_name in in_files:
-            datasets = process_file(file_name, out_file, train_frac, n_tops)
+            datasets = process_file(file_name, out_file, train_frac, n_tops, no_targets)
             if type(datasets) is int: 
                 if datasets == 999: break
                 else: continue
@@ -815,6 +813,7 @@ def main(in_files, out_file, split_file_size, file_limit, train_frac, n_tops, pl
                 all_datasets[dataset_name].append(data)
             num_events = sum(len(all_datasets[dataset_name][i]) for i in range(len(all_datasets[dataset_name])))
             if split_file_size > 0 and num_events > 2_000*split_file_size:
+                print(f'Saving file to {new_outfile_with_idx(out_file, out_file_idx)}')
                 save_file(new_outfile_with_idx(out_file, out_file_idx), all_datasets)
                 out_file_idx += 1; all_datasets = {}
             if out_file_idx == file_limit: break
@@ -831,7 +830,7 @@ def main(in_files, out_file, split_file_size, file_limit, train_frac, n_tops, pl
     elif multip:
         with Pool(10) as p:
             out_files, train_fracs, n_topses = [out_file]*len(in_files), [train_frac]*len(in_files), [n_tops]*len(in_files)
-            results = p.imap_unordered(process_file, zip(in_files, out_files, train_fracs, n_topses))
+            results = p.imap_unordered(process_file, zip(in_files, out_files, train_fracs, n_topses, no_targets))
 
 
 if __name__ == "__main__":
