@@ -58,15 +58,6 @@ WVSQCD_EFFS = {'t': 15.19e-2, 'W': 56.15e-2, 'bq': 9.92e-2, 'QCD': 1e-2}
 
 ################################
 
-# def awkidx(record):
-#     return record.idx
-# def typer(array_view_type):
-#     return array_view_type
-# def lower(context, builder, sig, args):
-#     return context.compile_internal(builder, awkidx, sig, args)
-# ak.behavior["__numba_typer__", "Momentum4D", "idx"] = typer
-# ak.behavior["__numba_lower__", "Momentum4D", "idx"] = lower
-
 
 def to_np_array(ak_array, max_n=10, pad=0):
     return ak.fill_none(ak.pad_none(ak_array, max_n, clip=True, axis=-1), pad).to_numpy()
@@ -82,28 +73,70 @@ def random2D(layout_array, RN_array, RN_builder):
         RN_builder.end_list()
     return RN_builder
 
-def final_particle(particle_pdgid, mother_pdgid, particles, final_status=-1, intermediate_particles=None):
-    if intermediate_particles is None:
-        intermediate_particles = particles[np.logical_and(
-            np.abs(particles.pid) == particle_pdgid, np.abs(particles.pid[particles.m1]) == mother_pdgid
-        )]
-    while ak.any(
-        ak.any(
-            np.logical_and(
-                np.abs(particles.pid[intermediate_particles.d1]) == particle_pdgid,
-                intermediate_particles.status < final_status
-            ), axis=1
-        ), axis=0
+@nb.njit
+def nbfinal_particle(
+    intermediates_idx: ak.Array, intermediates_pid: ak.Array, intermediates_d1: ak.Array, intermediates_status: ak.Array, 
+    particles_idx: ak.Array, particles_pid: ak.Array, particles_d1: ak.Array, particles_status: ak.Array, 
+    final_builder: ak.ArrayBuilder
+):
+    for (
+        intermediates_idx_event, intermediates_pid_event, intermediates_d1_event, intermediates_status_event, 
+        particles_idx_event, particles_pid_event, particles_d1_event, particles_status_event
+    ) in zip(
+        intermediates_idx, intermediates_pid, intermediates_d1, intermediates_status, 
+        particles_idx, particles_pid, particles_d1, particles_status
     ):
-        intermediate_particles = ak.where(
-            np.logical_and(
-                np.abs(particles.pid[intermediate_particles.d1]) == particle_pdgid,
-                intermediate_particles.status < final_status
-            ),
-            particles[intermediate_particles.d1],
-            intermediate_particles
+        final_builder.begin_list()
+        for intermediate_idx, intermediate_pid, intermediate_d1, intermediate_status in zip(
+            intermediates_idx_event, intermediates_pid_event, intermediates_d1_event, intermediates_status_event
+        ):
+            next_idx, next_pid, next_d1, next_status = intermediate_idx, intermediate_pid, intermediate_d1, intermediate_status
+            while particles_pid_event[next_d1] == next_pid and particles_status_event[next_d1] > next_status:
+                next_idx = particles_idx_event[next_d1]
+                next_pid = particles_pid_event[next_d1]
+                next_d1 = particles_d1_event[next_d1]
+                next_status = particles_status_event[next_d1]
+            final_builder.append(next_idx)
+        final_builder.end_list()
+    return final_builder
+
+def final_particle(intermediates: ak.Array, particles: ak.Array):
+    return particles[
+        nbfinal_particle(
+            intermediates.idx, intermediates.pid, intermediates.d1, intermediates.status,
+            particles.idx, particles.pid, particles.d1, particles.status,
+            ak.ArrayBuilder()
+        ).snapshot()
+    ]
+
+def get_tops(particles: ak.Array):
+    init_tops = particles[
+        np.logical_and(
+            np.abs(particles.pid) == 6,
+            np.logical_or(
+                np.logical_and(np.abs(particles.pid[particles.d1]) == 5, np.abs(particles.pid[particles.d2]) == 24),
+                np.logical_and(np.abs(particles.pid[particles.d2]) == 5, np.abs(particles.pid[particles.d1]) == 24)
+            )
         )
-    return intermediate_particles
+    ]
+    return final_particle(init_tops, particles)
+
+def get_bs(particles: ak.Array, tops: ak.Array):
+    init_bs = ak.where(
+        np.abs(particles.pid[tops.d1]) == 5, particles[tops.d1], particles[tops.d2]
+    )
+    return final_particle(init_bs, particles)
+
+def get_Ws(particles: ak.Array, tops: ak.Array):
+    init_Ws = ak.where(
+        np.abs(particles.pid[tops.d1]) == 24, particles[tops.d1], particles[tops.d2]
+    )
+    return final_particle(init_Ws, particles)
+
+def get_Wds(particles: ak.Array, Ws: ak.Array):
+    init_Wd1s, init_Wd2s = particles[Ws.d1], particles[Ws.d2]
+    return final_particle(init_Wd1s, particles), final_particle(init_Wd2s, particles)
+
 
 ################################
 # Targets builder
@@ -113,6 +146,7 @@ def get_genparts(arrays, n_tops, n_targets, event_mask):
     part_pid = arrays["Particle/Particle.PID"]  # PDG ID
     part_status = arrays["Particle/Particle.Status"]
     part_m1 = arrays["Particle/Particle.M1"]
+    part_m2 = arrays["Particle/Particle.M2"]
     part_d1 = arrays["Particle/Particle.D1"]
     part_d2 = arrays["Particle/Particle.D2"]
     part_pt = arrays["Particle/Particle.PT"]
@@ -132,6 +166,7 @@ def get_genparts(arrays, n_tops, n_targets, event_mask):
             "pid": part_pid,
             "status": part_status,
             "m1": part_m1,
+            "m2": part_m2,
             "d1": part_d1,
             "d2": part_d2,
             "idx": ak.local_index(part_pid),
@@ -139,62 +174,43 @@ def get_genparts(arrays, n_tops, n_targets, event_mask):
         with_name="Momentum4D",
     )
 
-    tops_condition = np.logical_and(
-        np.abs(particles.pid) == 6, np.logical_or(
-            np.logical_and(
-                np.abs(particles.pid[particles.d1]) == 24, np.abs(particles.pid[particles.d2]) == 5
-            ),
-            np.logical_and(
-                np.abs(particles.pid[particles.d1]) == 5, np.abs(particles.pid[particles.d2]) == 24
-            )
-        )
-    )
-    topquarks = ak.to_regular(particles[tops_condition], axis=1)
-    print(f"{n_targets} tops in every event? = {ak.all(ak.num(topquarks) == n_targets)}")
-    topquark_idx_sort = ak.argsort(topquarks.idx, axis=-1)
-    topquarks = ak.to_regular(topquarks[topquark_idx_sort])
-
-    bquarks = ak.to_regular(
-        final_particle(
-            5, 6, particles,
-        ), axis=1
-    )
-    bquarks = ak.to_regular(bquarks[topquark_idx_sort])
-    print(f"{n_targets} bquarks in every event? = {ak.all(ak.num(bquarks) == n_targets)}")
-
-    wbosons = ak.to_regular(
-        final_particle(
-            24, 6, particles, 
-        ), axis=1
-    )
-    wbosons = ak.to_regular(wbosons[topquark_idx_sort])
-    print(f"{n_targets} wbosons in every event? = {ak.all(ak.num(wbosons) == n_targets)}")
-    
-    wquarks_d1 = ak.to_regular(
-        final_particle(
-            np.abs(ak.to_regular(particles.pid[wbosons.d1], axis=1)), None, particles, 
-            intermediate_particles=particles[wbosons.d1]
-        ), axis=1
-    )
-    print(f"{n_targets} wquarks_d1 in every event? = {ak.all(ak.num(wquarks_d1) == n_targets)}")
-    wquarks_d2 = ak.to_regular(
-        final_particle(
-            np.abs(ak.to_regular(particles.pid[wbosons.d2], axis=1)), None, particles, 
-            intermediate_particles=particles[wbosons.d2]
-        ), axis=1
-    )
-    print(f"{n_targets} wquarks_d2 in every event? = {ak.all(ak.num(wquarks_d2) == n_targets)}")
-
     ################################
     # Perform pre-selection
     particles = particles[event_mask]
-    topquarks = topquarks[event_mask]
-    bquarks = bquarks[event_mask]
-    wbosons = wbosons[event_mask]
-    wquarks_d1 = wquarks_d1[event_mask]
-    wquarks_d2 = wquarks_d2[event_mask]
 
-    return particles, topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2
+    ################################
+    # Find tops and children
+    topquarks = get_tops(particles)
+    bquarks = get_bs(particles, topquarks)
+    wbosons = get_Ws(particles, topquarks)
+    wquarks_d1, wquarks_d2 = get_Wds(particles, wbosons)
+
+    good_tops = np.logical_and(
+        np.abs(topquarks.pid) == 6,
+        np.logical_and(np.abs(bquarks.pid) == 5, np.abs(wbosons.pid) == 24)
+    )
+    hadronic_tops = good_tops & np.logical_and(
+        np.isin(np.abs(wquarks_d1.pid), list(range(1, 6))),  # assumes W can't decay to t
+        np.isin(np.abs(wquarks_d2.pid), list(range(1, 6)))
+    )
+    print(f"Number of hadronic tops: {ak.sum(hadronic_tops, axis=None)}")
+    leptonic_tops = good_tops & np.logical_and(
+        np.isin(np.abs(wquarks_d1.pid), list(range(11, 15))),  # assumes W can't decay to tau
+        np.isin(np.abs(wquarks_d2.pid), list(range(11, 15)))
+    )
+    print(f"Number of leptonic tops: {ak.sum(leptonic_tops, axis=None)}")
+
+    ################################
+    # Perform hadronic selection
+    topquarks = topquarks[hadronic_tops]
+    bquarks = bquarks[hadronic_tops]
+    wbosons = wbosons[hadronic_tops]
+    wquarks_d1 = wquarks_d1[hadronic_tops]
+    wquarks_d2 = wquarks_d2[hadronic_tops]
+
+    event_mask = (ak.num(topquarks, axis=1) == n_targets)
+
+    return event_mask, particles[event_mask], topquarks[event_mask], bquarks[event_mask], wbosons[event_mask], wquarks_d1[event_mask], wquarks_d2[event_mask]
 
 
 ################################
@@ -327,19 +343,20 @@ def get_jets(arrays, n_tops, n_targets):
     print(f'Unique Nfatjets passing event selection and FatJet object selection: {np.unique(ak.num(fjet_mask, axis=1))}')
     print('-'*60)
 
-    N_JETS = N_JETS(n_tops)
-    N_FJETS = N_FJETS(n_tops)
+    global N_JETS, N_FJETS
+    if callable(N_JETS): N_JETS = N_JETS(n_tops)
+    if callable(N_FJETS): N_FJETS = N_FJETS(n_tops)
 
 
     ################################
     # Perform pre-selection and sorting
     # Jets
     jets = jets[jet_sort][event_mask][jet_mask][:, :N_JETS]
-    jets['idx'] = ak.local_index(pt, axis=1)
+    jets['idx'] = ak.local_index(jets.pt, axis=1)
 
     # FatJets
     fjets = fjets[fjet_sort][event_mask][fjet_mask][:, :N_FJETS]
-    fjets['idx'] = ak.local_index(fj_pt)
+    fjets['idx'] = ak.local_index(fjets.pt, axis=1)
 
     # Gen Jets
     genjets = genjets[event_mask]
@@ -453,8 +470,15 @@ def get_datasets(arrays, n_tops, n_targets, min_valid_targets):  # noqa: C901
     print(f'num events = {len(arrays["Particle/Particle.PID"])}')
 
     event_mask, jets, fjets, genjets, genfjets = get_jets(arrays, n_tops, n_targets)
+    event_mask, particles, topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2 = get_genparts(arrays, n_tops, n_targets, event_mask)
+    assert ak.all(ak.num(topquarks, axis=1) == n_targets), f"Not all events have {n_targets} hadronic tops"
+    assert ak.all(ak.num(bquarks, axis=1) == n_targets), f"Not all events have {n_targets} bquarks"
+    assert ak.all(ak.num(wbosons, axis=1) == n_targets), f"Not all events have {n_targets} wbosons"
+    assert ak.all(ak.num(wquarks_d1, axis=1) == n_targets), f"Not all events have {n_targets} wquarks_d1"
+    assert ak.all(ak.num(wquarks_d2, axis=1) == n_targets), f"Not all events have {n_targets} wquarks_d2"
+    jets, fjets, genjets, genfjets = jets[event_mask], fjets[event_mask], genjets[event_mask], genfjets[event_mask]
     n_evts = np.sum(event_mask)
-    particles, topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2 = get_genparts(arrays, n_tops, n_targets, event_mask)
+    print(f"Num events after pre-selection = {n_evts}")
 
     # Jet-FatJet overlap
     matched_fjet_jet_idx, matched_fjet_jet_DR  = match_fjet_to_jet(fjets, jets, ak.ArrayBuilder(), ak.ArrayBuilder())
@@ -594,16 +618,16 @@ def get_datasets(arrays, n_tops, n_targets, min_valid_targets):  # noqa: C901
 
     ################################
     # Cleaning non-reconstructable events
-    at_least_one_target_mask = np.zeros_like(n_evts).astype("bool")
+    n_targets_per_event = np.zeros(n_evts, dtype=int)
     for i in range(n_tops):
-        at_least_one_target_mask += ak.to_numpy(
+        n_targets_per_event += ak.to_numpy(
             top_fullyResolved[f"top{i+1}_mask"]
             | top_semiResolved_qq[f"top{i+1}_mask"]
             | top_semiResolved_bq[f"top{i+1}_mask"]
             | top_fullyBoosted[f"top{i+1}_mask"]
-        ).astype("bool")
-    print(f"Viable tops = {np.sum(at_least_one_target_mask)}")
-    at_least_one_target_mask = np.asarray(at_least_one_target_mask >= min_valid_targets, dtype=bool)
+        ).astype("int")
+    print(f"Viable tops = {np.sum(n_targets_per_event)}")
+    min_valid_targets_mask = np.asarray(n_targets_per_event >= min_valid_targets, dtype=bool)
 
     ################################
     # Sanity checking reconstruction
@@ -613,62 +637,62 @@ def get_datasets(arrays, n_tops, n_targets, min_valid_targets):  # noqa: C901
     # Store processed data in dataset for training/testing
     # Inputs
     datasets = {}
-    datasets["INPUTS/Jets/MASK"] = to_np_array(jets.pt > 0, max_n=N_JETS).astype("bool")[at_least_one_target_mask]
-    datasets["INPUTS/Jets/pt"] = to_np_array(jets.pt, max_n=N_JETS).astype("float32")[at_least_one_target_mask]
-    datasets["INPUTS/Jets/eta"] = to_np_array(jets.eta, max_n=N_JETS).astype("float32")[at_least_one_target_mask]
-    datasets["INPUTS/Jets/phi"] = to_np_array(jets.phi, max_n=N_JETS).astype("float32")[at_least_one_target_mask]
-    datasets["INPUTS/Jets/sinphi"] = to_np_array(np.sin(jets.phi), max_n=N_JETS).astype("float32")[at_least_one_target_mask]
-    datasets["INPUTS/Jets/cosphi"] = to_np_array(np.cos(jets.phi), max_n=N_JETS).astype("float32")[at_least_one_target_mask]
-    datasets["INPUTS/Jets/mass"] = to_np_array(jets.mass, max_n=N_JETS).astype("float32")[at_least_one_target_mask]
-    datasets["INPUTS/Jets/btag"] = to_np_array(jets["btag"], max_n=N_JETS).astype("bool")[at_least_one_target_mask]
-    datasets["INPUTS/Jets/flavor"] = to_np_array(jets["flavor"], max_n=N_JETS).astype("float32")[at_least_one_target_mask]
-    datasets["INPUTS/Jets/matchedfj"] = to_np_array(matched_fjet_jet_idx, max_n=N_JETS).astype("int32")[at_least_one_target_mask]
-    datasets["INPUTS/Jets/deltaRfj"] = to_np_array(matched_fjet_jet_DR, max_n=N_JETS).astype("int32")[at_least_one_target_mask]
+    datasets["INPUTS/Jets/MASK"] = to_np_array(jets.pt > 0, max_n=N_JETS).astype("bool")[min_valid_targets_mask]
+    datasets["INPUTS/Jets/pt"] = to_np_array(jets.pt, max_n=N_JETS).astype("float32")[min_valid_targets_mask]
+    datasets["INPUTS/Jets/eta"] = to_np_array(jets.eta, max_n=N_JETS).astype("float32")[min_valid_targets_mask]
+    datasets["INPUTS/Jets/phi"] = to_np_array(jets.phi, max_n=N_JETS).astype("float32")[min_valid_targets_mask]
+    datasets["INPUTS/Jets/sinphi"] = to_np_array(np.sin(jets.phi), max_n=N_JETS).astype("float32")[min_valid_targets_mask]
+    datasets["INPUTS/Jets/cosphi"] = to_np_array(np.cos(jets.phi), max_n=N_JETS).astype("float32")[min_valid_targets_mask]
+    datasets["INPUTS/Jets/mass"] = to_np_array(jets.mass, max_n=N_JETS).astype("float32")[min_valid_targets_mask]
+    datasets["INPUTS/Jets/btag"] = to_np_array(jets["btag"], max_n=N_JETS).astype("bool")[min_valid_targets_mask]
+    datasets["INPUTS/Jets/flavor"] = to_np_array(jets["flavor"], max_n=N_JETS).astype("float32")[min_valid_targets_mask]
+    datasets["INPUTS/Jets/matchedfj"] = to_np_array(matched_fjet_jet_idx, max_n=N_JETS).astype("int32")[min_valid_targets_mask]
+    datasets["INPUTS/Jets/deltaRfj"] = to_np_array(matched_fjet_jet_DR, max_n=N_JETS).astype("int32")[min_valid_targets_mask]
 
-    datasets["INPUTS/BoostedJets/MASK"] = to_np_array(fjets.pt > 0, max_n=N_FJETS).astype("bool")[at_least_one_target_mask]
-    datasets["INPUTS/BoostedJets/fj_pt"] = to_np_array(fjets.pt, max_n=N_FJETS).astype("float32")[at_least_one_target_mask]
-    datasets["INPUTS/BoostedJets/fj_eta"] = to_np_array(fjets.eta, max_n=N_FJETS).astype("float32")[at_least_one_target_mask]
-    datasets["INPUTS/BoostedJets/fj_phi"] = to_np_array(fjets.phi, max_n=N_FJETS).astype("float32")[at_least_one_target_mask]
-    datasets["INPUTS/BoostedJets/fj_sinphi"] = to_np_array(np.sin(fjets.phi), max_n=N_FJETS).astype("float32")[at_least_one_target_mask]
-    datasets["INPUTS/BoostedJets/fj_cosphi"] = to_np_array(np.cos(fjets.phi), max_n=N_FJETS).astype("float32")[at_least_one_target_mask]
-    datasets["INPUTS/BoostedJets/fj_mass"] = to_np_array(fjets.mass, max_n=N_FJETS).astype("float32")[at_least_one_target_mask]
-    datasets["INPUTS/BoostedJets/fj_sdmass"] = to_np_array(fjets["sdmass"], max_n=N_FJETS).astype("float32")[at_least_one_target_mask]
-    datasets["INPUTS/BoostedJets/fj_Ttag"] = to_np_array(fjets["Ttag"], max_n=N_FJETS).astype("bool")[at_least_one_target_mask]
-    datasets["INPUTS/BoostedJets/fj_Wtag"] = to_np_array(fjets["Wtag"], max_n=N_FJETS).astype("bool")[at_least_one_target_mask]
-    datasets["INPUTS/BoostedJets/fj_tau21"] = to_np_array(fjets["tau21"], max_n=N_FJETS).astype("float32")[at_least_one_target_mask]
-    datasets["INPUTS/BoostedJets/fj_tau32"] = to_np_array(fjets["tau32"], max_n=N_FJETS).astype("float32")[at_least_one_target_mask]
-    datasets["INPUTS/BoostedJets/fj_charge"] = to_np_array(fjets["charge"], max_n=N_FJETS).astype("float32")[at_least_one_target_mask]
-    datasets["INPUTS/BoostedJets/fj_ehadovereem"] = to_np_array(fjets["ehadovereem"], max_n=N_FJETS).astype("float32")[at_least_one_target_mask]
-    datasets["INPUTS/BoostedJets/fj_neutralenergyfrac"] = to_np_array(fjets["neutralenergyfrac"], max_n=N_FJETS).astype("float32")[at_least_one_target_mask]
-    datasets["INPUTS/BoostedJets/fj_chargedenergyfrac"] = to_np_array(fjets["chargedenergyfrac"], max_n=N_FJETS).astype("float32")[at_least_one_target_mask]
-    datasets["INPUTS/BoostedJets/fj_nneutral"] = to_np_array(fjets["nneutral"], max_n=N_FJETS).astype("float32")[at_least_one_target_mask]
-    datasets["INPUTS/BoostedJets/fj_ncharged"] = to_np_array(fjets["ncharged"], max_n=N_FJETS).astype("float32")[at_least_one_target_mask]
+    datasets["INPUTS/BoostedJets/MASK"] = to_np_array(fjets.pt > 0, max_n=N_FJETS).astype("bool")[min_valid_targets_mask]
+    datasets["INPUTS/BoostedJets/fj_pt"] = to_np_array(fjets.pt, max_n=N_FJETS).astype("float32")[min_valid_targets_mask]
+    datasets["INPUTS/BoostedJets/fj_eta"] = to_np_array(fjets.eta, max_n=N_FJETS).astype("float32")[min_valid_targets_mask]
+    datasets["INPUTS/BoostedJets/fj_phi"] = to_np_array(fjets.phi, max_n=N_FJETS).astype("float32")[min_valid_targets_mask]
+    datasets["INPUTS/BoostedJets/fj_sinphi"] = to_np_array(np.sin(fjets.phi), max_n=N_FJETS).astype("float32")[min_valid_targets_mask]
+    datasets["INPUTS/BoostedJets/fj_cosphi"] = to_np_array(np.cos(fjets.phi), max_n=N_FJETS).astype("float32")[min_valid_targets_mask]
+    datasets["INPUTS/BoostedJets/fj_mass"] = to_np_array(fjets.mass, max_n=N_FJETS).astype("float32")[min_valid_targets_mask]
+    datasets["INPUTS/BoostedJets/fj_sdmass"] = to_np_array(fjets["sdmass"], max_n=N_FJETS).astype("float32")[min_valid_targets_mask]
+    datasets["INPUTS/BoostedJets/fj_Ttag"] = to_np_array(fjets["Ttag"], max_n=N_FJETS).astype("bool")[min_valid_targets_mask]
+    datasets["INPUTS/BoostedJets/fj_Wtag"] = to_np_array(fjets["Wtag"], max_n=N_FJETS).astype("bool")[min_valid_targets_mask]
+    datasets["INPUTS/BoostedJets/fj_tau21"] = to_np_array(fjets["tau21"], max_n=N_FJETS).astype("float32")[min_valid_targets_mask]
+    datasets["INPUTS/BoostedJets/fj_tau32"] = to_np_array(fjets["tau32"], max_n=N_FJETS).astype("float32")[min_valid_targets_mask]
+    datasets["INPUTS/BoostedJets/fj_charge"] = to_np_array(fjets["charge"], max_n=N_FJETS).astype("float32")[min_valid_targets_mask]
+    datasets["INPUTS/BoostedJets/fj_ehadovereem"] = to_np_array(fjets["ehadovereem"], max_n=N_FJETS).astype("float32")[min_valid_targets_mask]
+    datasets["INPUTS/BoostedJets/fj_neutralenergyfrac"] = to_np_array(fjets["neutralenergyfrac"], max_n=N_FJETS).astype("float32")[min_valid_targets_mask]
+    datasets["INPUTS/BoostedJets/fj_chargedenergyfrac"] = to_np_array(fjets["chargedenergyfrac"], max_n=N_FJETS).astype("float32")[min_valid_targets_mask]
+    datasets["INPUTS/BoostedJets/fj_nneutral"] = to_np_array(fjets["nneutral"], max_n=N_FJETS).astype("float32")[min_valid_targets_mask]
+    datasets["INPUTS/BoostedJets/fj_ncharged"] = to_np_array(fjets["ncharged"], max_n=N_FJETS).astype("float32")[min_valid_targets_mask]
 
     # Targets
     for i in range(n_tops):
         # fully-resolved tops
-        datasets[f"TARGETS/FRt{i+1}/MASK"] = top_fullyResolved[f"top{i+1}_mask"][at_least_one_target_mask]
-        datasets[f"TARGETS/FRt{i+1}/b"] = top_fullyResolved[f"top{i+1}_b"][at_least_one_target_mask]
-        datasets[f"TARGETS/FRt{i+1}/q1"] = top_fullyResolved[f"top{i+1}_q1"][at_least_one_target_mask]
-        datasets[f"TARGETS/FRt{i+1}/q2"] = top_fullyResolved[f"top{i+1}_q2"][at_least_one_target_mask]
-        datasets[f"TARGETS/FRt{i+1}/pt"] = top_pt_dict[f"top{i+1}_pt"][at_least_one_target_mask]
+        datasets[f"TARGETS/FRt{i+1}/MASK"] = top_fullyResolved[f"top{i+1}_mask"][min_valid_targets_mask]
+        datasets[f"TARGETS/FRt{i+1}/b"] = top_fullyResolved[f"top{i+1}_b"][min_valid_targets_mask]
+        datasets[f"TARGETS/FRt{i+1}/q1"] = top_fullyResolved[f"top{i+1}_q1"][min_valid_targets_mask]
+        datasets[f"TARGETS/FRt{i+1}/q2"] = top_fullyResolved[f"top{i+1}_q2"][min_valid_targets_mask]
+        datasets[f"TARGETS/FRt{i+1}/pt"] = top_pt_dict[f"top{i+1}_pt"][min_valid_targets_mask]
 
         # semi-resolved (qq fatjet) tops
-        datasets[f"TARGETS/SRqqt{i+1}/MASK"] = top_semiResolved_qq[f"top{i+1}_mask"][at_least_one_target_mask]
-        datasets[f"TARGETS/SRqqt{i+1}/b"] = top_semiResolved_qq[f"top{i+1}_b"][at_least_one_target_mask]
-        datasets[f"TARGETS/SRqqt{i+1}/qq"] = top_semiResolved_qq[f"top{i+1}_qq"][at_least_one_target_mask]
-        datasets[f"TARGETS/SRqqt{i+1}/pt"] = top_pt_dict[f"top{i+1}_pt"][at_least_one_target_mask]
+        datasets[f"TARGETS/SRqqt{i+1}/MASK"] = top_semiResolved_qq[f"top{i+1}_mask"][min_valid_targets_mask]
+        datasets[f"TARGETS/SRqqt{i+1}/b"] = top_semiResolved_qq[f"top{i+1}_b"][min_valid_targets_mask]
+        datasets[f"TARGETS/SRqqt{i+1}/qq"] = top_semiResolved_qq[f"top{i+1}_qq"][min_valid_targets_mask]
+        datasets[f"TARGETS/SRqqt{i+1}/pt"] = top_pt_dict[f"top{i+1}_pt"][min_valid_targets_mask]
 
         # semi-resolved (bq fatjet) tops
-        datasets[f"TARGETS/SRbqt{i+1}/MASK"] = top_semiResolved_bq[f"top{i+1}_mask"][at_least_one_target_mask]
-        datasets[f"TARGETS/SRbqt{i+1}/q"] = top_semiResolved_bq[f"top{i+1}_q"][at_least_one_target_mask]
-        datasets[f"TARGETS/SRbqt{i+1}/bq"] = top_semiResolved_bq[f"top{i+1}_bq"][at_least_one_target_mask]
-        datasets[f"TARGETS/SRbqt{i+1}/pt"] = top_pt_dict[f"top{i+1}_pt"][at_least_one_target_mask]
+        datasets[f"TARGETS/SRbqt{i+1}/MASK"] = top_semiResolved_bq[f"top{i+1}_mask"][min_valid_targets_mask]
+        datasets[f"TARGETS/SRbqt{i+1}/q"] = top_semiResolved_bq[f"top{i+1}_q"][min_valid_targets_mask]
+        datasets[f"TARGETS/SRbqt{i+1}/bq"] = top_semiResolved_bq[f"top{i+1}_bq"][min_valid_targets_mask]
+        datasets[f"TARGETS/SRbqt{i+1}/pt"] = top_pt_dict[f"top{i+1}_pt"][min_valid_targets_mask]
 
         # fully-boosted tops
-        datasets[f"TARGETS/FBt{i+1}/MASK"] = top_fullyBoosted[f"top{i+1}_mask"][at_least_one_target_mask]
-        datasets[f"TARGETS/FBt{i+1}/bqq"] = top_fullyBoosted[f"top{i+1}_bqq"][at_least_one_target_mask]
-        datasets[f"TARGETS/FBt{i+1}/pt"] = top_pt_dict[f"top{i+1}_pt"][at_least_one_target_mask]
+        datasets[f"TARGETS/FBt{i+1}/MASK"] = top_fullyBoosted[f"top{i+1}_mask"][min_valid_targets_mask]
+        datasets[f"TARGETS/FBt{i+1}/bqq"] = top_fullyBoosted[f"top{i+1}_bqq"][min_valid_targets_mask]
+        datasets[f"TARGETS/FBt{i+1}/pt"] = top_pt_dict[f"top{i+1}_pt"][min_valid_targets_mask]
 
     return datasets
 
