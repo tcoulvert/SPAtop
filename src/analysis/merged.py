@@ -6,7 +6,7 @@ import numpy as np
 import vector
 vector.register_awkward()
 
-from src.analysis.utils import reco_reorder, reset_collision_dp, dp_to_TopNumProb, match_jet, get_symmetries, n_alpha
+from src.analysis.utils import reco_reorder, reset_collision_dp, dp_to_TopNumProb, match_jet, get_symmetries, n_alpha, get_numerical, get_jets
 
 N_AK5_JETS = 10
 N_AK8_JETS = 2
@@ -159,27 +159,6 @@ def parse_merged_w_target(
     DELTARS = [[0.8 if n_alpha(label) > 1 else 0.5 for label in jet_labels[reco]] for reco in reconstructions]
     SYMMETRIES = get_symmetries(reconstructions, jet_labels)
 
-    def get_numerical(file, key: str):
-        return ak.Array(
-            np.concatenate([
-                np.array(file["TARGETS"][reco][key]).reshape(-1, 1)
-                for reco in reconstructions
-            ], axis=1)
-        )
-    def get_jets(file):
-        return ak.concatenate([
-            ak.concatenate([
-                ak.firsts(
-                    jets[ak.local_index(jets) == np.array(file["TARGETS"][reco][label])]
-                    if n_alpha(label) == 1 else
-                    fatjets[(ak.local_index(fatjets) == np.array(file["TARGETS"][reco][label])) 
-                        | (fatjets["index"] == np.array(file["TARGETS"][reco][label]))]
-                )[:, np.newaxis]
-                for label in jet_labels[reco]
-            ], axis=1)[:, np.newaxis, :]
-            for reco in reconstructions
-        ], axis=1)
-
     # jet 4-momentums
     jets = ak.from_regular(ak.zip({
         "pt": np.array(testfile["INPUTS"]["Jets"]["pt"]),
@@ -201,16 +180,16 @@ def parse_merged_w_target(
     print(f"Number of AK8 jets: {N_AK8_JETS}")
 
     # target pt
-    target_pts = get_numerical(testfile, "pt")
+    target_pts = get_numerical(testfile, "pt", reconstructions)
 
     # target MASK
-    target_masks = get_numerical(testfile, "MASK")
+    target_masks = get_numerical(testfile, "MASK", reconstructions)
 
     # target jets
-    target_jets = get_jets(testfile)
+    target_jets = get_jets(testfile, reconstructions, jet_labels, jets, fatjets)
 
     # predicted jets
-    predicted_jets = get_jets(predfile)
+    predicted_jets = get_jets(predfile, reconstructions, jet_labels, jets, fatjets)
     predicted_pts = ak.Array(ak.sum(predicted_jets, axis=-1).pt)
 
     # predicted probabilities

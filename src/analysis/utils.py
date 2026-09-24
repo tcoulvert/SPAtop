@@ -28,6 +28,29 @@ def get_symmetries(recos, jet_labels):
     return symmetries
 
 
+def get_numerical(file, key: str, reconstructions: list, targets_key: str="TARGETS"):
+    return ak.Array(
+        np.concatenate([
+            np.array(file[targets_key][reco][key]).reshape(-1, 1)
+            for reco in reconstructions
+        ], axis=1)
+    )
+
+def get_jets(file, reconstructions: list, jet_labels: dict[str, list], jets, fatjets, targets_key: str="TARGETS"):
+    return ak.concatenate([
+        ak.concatenate([
+            ak.firsts(
+                jets[ak.local_index(jets) == np.array(file[targets_key][reco][label])]
+                if n_alpha(label) == 1 else
+                fatjets[(ak.local_index(fatjets) == np.array(file[targets_key][reco][label])) 
+                    | (fatjets["index"] == np.array(file[targets_key][reco][label]))]
+            )[:, np.newaxis]
+            for label in jet_labels[reco]
+        ], axis=1)[:, np.newaxis, :]
+        for reco in reconstructions
+    ], axis=1)
+
+
 @nb.njit
 def match_jet(jet1, jet2):
     if jet1 is None or jet2 is None: return False
