@@ -192,11 +192,9 @@ def parse_merged_w_target(
     # select predictions and targets
     selected_target_jets, selected_target_pts = sel_target_t_by_mask(target_jets, target_pts, target_masks)
     selected_predicted_jets, selected_predicted_pts, selected_order = sel_pred_t_by_prob(predicted_jets, predicted_pts, dps, aps)
-    return selected_order
-    # # generate look up tables
-    # LUT_pred = generate_pred_LUT(selected_predicted_jets, selected_target_jets, selected_predicted_pts, selected_order)
-    # LUT_target = generate_target_LUT(selected_target_jets, selected_predicted_jets, selected_target_pts, selected_order)
+    
+    # generate look up tables
+    LUT_pred = generate_pred_LUT(selected_predicted_jets, selected_target_jets, selected_predicted_pts, selected_order)
+    LUT_target = generate_target_LUT(selected_target_jets, selected_predicted_jets, selected_target_pts, selected_order)
 
-    # add_merged_selections(predfile, testfile, reconstructions, selected_order, LUT_pred)
-
-    # return LUT_pred, LUT_target
+    return LUT_pred, LUT_target

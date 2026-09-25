@@ -9,19 +9,6 @@ from hist.intervals import clopper_pearson_interval
 def n_alpha(string: str):
     return len([c for c in string if c.isalpha()])
 
-def add_merged_selections(predfile, testfile, reconstructions: list[str], n_tops: int, selected_order: ak.Array, LUT_pred: ak.Array):
-    valids = get_numerical(testfile, "MASK", reconstructions)
-    for i, reco_class in enumerate(reconstructions):
-        # print(ak.local_index(selected_order, axis=1))
-        # print(ak.local_index(selected_order, axis=1)[selected_order == i])
-        # print(ak.firsts(ak.local_index(selected_order, axis=1)[selected_order == i], axis=1))
-        # print(ak.fill_none(ak.firsts(ak.local_index(selected_order, axis=1)[selected_order == i], axis=1), -1))
-        predfile["TARGETS"][reco_class]["merged_order"] = ak.fill_none(ak.firsts(ak.local_index(selected_order, axis=1)[selected_order == i], axis=1), -1)
-        predfile["TARGETS"][reco_class]["merged_correct"] = ak.fill_none(ak.firsts(LUT_pred[..., 0][selected_order == i], axis=1), -1)
-        # merged_correct = ak.fill_none(ak.firsts(selected_order[selected_order == i], axis=1), -1)
-        # predfile["TARGETS"][reco_class]["merged_correct"] = ak.where(merged_correct != -1, LUT_pred[:, 0], )
-        predfile["TARGETS"][reco_class]["merged_valid"] = ak.any(valids[:, [j for j in range(len(reconstructions)) if j // n_tops == i // n_tops]], axis=1)
-
 def reset_collision_dp(dps, aps):
     ap_filter = aps < 1 / (13 * 13)
     return ak.where(ap_filter, 0, dps)
