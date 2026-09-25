@@ -9,10 +9,42 @@ from hist.intervals import clopper_pearson_interval
 def n_alpha(string: str):
     return len([c for c in string if c.isalpha()])
 
+def add_merged_selections(predfile, testfile, reconstructions: list[str], n_tops: int, selected_order: ak.Array, LUT_pred: ak.Array):
+    valids = get_numerical(testfile, "MASK", reconstructions)
+    for i, reco_class in enumerate(reconstructions):
+        # print(ak.local_index(selected_order, axis=1))
+        # print(ak.local_index(selected_order, axis=1)[selected_order == i])
+        # print(ak.firsts(ak.local_index(selected_order, axis=1)[selected_order == i], axis=1))
+        # print(ak.fill_none(ak.firsts(ak.local_index(selected_order, axis=1)[selected_order == i], axis=1), -1))
+        predfile["TARGETS"][reco_class]["merged_order"] = ak.fill_none(ak.firsts(ak.local_index(selected_order, axis=1)[selected_order == i], axis=1), -1)
+        predfile["TARGETS"][reco_class]["merged_correct"] = ak.fill_none(ak.firsts(LUT_pred[..., 0][selected_order == i], axis=1), -1)
+        # merged_correct = ak.fill_none(ak.firsts(selected_order[selected_order == i], axis=1), -1)
+        # predfile["TARGETS"][reco_class]["merged_correct"] = ak.where(merged_correct != -1, LUT_pred[:, 0], )
+        predfile["TARGETS"][reco_class]["merged_valid"] = ak.any(valids[:, [j for j in range(len(reconstructions)) if j // n_tops == i // n_tops]], axis=1)
 
 def reset_collision_dp(dps, aps):
     ap_filter = aps < 1 / (13 * 13)
     return ak.where(ap_filter, 0, dps)
+
+def get_jet4moms(testfile):
+    jets = ak.from_regular(ak.zip({
+        "pt": np.array(testfile["INPUTS"]["Jets"]["pt"]),
+        "eta": np.array(testfile["INPUTS"]["Jets"]["eta"]),
+        "phi": np.array(testfile["INPUTS"]["Jets"]["phi"]),
+        "mass": np.array(testfile["INPUTS"]["Jets"]["mass"])
+    },  with_name="Momentum4D"))
+    jets["index"] = ak.local_index(jets)
+
+
+    fatjets = ak.from_regular(ak.zip({
+        "pt": np.array(testfile["INPUTS"]["BoostedJets"]["fj_pt"]),
+        "eta": np.array(testfile["INPUTS"]["BoostedJets"]["fj_eta"]),
+        "phi": np.array(testfile["INPUTS"]["BoostedJets"]["fj_phi"]),
+        "mass": np.array(testfile["INPUTS"]["BoostedJets"]["fj_mass"])
+    }, with_name="Momentum4D"))
+    fatjets["index"] = ak.local_index(fatjets) + ak.max(ak.local_index(jets), axis=None) + 1
+
+    return jets, fatjets
 
 
 def get_symmetries(recos, jet_labels):
@@ -100,6 +132,8 @@ def overlap(jets, idxs, nrecos, ntops, deltaRs, builder):
 def reco_reorder(predicted_jets, dps, aps, n_recos, n_tops, deltaRs):
     ps = dps * aps
     idx_sort = np.flip(np.argsort(ps, axis=-1), axis=-1)
+    print(idx_sort)
+    print(ak.type(idx_sort))
     idx_sel = overlap(predicted_jets, idx_sort, n_recos, n_tops, ak.Array(deltaRs), ak.ArrayBuilder()).snapshot()
 
     return idx_sel
@@ -153,14 +187,16 @@ def dp_to_TopNumProb(dps):
 def calc_pureff(LUT, bins):
     if LUT is None: return None, None
 
+    retrieved = LUT.flatten()[0::2]
+    pt = LUT.flatten()[1::2]
+
     Tops = np.array([top for top in LUT])
 
-    Tops_inds = np.digitize(Tops[:, 1], bins)  # index 1 is pt
-    Tops_inds = ak.where(Tops[:, 1] < bins[-1], Tops_inds, bins[-1]+1)
+    Tops_inds = np.digitize(pt, bins)  # index 1 is pt
 
     correctTruth_per_bin = []
-    for bin_i in range(len(bins)):
-        correctTruth_per_bin.append(Tops[:, 0][Tops_inds == bin_i])  # index 0 is correct prediction
+    for bin_i in range(1, len(bins)):
+        correctTruth_per_bin.append(retrieved[Tops_inds == bin_i])  # index 0 is correct prediction
     correctTruth_per_bin = ak.Array(correctTruth_per_bin)
 
     means = ak.mean(correctTruth_per_bin, axis=-1)

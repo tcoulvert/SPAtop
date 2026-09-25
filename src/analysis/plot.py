@@ -50,6 +50,8 @@ def calc_pur_eff(target_path, pred_path, bins_dict, mode: str='pur_eff', chi2: b
         results["eff_srqq"], results["efferr_srqq"] = calc_pureff(LUT_semiresolved_qq_target, bins_dict['SRqq'])
         results["eff_srbq"], results["efferr_srbq"] = calc_pureff(LUT_semiresolved_bq_target, bins_dict['SRbq'])
 
+    pred_h5.close(); target_h5.close()
+
     return results
 
 

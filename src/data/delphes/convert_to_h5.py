@@ -31,6 +31,7 @@ plt.rcParams.update({"axes.prop_cycle": cycler("color", cmap_petroff10)})
 from src.data.delphes.matching import (
     reconstruct_top,
     FullyResolved_top, SemiResolvedQQ_top, SemiResolvedBQ_top, FullyBoosted_top, 
+    FullyResolved_overlap, SemiResolved_overlap, FullyBoosted_overlap,
     match_fjet_to_jet,
 )
 from src.data.delphes.condor_conversion import LPCVanillaSubmitter
@@ -75,27 +76,27 @@ def random2D(layout_array, RN_array, RN_builder):
 
 @nb.njit
 def nbfinal_particle(
-    intermediates_idx: ak.Array, intermediates_pid: ak.Array, intermediates_d1: ak.Array, intermediates_status: ak.Array, 
-    particles_idx: ak.Array, particles_pid: ak.Array, particles_d1: ak.Array, particles_status: ak.Array, 
+    intermediates_idx: ak.Array, intermediates_pid: ak.Array, intermediates_status: ak.Array, intermediates_d1: ak.Array, 
+    particles_idx: ak.Array, particles_pid: ak.Array, particles_status: ak.Array, particles_d1: ak.Array, 
     final_builder: ak.ArrayBuilder
 ):
     for (
-        intermediates_idx_event, intermediates_pid_event, intermediates_d1_event, intermediates_status_event, 
-        particles_idx_event, particles_pid_event, particles_d1_event, particles_status_event
+        intermediates_idx_event, intermediates_pid_event, intermediates_status_event, intermediates_d1_event, 
+        particles_idx_event, particles_pid_event, particles_status_event, particles_d1_event
     ) in zip(
-        intermediates_idx, intermediates_pid, intermediates_d1, intermediates_status, 
-        particles_idx, particles_pid, particles_d1, particles_status
+        intermediates_idx, intermediates_pid, intermediates_status, intermediates_d1, 
+        particles_idx, particles_pid, particles_status, particles_d1
     ):
         final_builder.begin_list()
-        for intermediate_idx, intermediate_pid, intermediate_d1, intermediate_status in zip(
-            intermediates_idx_event, intermediates_pid_event, intermediates_d1_event, intermediates_status_event
+        for intermediate_idx, intermediate_pid, intermediate_status, intermediate_d1 in zip(
+            intermediates_idx_event, intermediates_pid_event, intermediates_status_event, intermediates_d1_event
         ):
-            next_idx, next_pid, next_d1, next_status = intermediate_idx, intermediate_pid, intermediate_d1, intermediate_status
+            next_idx, next_pid, next_status, next_d1 = intermediate_idx, intermediate_pid, intermediate_status, intermediate_d1
             while particles_pid_event[next_d1] == next_pid and particles_status_event[next_d1] > next_status:
                 next_idx = particles_idx_event[next_d1]
                 next_pid = particles_pid_event[next_d1]
-                next_d1 = particles_d1_event[next_d1]
                 next_status = particles_status_event[next_d1]
+                next_d1 = particles_d1_event[next_d1]
             final_builder.append(next_idx)
         final_builder.end_list()
     return final_builder
@@ -103,8 +104,8 @@ def nbfinal_particle(
 def final_particle(intermediates: ak.Array, particles: ak.Array):
     return particles[
         nbfinal_particle(
-            intermediates.idx, intermediates.pid, intermediates.d1, intermediates.status,
-            particles.idx, particles.pid, particles.d1, particles.status,
+            intermediates.idx, intermediates.pid, intermediates.status, intermediates.d1,
+            particles.idx, particles.pid, particles.status, particles.d1,
             ak.ArrayBuilder()
         ).snapshot()
     ]
@@ -181,6 +182,8 @@ def get_genparts(arrays, n_tops, n_targets, event_mask):
     ################################
     # Find tops and children
     topquarks = get_tops(particles)
+    top_sort = ak.argsort(topquarks.pt, ascending=False, axis=-1)
+    topquarks = topquarks[top_sort]
     bquarks = get_bs(particles, topquarks)
     wbosons = get_Ws(particles, topquarks)
     wquarks_d1, wquarks_d2 = get_Wds(particles, wbosons)
@@ -332,13 +335,15 @@ def get_jets(arrays, n_tops, n_targets):
     print('-'*60)
     print(f'Nevts passing event selection: {ak.sum(event_mask, axis=0)}')
 
-    jet_sort = ak.argsort(pt, ascending=False, axis=-1)
-    jet_mask = (pt[event_mask] > MIN_JET_PT)
+    jet_sort = ak.argsort(jets.pt, ascending=False, axis=-1)
+    jets = jets[jet_sort]
+    jet_mask = (jets.pt[event_mask] > MIN_JET_PT)
     print(f'Unique Njets passing Jet object selection: {np.unique(ak.num(pt > MIN_JET_PT, axis=1))}')
     print(f'Unique Njets passing event selection and Jet object selection: {np.unique(ak.num(jet_mask, axis=1))}')
 
-    fjet_sort = ak.argsort(fj_pt, ascending=False, axis=-1)
-    fjet_mask = (fj_pt[event_mask] > MIN_FJET_PT)
+    fjet_sort = ak.argsort(fjets.pt, ascending=False, axis=-1)
+    fjets = fjets[fjet_sort]
+    fjet_mask = (fjets.pt[event_mask] > MIN_FJET_PT)
     print(f'Unique Nfatjets passing FatJet object selection: {np.unique(ak.num(fj_pt > MIN_FJET_PT, axis=1))}')
     print(f'Unique Nfatjets passing event selection and FatJet object selection: {np.unique(ak.num(fjet_mask, axis=1))}')
     print('-'*60)
@@ -351,11 +356,11 @@ def get_jets(arrays, n_tops, n_targets):
     ################################
     # Perform pre-selection and sorting
     # Jets
-    jets = jets[jet_sort][event_mask][jet_mask][:, :N_JETS]
+    jets = jets[event_mask][jet_mask][:, :N_JETS]
     jets['idx'] = ak.local_index(jets.pt, axis=1)
 
     # FatJets
-    fjets = fjets[fjet_sort][event_mask][fjet_mask][:, :N_FJETS]
+    fjets = fjets[event_mask][fjet_mask][:, :N_FJETS]
     fjets['idx'] = ak.local_index(fjets.pt, axis=1)
 
     # Gen Jets
@@ -391,6 +396,7 @@ def fr_match_jets(jets, fjets, topquarks, bquarks, wbosons, wquarks_d1, wquarks_
         topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2,
         FR_3jets,
         FullyResolved_top,
+        FullyResolved_overlap,
         ak.ArrayBuilder()
     ).snapshot()
     FR_bjet_idxs = get_matched_jetfjets_idx(FR_3jets, FR_combo_jet_idxs, 'bjet', n_targets)
@@ -414,6 +420,7 @@ def srqq_match_jets(jets, fjets, topquarks, bquarks, wbosons, wquarks_d1, wquark
         topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2,
         SR_1jet1fjet,
         SemiResolvedQQ_top,
+        SemiResolved_overlap,
         ak.ArrayBuilder()
     ).snapshot()
     SRqq_bjet_idxs = get_matched_jetfjets_idx(SR_1jet1fjet, SRqq_combo_jetfjet_idxs, 'jet', n_targets)
@@ -435,6 +442,7 @@ def srbq_match_jets(jets, fjets, topquarks, bquarks, wbosons, wquarks_d1, wquark
         topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2,
         SR_1jet1fjet,
         SemiResolvedBQ_top,
+        SemiResolved_overlap,
         ak.ArrayBuilder()
     ).snapshot()
     SRbq_qjet_idxs = get_matched_jetfjets_idx(SR_1jet1fjet, SRbq_combo_jetfjet_idxs, 'jet', n_targets)
@@ -454,6 +462,7 @@ def fb_match_jets(jets, fjets, topquarks, bquarks, wbosons, wquarks_d1, wquarks_
         topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2,
         FB_1fjet,
         FullyBoosted_top,
+        FullyBoosted_overlap,
         ak.ArrayBuilder()
     ).snapshot()
     FB_bqqfjet_idxs = get_matched_jetfjets_idx(FB_1fjet, FB_combo_fjet_idxs, 'fjet', n_targets)
@@ -531,33 +540,21 @@ def get_datasets(arrays, n_tops, n_targets, min_valid_targets):  # noqa: C901
     ################################
     # PNet tagger emulations
     # apply emulated TvsQCD and WvsQCD bools @ 1.0% QCD eff WPs
-    for i in range(n_tops):
-        top_fjet_mask = (ak.local_index(fjets) == top_fullyBoosted[f"top{i+1}_bqq"])
-        w_fjet_mask = (ak.local_index(fjets) == top_semiResolved_qq[f"top{i+1}_qq"])
-        bq_fjet_mask = (ak.local_index(fjets) == top_semiResolved_bq[f"top{i+1}_bq"])
-
-        # Emulate PNet AK8 T-tagger
-        fjets["Ttag"] = ak.where(
-            top_fjet_mask, fjets["TtagRN"] < TVSQCD_EFFS['t'], 
+    tops_fjet_mask = ak.any([ak.local_index(fjets) == top_fullyBoosted[f"top{i+1}_bqq"] for i in range(n_tops)], axis=0)
+    w_fjet_mask = ak.any([ak.local_index(fjets) == top_semiResolved_qq[f"top{i+1}_qq"] for i in range(n_tops)], axis=0)
+    bq_fjet_mask = ak.any([ak.local_index(fjets) == top_semiResolved_bq[f"top{i+1}_bq"] for i in range(n_tops)], axis=0)
+    apply_effs_by_mask = lambda tag, effs: ak.where(
+        tops_fjet_mask, fjets[f"{tag}RN"] < effs['t'], 
+        ak.where(
+            w_fjet_mask, fjets[f"{tag}RN"] < effs['W'], 
             ak.where(
-                w_fjet_mask, fjets["TtagRN"] < TVSQCD_EFFS['W'], 
-                ak.where(
-                    bq_fjet_mask, fjets["TtagRN"] < TVSQCD_EFFS['bq'],
-                    fjets["TtagRN"] < TVSQCD_EFFS['QCD']
-                )
+                bq_fjet_mask, fjets[f"{tag}RN"] < effs['bq'],
+                fjets[f"{tag}RN"] < effs['QCD']
             )
         )
-        # Emulate PNet AK8 W-tagger
-        fjets["Wtag"] = ak.where(
-            top_fjet_mask, fjets["WtagRN"] < WVSQCD_EFFS['t'], 
-            ak.where(
-                w_fjet_mask, fjets["WtagRN"] < WVSQCD_EFFS['W'], 
-                ak.where(
-                    bq_fjet_mask, fjets["WtagRN"] < WVSQCD_EFFS['bq'],
-                    fjets["WtagRN"] < WVSQCD_EFFS['QCD']
-                )
-            )
-        )
+    )
+    fjets["Ttag"] = apply_effs_by_mask("Ttag", TVSQCD_EFFS)
+    fjets["Wtag"] = apply_effs_by_mask("Wtag", WVSQCD_EFFS)
 
 
     ################################
@@ -647,7 +644,7 @@ def get_datasets(arrays, n_tops, n_targets, min_valid_targets):  # noqa: C901
     datasets["INPUTS/Jets/btag"] = to_np_array(jets["btag"], max_n=N_JETS).astype("bool")[min_valid_targets_mask]
     datasets["INPUTS/Jets/flavor"] = to_np_array(jets["flavor"], max_n=N_JETS).astype("float32")[min_valid_targets_mask]
     datasets["INPUTS/Jets/matchedfj"] = to_np_array(matched_fjet_jet_idx, max_n=N_JETS).astype("int32")[min_valid_targets_mask]
-    datasets["INPUTS/Jets/deltaRfj"] = to_np_array(matched_fjet_jet_DR, max_n=N_JETS).astype("int32")[min_valid_targets_mask]
+    datasets["INPUTS/Jets/deltaRfj"] = to_np_array(matched_fjet_jet_DR, max_n=N_JETS).astype("float32")[min_valid_targets_mask]
 
     datasets["INPUTS/BoostedJets/MASK"] = to_np_array(fjets.pt > 0, max_n=N_FJETS).astype("bool")[min_valid_targets_mask]
     datasets["INPUTS/BoostedJets/fj_pt"] = to_np_array(fjets.pt, max_n=N_FJETS).astype("float32")[min_valid_targets_mask]
@@ -788,7 +785,6 @@ def save_file(filepath: str, dataset: dict):
     help="Number of top quark targets to include per event",
 )
 @click.option("--plots", is_flag=True, help="Boolean to make plots.")
-@click.option("--multip", is_flag=True, help="Boolean to use multiprocessing.")
 @click.option("--condor", is_flag=True, help="Boolean to use condor processing.")
 @click.option(
     "--condor-files-per-job",
@@ -811,6 +807,7 @@ def save_file(filepath: str, dataset: dict):
 )
 def main(in_files, out_file, split_file_size, file_limit, train_frac, n_tops, plots, multip, condor, condor_files_per_job, n_targets, min_valid_targets):
     if plots:
+        global PLOTS
         PLOTS = True
     assert n_targets <= n_tops, f"\'n-targets\' needs to be less than or equal to \'n-tops\'"
     
@@ -832,7 +829,7 @@ def main(in_files, out_file, split_file_size, file_limit, train_frac, n_tops, pl
     in_files = expanded_in_files
     out_file_idx = 0
     new_outfile_with_idx = lambda outfile, idx: outfile[:outfile.rfind('.')]+str(idx)+outfile[outfile.rfind('.'):]
-    if not multip and not condor:
+    if not condor:
         for file_name in in_files:
             datasets = process_file(file_name, out_file, train_frac, n_tops, n_targets, min_valid_targets)
             if type(datasets) is int: 
@@ -857,10 +854,6 @@ def main(in_files, out_file, split_file_size, file_limit, train_frac, n_tops, pl
         ]
         submitter = LPCVanillaSubmitter(job_filepaths, out_file)
         submitter.submit()
-    elif multip:
-        with Pool(10) as p:
-            out_files, train_fracs, n_topses, n_targetses, min_valid_targetses = [out_file]*len(in_files), [train_frac]*len(in_files), [n_tops]*len(in_files), [n_targets]*len(in_files), [min_valid_targets]*len(in_files)
-            results = p.imap_unordered(process_file, zip(in_files, out_files, train_fracs, n_topses, n_targetses, min_valid_targetses))
 
 
 if __name__ == "__main__":

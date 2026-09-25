@@ -28,27 +28,38 @@ FR_PTCUT, SRQQ_PTCUT, SRBQ_PTCUT, FB_PTCUT = 0., 0., 0., 350.  # GeV
 
 
 ################################
-# Baseline function to reconstruct tops
+# Baseline functions to reconstruct tops
+@nb.njit
+def matched_overlap(idx, matched_idxs, jetfjets, overlap_check_func):
+    if idx in matched_idxs: return True
+    overlap = False
+    jetfjet = jetfjets[idx]
+    for idx_ in matched_idxs:
+        jetfjet_ = jetfjets[idx_]
+        if overlap_check_func(jetfjet, jetfjet_): 
+            overlap = True; break
+    return overlap
 @nb.njit
 def reconstruct_top(
     topquarks, bquarks, wbosons, wquarks1, wquarks2, 
     jetfjets, 
-    reco_check_func, 
+    reco_check_func, overlap_check_func,
     matched_jetfjets_builder
 ):
     # Loop over every event
     for topquarks_event, bquarks_event, wbosons_event, wquarks1_event, wquarks2_event, jetfjets_event in zip(
         topquarks, bquarks, wbosons, wquarks1, wquarks2, jetfjets
     ):
+        matched_jetfjet_idxs = {}
         # Loop over every top (+ daughters)
         matched_jetfjets_builder.begin_list()
         for topquark, bquark, wboson, wquark1, wquark2 in zip(
             topquarks_event, bquarks_event, wbosons_event, wquarks1_event, wquarks2_event
         ):  # dont need to check b and w mother index b/c constructed to match
             minDR, minDR_jetfjet_idx = DR_FILL_VALUE, NOJET_FILL_VALUE  # mindeltaR, mindeltaR_jetidx, mindeltaR_fjetidx
-            
             # Find the jet(s) and fatjet(s) with the smallest combined deltaR, depending on the reco type
             for i, jetfjet in enumerate(jetfjets_event):
+                if matched_overlap(i, matched_jetfjet_idxs, jetfjets_event, overlap_check_func): continue
                 top_jetfjet_deltaR  = reco_check_func(topquark, bquark, wboson, wquark1, wquark2, jetfjet)
                 minDR, minDR_jetfjet_idx = (top_jetfjet_deltaR, i) if top_jetfjet_deltaR < minDR else (minDR, minDR_jetfjet_idx)
 
@@ -63,6 +74,9 @@ def reconstruct_top(
 
 ################################
 # Specific reconstruction definitions via deltaR matching
+@nb.njit
+def FullyBoosted_overlap(jetfjet, jetfjet_):
+    return (jetfjet['fjet'].deltaR(jetfjet_['fjet']) < FJET_DR)
 @nb.njit
 def FullyBoosted_top(
     topquark, bquark, wboson, wquark1, wquark2, 
@@ -89,6 +103,14 @@ def FullyBoosted_top(
 
     return top_jetfjet_deltaR
 
+@nb.njit
+def SemiResolved_overlap(jetfjet, jetfjet_):
+    return (
+        (jetfjet['jet'].deltaR(jetfjet_['jet']) < JET_DR)
+        | (jetfjet['jet'].deltaR(jetfjet_['fjet']) < FJET_DR)
+        | (jetfjet['fjet'].deltaR(jetfjet_['jet']) < FJET_DR)
+        | (jetfjet['fjet'].deltaR(jetfjet_['fjet']) < FJET_DR)
+    )
 @nb.njit
 def SemiResolvedQQ_top(
     topquark, bquark, wboson, wquark1, wquark2, 
@@ -170,6 +192,16 @@ def SemiResolvedBQ2_top(
     return top_jetfjet_deltaR
 
 @nb.njit
+def FullyResolved_overlap(jetfjet, jetfjet_):
+    return (
+        (jetfjet['bjet'].deltaR(jetfjet_['bjet']) < JET_DR)
+        | (jetfjet['bjet'].deltaR(jetfjet_['q1jet']) < JET_DR)
+        | (jetfjet['bjet'].deltaR(jetfjet_['q2jet']) < JET_DR)
+        | (jetfjet['q1jet'].deltaR(jetfjet_['q1jet']) < JET_DR)
+        | (jetfjet['q1jet'].deltaR(jetfjet_['q2jet']) < JET_DR)
+        | (jetfjet['q2jet'].deltaR(jetfjet_['q2jet']) < JET_DR)
+    )
+@nb.njit
 def FullyResolved_top(
     topquark, bquark, wboson, wquark1, wquark2, 
     jetfjet  # Should be the cartesian product of jet collection with itself, choose 3
@@ -203,10 +235,9 @@ def match_fjet_to_jet(fjets, jets, builder, deltaR_builder):
         for i, jet in enumerate(jets_event):
             minDR, matched_fjet_idx = DR_FILL_VALUE, NOJET_FILL_VALUE
             for j, fjet in enumerate(fjets_event):
-                if jet.deltaR(fjet) < FJET_DR:
+                dR = jet.deltaR(fjet)
+                if dR < FJET_DR and dR < minDR:
                     matched_fjet_idx = j
-                    minDR = jet.deltaR(fjet)
-                elif jet.deltaR(fjet) < minDR:
                     minDR = jet.deltaR(fjet)
             builder.append(matched_fjet_idx)
             deltaR_builder.append(minDR)

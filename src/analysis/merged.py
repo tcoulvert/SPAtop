@@ -6,10 +6,10 @@ import numpy as np
 import vector
 vector.register_awkward()
 
-from src.analysis.utils import reco_reorder, reset_collision_dp, dp_to_TopNumProb, match_jet, get_symmetries, n_alpha, get_numerical, get_jets
+from src.analysis.utils import reco_reorder, reset_collision_dp, dp_to_TopNumProb, match_jet, get_symmetries, n_alpha, get_numerical, get_jets, get_jet4moms
 
 N_AK5_JETS = 10
-N_AK8_JETS = 2
+N_AK8_JETS = 3
 N_TOPS = 2
 DELTARS = None
 SYMMETRIES = None
@@ -59,17 +59,21 @@ def generate_one_pred_LUT(
         predicted_toppt,
         selected_order
     ):
+        builder.begin_list()
         # for each prediction per event, in order of best probs
+        matched_targ_idxs = {}
         for pred_idx in order_event:
             pjets, toppt = pjets_event[pred_idx], toppt_event[pred_idx]
             if pjets is None: continue
 
-            retrieved = 0
+            retrieved, exists = 0, 0
             # check all targets of matching reco (i.e. account for symmetry of top label exchange)
             target_idxs = [pred_idx - i for i in range(1, (pred_idx % N_TOPS)+1)][::-1]+[pred_idx]+[pred_idx + i for i in range(1, N_TOPS-(pred_idx % N_TOPS))]
             for targ_idx in target_idxs:
+                if targ_idx in matched_targ_idxs: continue
                 tjets = tjets_event[targ_idx]
                 if tjets is None: continue
+                exists = 1
 
                 # check all valid labels (i.e. account for symmetry of jet labels)
                 for symand in symmetries[pred_idx]:
@@ -84,6 +88,7 @@ def generate_one_pred_LUT(
             builder.append(retrieved)
             builder.append(toppt)
             builder.end_list()
+        builder.end_list()
 
     return builder
 
@@ -160,22 +165,9 @@ def parse_merged_w_target(
     SYMMETRIES = get_symmetries(reconstructions, jet_labels)
 
     # jet 4-momentums
-    jets = ak.from_regular(ak.zip({
-        "pt": np.array(testfile["INPUTS"]["Jets"]["pt"]),
-        "eta": np.array(testfile["INPUTS"]["Jets"]["eta"]),
-        "phi": np.array(testfile["INPUTS"]["Jets"]["phi"]),
-        "mass": np.array(testfile["INPUTS"]["Jets"]["mass"])
-    },  with_name="Momentum4D"))
-    jets["index"] = ak.local_index(jets)
+    jets, fatjets = get_jet4moms(testfile)
     N_AK5_JETS = ak.max(ak.local_index(jets), axis=None) + 1
     print(f"Number of AK5 jets: {N_AK5_JETS}")
-    fatjets = ak.from_regular(ak.zip({
-        "pt": np.array(testfile["INPUTS"]["BoostedJets"]["fj_pt"]),
-        "eta": np.array(testfile["INPUTS"]["BoostedJets"]["fj_eta"]),
-        "phi": np.array(testfile["INPUTS"]["BoostedJets"]["fj_phi"]),
-        "mass": np.array(testfile["INPUTS"]["BoostedJets"]["fj_mass"])
-    }, with_name="Momentum4D"))
-    fatjets["index"] = ak.local_index(fatjets) + N_AK5_JETS
     N_AK8_JETS = ak.max(ak.local_index(fatjets), axis=None) + 1
     print(f"Number of AK8 jets: {N_AK8_JETS}")
 
@@ -193,17 +185,18 @@ def parse_merged_w_target(
     predicted_pts = ak.Array(ak.sum(predicted_jets, axis=-1).pt)
 
     # predicted probabilities
-    dps = get_numerical(predfile, "detection_probability")
-    aps = get_numerical(predfile, "assignment_probability")
+    dps = get_numerical(predfile, "detection_probability", reconstructions)
+    aps = get_numerical(predfile, "assignment_probability", reconstructions)
     if not chi2: dps = reset_collision_dp(dps, aps)
-
 
     # select predictions and targets
     selected_target_jets, selected_target_pts = sel_target_t_by_mask(target_jets, target_pts, target_masks)
     selected_predicted_jets, selected_predicted_pts, selected_order = sel_pred_t_by_prob(predicted_jets, predicted_pts, dps, aps)
+    return selected_order
+    # # generate look up tables
+    # LUT_pred = generate_pred_LUT(selected_predicted_jets, selected_target_jets, selected_predicted_pts, selected_order)
+    # LUT_target = generate_target_LUT(selected_target_jets, selected_predicted_jets, selected_target_pts, selected_order)
 
-    # generate look up tables
-    LUT_pred = generate_pred_LUT(selected_predicted_jets, selected_target_jets, selected_predicted_pts, selected_order)
-    LUT_target = generate_target_LUT(selected_target_jets, selected_predicted_jets, selected_target_pts, selected_order)
+    # add_merged_selections(predfile, testfile, reconstructions, selected_order, LUT_pred)
 
-    return LUT_pred, LUT_target
+    # return LUT_pred, LUT_target
