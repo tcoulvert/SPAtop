@@ -4,7 +4,7 @@ import logging
 import os
 import re
 import subprocess
-from multiprocessing import Pool
+import sys
 from pathlib import Path
 
 import awkward as ak
@@ -76,27 +76,41 @@ def random2D(layout_array, RN_array, RN_builder):
 
 @nb.njit
 def nbfinal_particle(
-    intermediates_idx: ak.Array, intermediates_pid: ak.Array, intermediates_status: ak.Array, intermediates_d1: ak.Array, 
-    particles_idx: ak.Array, particles_pid: ak.Array, particles_status: ak.Array, particles_d1: ak.Array, 
+    intermediates_idx: ak.Array, intermediates_pid: ak.Array, intermediates_d1: ak.Array, intermediates_d2: ak.Array,
+    particles_pid: ak.Array, particles_d1: ak.Array, particles_d2: ak.Array,
     final_builder: ak.ArrayBuilder
 ):
+    """Follow each intermediate particle to the last copy of itself in the record.
+
+    A copy is a daughter with the same PID. Either daughter slot may hold it
+    (W -> W gamma lists the photon in d1 or d2), and Pythia does not guarantee
+    the copy's status code exceeds its parent's (W -> W W at equal status, or a
+    status-51 copy under a status-52 parent), so no status condition is used.
+    Final-state particles carry d1 = d2 = -1, which must not be used as an index.
+    The step cap guards against a malformed record with a cycle.
+    """
     for (
-        intermediates_idx_event, intermediates_pid_event, intermediates_status_event, intermediates_d1_event, 
-        particles_idx_event, particles_pid_event, particles_status_event, particles_d1_event
+        intermediates_idx_event, intermediates_pid_event, intermediates_d1_event, intermediates_d2_event,
+        particles_pid_event, particles_d1_event, particles_d2_event
     ) in zip(
-        intermediates_idx, intermediates_pid, intermediates_status, intermediates_d1, 
-        particles_idx, particles_pid, particles_status, particles_d1
+        intermediates_idx, intermediates_pid, intermediates_d1, intermediates_d2,
+        particles_pid, particles_d1, particles_d2
     ):
         final_builder.begin_list()
-        for intermediate_idx, intermediate_pid, intermediate_status, intermediate_d1 in zip(
-            intermediates_idx_event, intermediates_pid_event, intermediates_status_event, intermediates_d1_event
+        n_particles = len(particles_pid_event)
+        for intermediate_idx, intermediate_pid, intermediate_d1, intermediate_d2 in zip(
+            intermediates_idx_event, intermediates_pid_event, intermediates_d1_event, intermediates_d2_event
         ):
-            next_idx, next_pid, next_status, next_d1 = intermediate_idx, intermediate_pid, intermediate_status, intermediate_d1
-            while particles_pid_event[next_d1] == next_pid and particles_status_event[next_d1] > next_status:
-                next_idx = particles_idx_event[next_d1]
-                next_pid = particles_pid_event[next_d1]
-                next_status = particles_status_event[next_d1]
-                next_d1 = particles_d1_event[next_d1]
+            next_idx, next_d1, next_d2 = intermediate_idx, intermediate_d1, intermediate_d2
+            for _ in range(n_particles):
+                if next_d1 >= 0 and particles_pid_event[next_d1] == intermediate_pid:
+                    next_idx = next_d1
+                elif next_d2 >= 0 and particles_pid_event[next_d2] == intermediate_pid:
+                    next_idx = next_d2
+                else:
+                    break
+                next_d1 = particles_d1_event[next_idx]
+                next_d2 = particles_d2_event[next_idx]
             final_builder.append(next_idx)
         final_builder.end_list()
     return final_builder
@@ -104,8 +118,8 @@ def nbfinal_particle(
 def final_particle(intermediates: ak.Array, particles: ak.Array):
     return particles[
         nbfinal_particle(
-            intermediates.idx, intermediates.pid, intermediates.status, intermediates.d1,
-            particles.idx, particles.pid, particles.status, particles.d1,
+            intermediates.idx, intermediates.pid, intermediates.d1, intermediates.d2,
+            particles.pid, particles.d1, particles.d2,
             ak.ArrayBuilder()
         ).snapshot()
     ]
@@ -724,10 +738,9 @@ def process_file(file_name, out_file, train_frac, n_tops, n_targets, min_valid_t
 
         if re.match('root://', file_name): subprocess.run(['rm', '-rf', current_file_name])
         return datasets
-    except Exception as e:
+    except Exception:
         if re.match('root://', file_name): subprocess.run(['rm', '-rf', current_file_name])
-        if e is KeyboardInterrupt: return 999
-        logging.info(f"Preprocessing failed for file:\n{file_name}\n\nwith error:\n{e}\n\n...continuing with other files")
+        logging.exception(f"Preprocessing failed for file: {file_name}\n...continuing with other files")
         return 400
 
 def save_file(filepath: str, dataset: dict):
@@ -735,7 +748,8 @@ def save_file(filepath: str, dataset: dict):
         raise Exception(f'No filepath extension, ambiguous how to save file.')
     else:
         filetype = filepath.split('/')[-1].split('.')[-1]
-    print(f"Saving {len(dataset[list(dataset.keys())[0]])} events into {filepath}")
+    n_events = sum(len(chunk) for chunk in dataset[list(dataset.keys())[0]])
+    print(f"Saving {n_events} events into {filepath}")
         
     if filetype == 'h5':
         with h5py.File(filepath, "w") as output:
@@ -755,6 +769,7 @@ def save_file(filepath: str, dataset: dict):
                 merged_dataset[dataset_name] = concat_data
             output['Events'] = merged_dataset
     else: raise NotImplementedError(f'Requested file type saving not implemented, try \'.h5\' or \'.root\'.')
+    return n_events
 
 @click.command()
 @click.argument("in-files", nargs=-1)
@@ -794,9 +809,9 @@ def save_file(filepath: str, dataset: dict):
 @click.option(
     "--n-targets",
     "n_targets",
-    default=2,
+    default=None,
     type=click.IntRange(0, 4),
-    help="Number of true top quarks per event (must be less than or equal to \'n-tops\')",
+    help="Number of true hadronic top quarks required per event (default: same as \'n-tops\'; must not exceed it)",
 )
 @click.option(
     "--min-valid-targets",
@@ -805,10 +820,12 @@ def save_file(filepath: str, dataset: dict):
     type=click.IntRange(0, 4),
     help="Minimum number of valid targets (hadronic tops) per-event, events with fewer valid targets are excluded from the output dataset",
 )
-def main(in_files, out_file, split_file_size, file_limit, train_frac, n_tops, plots, multip, condor, condor_files_per_job, n_targets, min_valid_targets):
+def main(in_files, out_file, split_file_size, file_limit, train_frac, n_tops, plots, condor, condor_files_per_job, n_targets, min_valid_targets):
     if plots:
         global PLOTS
         PLOTS = True
+    if n_targets is None:
+        n_targets = n_tops
     assert n_targets <= n_tops, f"\'n-targets\' needs to be less than or equal to \'n-tops\'"
     
     all_datasets = {}
@@ -829,24 +846,32 @@ def main(in_files, out_file, split_file_size, file_limit, train_frac, n_tops, pl
     in_files = expanded_in_files
     out_file_idx = 0
     new_outfile_with_idx = lambda outfile, idx: outfile[:outfile.rfind('.')]+str(idx)+outfile[outfile.rfind('.'):]
+    n_failed, n_saved = 0, 0
     if not condor:
         for file_name in in_files:
             datasets = process_file(file_name, out_file, train_frac, n_tops, n_targets, min_valid_targets)
-            if type(datasets) is int: 
-                if datasets == 999: break
-                else: continue
+            if isinstance(datasets, int):
+                n_failed += 1
+                continue
             for dataset_name, data in datasets.items():
                 if dataset_name not in all_datasets: all_datasets[dataset_name] = []
                 all_datasets[dataset_name].append(data)
             num_events = sum(len(all_datasets[dataset_name][i]) for i in range(len(all_datasets[dataset_name])))
             if split_file_size > 0 and num_events > 2_000*split_file_size:
                 print(f'Saving file to {new_outfile_with_idx(out_file, out_file_idx)}')
-                save_file(new_outfile_with_idx(out_file, out_file_idx), all_datasets)
+                n_saved += save_file(new_outfile_with_idx(out_file, out_file_idx), all_datasets)
                 out_file_idx += 1; all_datasets = {}
             if out_file_idx == file_limit: break
         if all_datasets != {}:
-            if split_file_size > 0: save_file(new_outfile_with_idx(out_file, out_file_idx), all_datasets)
-            else: save_file(out_file, all_datasets)
+            if split_file_size > 0: n_saved += save_file(new_outfile_with_idx(out_file, out_file_idx), all_datasets)
+            else: n_saved += save_file(out_file, all_datasets)
+        print(f"Done: {len(in_files) - n_failed} of {len(in_files)} input files converted, {n_saved} events saved")
+        if n_failed:
+            logging.error(f"{n_failed} of {len(in_files)} input files failed to convert")
+            sys.exit(1)
+        if n_saved == 0:
+            logging.error("No events were saved")
+            sys.exit(2)
     elif condor:
         job_filepaths = [
             list(in_files[i*condor_files_per_job:(i+1)*condor_files_per_job]) 
