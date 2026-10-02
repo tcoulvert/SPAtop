@@ -2,6 +2,8 @@ import copy
 
 import awkward as ak
 import numba as nb
+from numba.typed import Dict as NumbaDict
+from numba import types as nbtypes
 import vector
 
 ################################
@@ -50,7 +52,8 @@ def reconstruct_top(
     for topquarks_event, bquarks_event, wbosons_event, wquarks1_event, wquarks2_event, jetfjets_event in zip(
         topquarks, bquarks, wbosons, wquarks1, wquarks2, jetfjets
     ):
-        matched_jetfjet_idxs = {}
+        # typed so numba can compile it; keys are candidate indices already assigned to a top in this event
+        matched_jetfjet_idxs = NumbaDict.empty(key_type=nbtypes.int64, value_type=nbtypes.int64)
         # Loop over every top (+ daughters)
         matched_jetfjets_builder.begin_list()
         for topquark, bquark, wboson, wquark1, wquark2 in zip(
@@ -63,8 +66,11 @@ def reconstruct_top(
                 top_jetfjet_deltaR  = reco_check_func(topquark, bquark, wboson, wquark1, wquark2, jetfjet)
                 minDR, minDR_jetfjet_idx = (top_jetfjet_deltaR, i) if top_jetfjet_deltaR < minDR else (minDR, minDR_jetfjet_idx)
 
-            # Add the matched jetfjets to the jetfjet builder
+            # Add the matched jetfjets to the jetfjet builder, and record the
+            # assignment so later tops in this event cannot reuse its objects
             matched_jetfjets_builder.append(minDR_jetfjet_idx)
+            if minDR_jetfjet_idx != NOJET_FILL_VALUE:
+                matched_jetfjet_idxs[minDR_jetfjet_idx] = 1
 
         matched_jetfjets_builder.end_list()
 
@@ -193,12 +199,17 @@ def SemiResolvedBQ2_top(
 
 @nb.njit
 def FullyResolved_overlap(jetfjet, jetfjet_):
+    # every role of one candidate against every role of the other: a jet used
+    # as a b in one top and as a light quark in another is still the same jet
     return (
         (jetfjet['bjet'].deltaR(jetfjet_['bjet']) < JET_DR)
         | (jetfjet['bjet'].deltaR(jetfjet_['q1jet']) < JET_DR)
         | (jetfjet['bjet'].deltaR(jetfjet_['q2jet']) < JET_DR)
+        | (jetfjet['q1jet'].deltaR(jetfjet_['bjet']) < JET_DR)
         | (jetfjet['q1jet'].deltaR(jetfjet_['q1jet']) < JET_DR)
         | (jetfjet['q1jet'].deltaR(jetfjet_['q2jet']) < JET_DR)
+        | (jetfjet['q2jet'].deltaR(jetfjet_['bjet']) < JET_DR)
+        | (jetfjet['q2jet'].deltaR(jetfjet_['q1jet']) < JET_DR)
         | (jetfjet['q2jet'].deltaR(jetfjet_['q2jet']) < JET_DR)
     )
 @nb.njit
@@ -238,7 +249,13 @@ def match_fjet_to_jet(fjets, jets, builder, deltaR_builder):
                 dR = jet.deltaR(fjet)
                 if dR < FJET_DR and dR < minDR:
                     matched_fjet_idx = j
-                    minDR = jet.deltaR(fjet)
+                    minDR = dR
+            # jets outside every fat-jet cone (or in events without fat jets)
+            # get the cone radius itself, so the feature is continuous at the
+            # boundary and survives z-score normalisation; a 999 sentinel would
+            # dominate the mean and variance and flatten the in-cone values
+            if matched_fjet_idx == NOJET_FILL_VALUE:
+                minDR = FJET_DR
             builder.append(matched_fjet_idx)
             deltaR_builder.append(minDR)
         builder.end_list()
