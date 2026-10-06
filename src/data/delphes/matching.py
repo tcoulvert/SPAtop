@@ -1,8 +1,10 @@
 import copy
+import math
 
 import awkward as ak
 import numba as nb
 import vector
+from numba.typed import List as NumbaList
 
 ################################
 
@@ -15,7 +17,7 @@ ak.numba.register_and_check()
 
 JET_DR = 0.5  # https://github.com/delphes/delphes/blob/master/cards/delphes_card_CMS.tcl#L642
 FJET_DR = 0.8  # https://github.com/delphes/delphes/blob/master/cards/delphes_card_CMS.tcl#L658
-DR_FILL_VALUE = 999
+DR_FILL_VALUE = ((2.5 - -2.5)**2 + (math.pi - -math.pi)**2)**0.5  # DeltaR between two objects at (η, ϕ) of (5, π) and (-5, -π), ≈8.03
 NOJET_FILL_VALUE = -1
 TOP_MASS, TOP_MASS_WINDOW = 172.5, 70  # GeV
 W_MASS, W_MASS_WINDOW = 80, 30  # GeV
@@ -50,13 +52,13 @@ def reconstruct_top(
     for topquarks_event, bquarks_event, wbosons_event, wquarks1_event, wquarks2_event, jetfjets_event in zip(
         topquarks, bquarks, wbosons, wquarks1, wquarks2, jetfjets
     ):
-        matched_jetfjet_idxs = {}
+        matched_jetfjet_idxs = NumbaList.empty_list(nb.types.int64)
         # Loop over every top (+ daughters)
         matched_jetfjets_builder.begin_list()
         for topquark, bquark, wboson, wquark1, wquark2 in zip(
             topquarks_event, bquarks_event, wbosons_event, wquarks1_event, wquarks2_event
         ):  # dont need to check b and w mother index b/c constructed to match
-            minDR, minDR_jetfjet_idx = DR_FILL_VALUE, NOJET_FILL_VALUE  # mindeltaR, mindeltaR_jetidx, mindeltaR_fjetidx
+            minDR, minDR_jetfjet_idx = DR_FILL_VALUE, NOJET_FILL_VALUE
             # Find the jet(s) and fatjet(s) with the smallest combined deltaR, depending on the reco type
             for i, jetfjet in enumerate(jetfjets_event):
                 if matched_overlap(i, matched_jetfjet_idxs, jetfjets_event, overlap_check_func): continue
@@ -65,6 +67,8 @@ def reconstruct_top(
 
             # Add the matched jetfjets to the jetfjet builder
             matched_jetfjets_builder.append(minDR_jetfjet_idx)
+            if minDR_jetfjet_idx != NOJET_FILL_VALUE:
+                matched_jetfjet_idxs.append(minDR_jetfjet_idx)
 
         matched_jetfjets_builder.end_list()
 
@@ -197,8 +201,11 @@ def FullyResolved_overlap(jetfjet, jetfjet_):
         (jetfjet['bjet'].deltaR(jetfjet_['bjet']) < JET_DR)
         | (jetfjet['bjet'].deltaR(jetfjet_['q1jet']) < JET_DR)
         | (jetfjet['bjet'].deltaR(jetfjet_['q2jet']) < JET_DR)
+        | (jetfjet['q1jet'].deltaR(jetfjet_['bjet']) < JET_DR)
         | (jetfjet['q1jet'].deltaR(jetfjet_['q1jet']) < JET_DR)
         | (jetfjet['q1jet'].deltaR(jetfjet_['q2jet']) < JET_DR)
+        | (jetfjet['q2jet'].deltaR(jetfjet_['bjet']) < JET_DR)
+        | (jetfjet['q2jet'].deltaR(jetfjet_['q1jet']) < JET_DR)
         | (jetfjet['q2jet'].deltaR(jetfjet_['q2jet']) < JET_DR)
     )
 @nb.njit
@@ -236,9 +243,10 @@ def match_fjet_to_jet(fjets, jets, builder, deltaR_builder):
             minDR, matched_fjet_idx = DR_FILL_VALUE, NOJET_FILL_VALUE
             for j, fjet in enumerate(fjets_event):
                 dR = jet.deltaR(fjet)
-                if dR < FJET_DR and dR < minDR:
-                    matched_fjet_idx = j
-                    minDR = jet.deltaR(fjet)
+                if dR < minDR:
+                    minDR = dR
+                    if dR < FJET_DR:
+                        matched_fjet_idx = j
             builder.append(matched_fjet_idx)
             deltaR_builder.append(minDR)
         builder.end_list()
