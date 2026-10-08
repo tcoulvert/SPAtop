@@ -5,6 +5,8 @@ import awkward as ak
 import numba as nb
 import vector
 from numba.typed import List as NumbaList
+from numba import types as nbtypes
+
 
 ################################
 
@@ -19,6 +21,7 @@ JET_DR = 0.5  # https://github.com/delphes/delphes/blob/master/cards/delphes_car
 FJET_DR = 0.8  # https://github.com/delphes/delphes/blob/master/cards/delphes_card_CMS.tcl#L658
 DR_FILL_VALUE = ((2.5 - -2.5)**2 + (math.pi - -math.pi)**2)**0.5  # DeltaR between two objects at (η, ϕ) of (5, π) and (-5, -π), ≈8.03
 NOJET_FILL_VALUE = -1
+NOFJET_DR_FILL_VALUE = math.hypot(10, math.pi)  # largest dR between two objects with |eta| < 5
 TOP_MASS, TOP_MASS_WINDOW = 172.5, 70  # GeV
 W_MASS, W_MASS_WINDOW = 80, 30  # GeV
 FR_PTCUT, SRQQ_PTCUT, SRBQ_PTCUT, FB_PTCUT = 0., 0., 0., 350.  # GeV
@@ -52,7 +55,7 @@ def reconstruct_top(
     for topquarks_event, bquarks_event, wbosons_event, wquarks1_event, wquarks2_event, jetfjets_event in zip(
         topquarks, bquarks, wbosons, wquarks1, wquarks2, jetfjets
     ):
-        matched_jetfjet_idxs = NumbaList.empty_list(nb.types.int64)
+        matched_jetfjet_idxs = NumbaList.empty_list(nbtypes.int64)
         # Loop over every top (+ daughters)
         matched_jetfjets_builder.begin_list()
         for topquark, bquark, wboson, wquark1, wquark2 in zip(
@@ -65,7 +68,8 @@ def reconstruct_top(
                 top_jetfjet_deltaR  = reco_check_func(topquark, bquark, wboson, wquark1, wquark2, jetfjet)
                 minDR, minDR_jetfjet_idx = (top_jetfjet_deltaR, i) if top_jetfjet_deltaR < minDR else (minDR, minDR_jetfjet_idx)
 
-            # Add the matched jetfjets to the jetfjet builder
+            # Add the matched jetfjets to the jetfjet builder, and record the
+            # assignment so later tops in this event cannot reuse its objects
             matched_jetfjets_builder.append(minDR_jetfjet_idx)
             if minDR_jetfjet_idx != NOJET_FILL_VALUE:
                 matched_jetfjet_idxs.append(minDR_jetfjet_idx)
@@ -197,6 +201,8 @@ def SemiResolvedBQ2_top(
 
 @nb.njit
 def FullyResolved_overlap(jetfjet, jetfjet_):
+    # every role of one candidate against every role of the other: a jet used
+    # as a b in one top and as a light quark in another is still the same jet
     return (
         (jetfjet['bjet'].deltaR(jetfjet_['bjet']) < JET_DR)
         | (jetfjet['bjet'].deltaR(jetfjet_['q1jet']) < JET_DR)
