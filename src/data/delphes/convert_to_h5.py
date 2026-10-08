@@ -861,8 +861,9 @@ def main(in_files, out_file, split_file_size, file_limit, train_frac, n_tops, pl
             for dataset_name, data in datasets.items():
                 if dataset_name not in all_datasets: all_datasets[dataset_name] = []
                 all_datasets[dataset_name].append(data)
-            num_events = sum(len(all_datasets[dataset_name][i]) for i in range(len(all_datasets[dataset_name])))
-            if split_file_size > 0 and num_events > 2_000*split_file_size:
+            num_events = np.sum([len(all_datasets[dataset_name][i]) for i in range(len(all_datasets[dataset_name]))])
+            num_bytes_per_event = np.sum([data.itemsize * data.size / data.shape[0] for data in datasets.values()])
+            if split_file_size > 0 and num_events * num_bytes_per_event > split_file_size:
                 print(f'Saving file to {new_outfile_with_idx(out_file, out_file_idx)}')
                 n_saved += save_file(new_outfile_with_idx(out_file, out_file_idx), all_datasets)
                 out_file_idx += 1; all_datasets = {}
