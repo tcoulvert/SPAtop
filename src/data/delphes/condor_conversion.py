@@ -11,9 +11,9 @@ import subprocess
 
 logger = logging.getLogger(__name__)
 
-class LPCVanillaSubmitter:
+class LPCCITVanillaSubmitter:
     """
-    A class for submitting jobs on the FNAL's LPC cluster using HTCondor, one job per file in a list of filepaths.
+    A class for submitting jobs on the FNAL's LPC or Caltech's Tier-2 cluster using HTCondor, one job per file in a list of filepaths.
     All jobs for a given era are submitted to the same cluster.
 
     Parameters:
@@ -30,10 +30,12 @@ class LPCVanillaSubmitter:
     def __init__(
         self,
         dataset_filepaths: list[list[str]], out_file: str, 
-        queue="longlunch", memory="8GB"
+        queue="longlunch", memory="4GB", location="LPC"
     ):
         self.queue = queue
         self.memory = memory
+        self.location = location
+        assert self.location in ["LPC", "CIT"], "Currently only supporting LPC (FNAL Tier-1) and CIT (Caltech Tier-2) clusters"
         
         self.git_repo = (
             subprocess.Popen(["git", "rev-parse", "--show-toplevel"], stdout=subprocess.PIPE)
@@ -130,13 +132,17 @@ class LPCVanillaSubmitter:
                 submit_file.write(f"error = {job_file_err}\n")
                 submit_file.write(f"log = {job_file_log}\n")
                 submit_file.write(f"request_memory = {self.memory}\n")
+                if location == "CIT":
+                    submit_file.write("RequestCpus = 1 \n")
+                    submit_file.write("RequestDisk = 4GB \n")
                 submit_file.write("getenv = True\n")
                 submit_file.write(f'+JobQueue = "{self.queue}"\n')
-                submit_file.write("+InteractiveUser = true \n")
-                submit_file.write("+SingularityImage = \"{}/public/heptools-compiled.simg\" \n".format(os.getenv('HOME')))
-                submit_file.write('+SingularityBindCVMFS = False \n')
-                submit_file.write("+RunAsOwner = True \n")
-                submit_file.write("x509userproxy = {}/x509_proxy \n".format(os.getenv('HOME')))
+                if location == "CIT":
+                    submit_file.write("+InteractiveUser = true \n")
+                    submit_file.write("+SingularityImage = \"{}/public/heptools-compiled.simg\" \n".format(os.getenv('HOME')))
+                    submit_file.write('+SingularityBindCVMFS = False \n')
+                    submit_file.write("+RunAsOwner = True \n")
+                    submit_file.write("x509userproxy = {}/x509_proxy \n".format(os.getenv('HOME')))
                 submit_file.write(f"should_transfer_files = YES\n")
                 submit_file.write(f"Transfer_Input_Files = {proxy}\n")
                 submit_file.write(f"Transfer_Output_Files = \"\"\n")
