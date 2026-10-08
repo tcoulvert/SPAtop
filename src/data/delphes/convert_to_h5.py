@@ -802,6 +802,26 @@ def save_file(filepath: str, dataset: dict):
 @click.option("--plots", is_flag=True, help="Boolean to make plots.")
 @click.option("--condor", is_flag=True, help="Boolean to use condor processing.")
 @click.option(
+    "--condor-queue",
+    default="longlunch",
+    help="Queue for condor jobs",
+)
+@click.option(
+    "--condor-memory",
+    default="4GB",
+    help="RAM per condor jobs",
+)
+@click.option(
+    "--condor-cpus",
+    default=1,
+    help="Number of CPUS per condor job",
+)
+@click.option(
+    "--condor-disk",
+    default="4GB",
+    help="Disk memory per condor job",
+)
+@click.option(
     "--condor-location",
     default="LPC",
     help="Location for condor",
@@ -825,7 +845,7 @@ def save_file(filepath: str, dataset: dict):
     type=click.IntRange(0, 4),
     help="Minimum number of valid targets (hadronic tops) per-event, events with fewer valid targets are excluded from the output dataset",
 )
-def main(in_files, out_file, split_file_size, file_limit, train_frac, n_tops, plots, condor, condor_location, condor_files_per_job, n_targets, min_valid_targets):
+def main(in_files, out_file, split_file_size, file_limit, train_frac, n_tops, plots, condor, condor_queue, condor_memory, condor_cpus, condor_disk, condor_location, condor_files_per_job, n_targets, min_valid_targets):
     if plots:
         global PLOTS
         PLOTS = True
@@ -883,7 +903,7 @@ def main(in_files, out_file, split_file_size, file_limit, train_frac, n_tops, pl
             list(in_files[i*condor_files_per_job:(i+1)*condor_files_per_job]) 
             for i in range(len(in_files)//condor_files_per_job)
         ]
-        submitter = LPCCITVanillaSubmitter(job_filepaths, out_file, location=condor_location)
+        submitter = LPCCITVanillaSubmitter(job_filepaths, out_file, queue=condor_queue, memory=condor_memory, cpus=condor_cpus, disk=condor_disk, location=condor_location)
         submitter.submit()
 
 

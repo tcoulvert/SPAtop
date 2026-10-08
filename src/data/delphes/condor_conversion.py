@@ -1,5 +1,6 @@
 # Stdlib packages
 import logging
+import math
 import os
 import subprocess
 
@@ -30,10 +31,15 @@ class LPCCITVanillaSubmitter:
     def __init__(
         self,
         dataset_filepaths: list[list[str]], out_file: str, 
-        queue="longlunch", memory="4GB", location="LPC"
+        queue="longlunch", memory="4GB", cpus=1, disk="4GB", location="LPC"
     ):
         self.queue = queue
         self.memory = memory
+        if 'GB' in memory: self.cpus = math.ceil(int(memory.replace('GB', '')) / 4)
+        elif memory.isnumeric(): self.cpus = math.ceil(int(memory) / 4096)
+        else: raise Exception(f"Unknwon format of \'memory\' parameter: {memory}. Allowed formats are <numeric> (RAM in MB) or <numeric>GB (RAM in GB).")
+        if cpus > self.cpus: self.cpus = cpus
+        self.disk = disk
         self.location = location
         assert self.location in ["LPC", "CIT"], "Currently only supporting LPC (FNAL Tier-1) and CIT (Caltech Tier-2) clusters"
         
@@ -133,8 +139,8 @@ class LPCCITVanillaSubmitter:
                 submit_file.write(f"log = {job_file_log}\n")
                 submit_file.write(f"request_memory = {self.memory}\n")
                 if self.location == "CIT":
-                    submit_file.write("RequestCpus = 1 \n")
-                    submit_file.write("RequestDisk = 4GB \n")
+                    submit_file.write(f"RequestCpus = {self.cpus} \n")
+                    submit_file.write(f"RequestDisk = {self.disk} \n")
                 submit_file.write("getenv = True\n")
                 submit_file.write(f'+JobQueue = "{self.queue}"\n')
                 if self.location == "CIT":
