@@ -3,9 +3,10 @@ import math
 
 import awkward as ak
 import numba as nb
+import vector
 from numba.typed import List as NumbaList
 from numba import types as nbtypes
-import vector
+
 
 ################################
 
@@ -18,7 +19,7 @@ ak.numba.register_and_check()
 
 JET_DR = 0.5  # https://github.com/delphes/delphes/blob/master/cards/delphes_card_CMS.tcl#L642
 FJET_DR = 0.8  # https://github.com/delphes/delphes/blob/master/cards/delphes_card_CMS.tcl#L658
-DR_FILL_VALUE = 999
+DR_FILL_VALUE = ((2.5 - -2.5)**2 + (math.pi - -math.pi)**2)**0.5  # DeltaR between two objects at (η, ϕ) of (5, π) and (-5, -π), ≈8.03
 NOJET_FILL_VALUE = -1
 NOFJET_DR_FILL_VALUE = math.hypot(10, math.pi)  # largest dR between two objects with |eta| < 5
 TOP_MASS, TOP_MASS_WINDOW = 172.5, 70  # GeV
@@ -60,7 +61,7 @@ def reconstruct_top(
         for topquark, bquark, wboson, wquark1, wquark2 in zip(
             topquarks_event, bquarks_event, wbosons_event, wquarks1_event, wquarks2_event
         ):  # dont need to check b and w mother index b/c constructed to match
-            minDR, minDR_jetfjet_idx = DR_FILL_VALUE, NOJET_FILL_VALUE  # mindeltaR, mindeltaR_jetidx, mindeltaR_fjetidx
+            minDR, minDR_jetfjet_idx = DR_FILL_VALUE, NOJET_FILL_VALUE
             # Find the jet(s) and fatjet(s) with the smallest combined deltaR, depending on the reco type
             for i, jetfjet in enumerate(jetfjets_event):
                 if matched_overlap(i, matched_jetfjet_idxs, jetfjets_event, overlap_check_func): continue
@@ -249,10 +250,9 @@ def match_fjet_to_jet(fjets, jets, builder, deltaR_builder):
             for j, fjet in enumerate(fjets_event):
                 dR = jet.deltaR(fjet)
                 if dR < minDR:
-                    matched_fjet_idx = j if dR < FJET_DR else NOJET_FILL_VALUE
                     minDR = dR
-            if len(fjets_event) == 0:
-                minDR = NOFJET_DR_FILL_VALUE
+                    if dR < FJET_DR:
+                        matched_fjet_idx = j
             builder.append(matched_fjet_idx)
             deltaR_builder.append(minDR)
         builder.end_list()
