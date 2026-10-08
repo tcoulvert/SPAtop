@@ -2,7 +2,7 @@ import copy
 
 import awkward as ak
 import numba as nb
-from numba.typed import Dict as NumbaDict
+from numba.typed import List as NumbaList
 from numba import types as nbtypes
 import vector
 
@@ -52,8 +52,7 @@ def reconstruct_top(
     for topquarks_event, bquarks_event, wbosons_event, wquarks1_event, wquarks2_event, jetfjets_event in zip(
         topquarks, bquarks, wbosons, wquarks1, wquarks2, jetfjets
     ):
-        # typed so numba can compile it; keys are candidate indices already assigned to a top in this event
-        matched_jetfjet_idxs = NumbaDict.empty(key_type=nbtypes.int64, value_type=nbtypes.int64)
+        matched_jetfjet_idxs = NumbaList.empty_list(nbtypes.int64)
         # Loop over every top (+ daughters)
         matched_jetfjets_builder.begin_list()
         for topquark, bquark, wboson, wquark1, wquark2 in zip(
@@ -70,7 +69,7 @@ def reconstruct_top(
             # assignment so later tops in this event cannot reuse its objects
             matched_jetfjets_builder.append(minDR_jetfjet_idx)
             if minDR_jetfjet_idx != NOJET_FILL_VALUE:
-                matched_jetfjet_idxs[minDR_jetfjet_idx] = 1
+                matched_jetfjet_idxs.append(minDR_jetfjet_idx)
 
         matched_jetfjets_builder.end_list()
 
