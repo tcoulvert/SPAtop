@@ -71,21 +71,21 @@ def test_fully_resolved_overlap_catches_every_role_pairing(role_a, role_b):
 
 
 # ------------------------------------------- fix 7: deltaRfj encoding
-def test_deltaRfj_is_cone_radius_outside_every_cone():
+def test_deltaRfj_is_the_real_distance_outside_every_cone():
     jets = momenta([(40.0, 0.0, 0.0, 5.0), (40.0, 0.0, 2.0, 5.0)])
     fjets = momenta([(200.0, 0.0, 0.3, 80.0)])
     idx, dr = M.match_fjet_to_jet(fjets, jets, ak.ArrayBuilder(), ak.ArrayBuilder())
     idx, dr = ak.to_list(idx.snapshot())[0], ak.to_list(dr.snapshot())[0]
     assert idx == [0, M.NOJET_FILL_VALUE]
-    assert dr[0] == pytest.approx(0.3) and dr[1] == pytest.approx(M.FJET_DR)
+    assert dr[0] == pytest.approx(0.3) and dr[1] == pytest.approx(1.7)
 
 
-def test_deltaRfj_without_fat_jets_is_cone_radius_not_sentinel():
+def test_deltaRfj_without_fat_jets_is_the_pad():
     jets = momenta([(40.0, 0.0, 0.0, 5.0)])
     fjets = ak.zip({k: [np.array([], dtype=float)] for k in ("pt", "eta", "phi", "mass")}, with_name="Momentum4D")
     idx, dr = M.match_fjet_to_jet(fjets, jets, ak.ArrayBuilder(), ak.ArrayBuilder())
     assert ak.to_list(idx.snapshot())[0] == [M.NOJET_FILL_VALUE]
-    assert ak.to_list(dr.snapshot())[0] == [pytest.approx(M.FJET_DR)]
+    assert ak.to_list(dr.snapshot())[0] == [pytest.approx(M.NOFJET_DR_FILL_VALUE)]
 
 
 # ------------------------------------------ fix 2: overlap exclusion works
