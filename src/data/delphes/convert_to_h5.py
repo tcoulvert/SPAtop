@@ -802,6 +802,11 @@ def save_file(filepath: str, dataset: dict):
 @click.option("--plots", is_flag=True, help="Boolean to make plots.")
 @click.option("--condor", is_flag=True, help="Boolean to use condor processing.")
 @click.option(
+    "--condor-location",
+    default="LPC",
+    help="Location for condor",
+)
+@click.option(
     "--condor-files-per-job",
     default=20,
     help="Number of input files per condor job",
@@ -820,7 +825,7 @@ def save_file(filepath: str, dataset: dict):
     type=click.IntRange(0, 4),
     help="Minimum number of valid targets (hadronic tops) per-event, events with fewer valid targets are excluded from the output dataset",
 )
-def main(in_files, out_file, split_file_size, file_limit, train_frac, n_tops, plots, condor, condor_files_per_job, n_targets, min_valid_targets):
+def main(in_files, out_file, split_file_size, file_limit, train_frac, n_tops, plots, condor, condor_location, condor_files_per_job, n_targets, min_valid_targets):
     if plots:
         global PLOTS
         PLOTS = True
@@ -877,7 +882,7 @@ def main(in_files, out_file, split_file_size, file_limit, train_frac, n_tops, pl
             list(in_files[i*condor_files_per_job:(i+1)*condor_files_per_job]) 
             for i in range(len(in_files)//condor_files_per_job)
         ]
-        submitter = LPCCITVanillaSubmitter(job_filepaths, out_file)
+        submitter = LPCCITVanillaSubmitter(job_filepaths, out_file, condor_location)
         submitter.submit()
 
 
