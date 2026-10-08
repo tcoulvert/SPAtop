@@ -1,8 +1,9 @@
 import copy
+import math
 
 import awkward as ak
 import numba as nb
-from numba.typed import Dict as NumbaDict
+from numba.typed import List as NumbaList
 from numba import types as nbtypes
 import vector
 
@@ -19,6 +20,7 @@ JET_DR = 0.5  # https://github.com/delphes/delphes/blob/master/cards/delphes_car
 FJET_DR = 0.8  # https://github.com/delphes/delphes/blob/master/cards/delphes_card_CMS.tcl#L658
 DR_FILL_VALUE = 999
 NOJET_FILL_VALUE = -1
+NOFJET_DR_FILL_VALUE = math.hypot(10, math.pi)  # largest dR between two objects with |eta| < 5
 TOP_MASS, TOP_MASS_WINDOW = 172.5, 70  # GeV
 W_MASS, W_MASS_WINDOW = 80, 30  # GeV
 FR_PTCUT, SRQQ_PTCUT, SRBQ_PTCUT, FB_PTCUT = 0., 0., 0., 350.  # GeV
@@ -52,8 +54,7 @@ def reconstruct_top(
     for topquarks_event, bquarks_event, wbosons_event, wquarks1_event, wquarks2_event, jetfjets_event in zip(
         topquarks, bquarks, wbosons, wquarks1, wquarks2, jetfjets
     ):
-        # typed so numba can compile it; keys are candidate indices already assigned to a top in this event
-        matched_jetfjet_idxs = NumbaDict.empty(key_type=nbtypes.int64, value_type=nbtypes.int64)
+        matched_jetfjet_idxs = NumbaList.empty_list(nbtypes.int64)
         # Loop over every top (+ daughters)
         matched_jetfjets_builder.begin_list()
         for topquark, bquark, wboson, wquark1, wquark2 in zip(
@@ -70,7 +71,7 @@ def reconstruct_top(
             # assignment so later tops in this event cannot reuse its objects
             matched_jetfjets_builder.append(minDR_jetfjet_idx)
             if minDR_jetfjet_idx != NOJET_FILL_VALUE:
-                matched_jetfjet_idxs[minDR_jetfjet_idx] = 1
+                matched_jetfjet_idxs.append(minDR_jetfjet_idx)
 
         matched_jetfjets_builder.end_list()
 
@@ -247,15 +248,11 @@ def match_fjet_to_jet(fjets, jets, builder, deltaR_builder):
             minDR, matched_fjet_idx = DR_FILL_VALUE, NOJET_FILL_VALUE
             for j, fjet in enumerate(fjets_event):
                 dR = jet.deltaR(fjet)
-                if dR < FJET_DR and dR < minDR:
-                    matched_fjet_idx = j
+                if dR < minDR:
+                    matched_fjet_idx = j if dR < FJET_DR else NOJET_FILL_VALUE
                     minDR = dR
-            # jets outside every fat-jet cone (or in events without fat jets)
-            # get the cone radius itself, so the feature is continuous at the
-            # boundary and survives z-score normalisation; a 999 sentinel would
-            # dominate the mean and variance and flatten the in-cone values
-            if matched_fjet_idx == NOJET_FILL_VALUE:
-                minDR = FJET_DR
+            if len(fjets_event) == 0:
+                minDR = NOFJET_DR_FILL_VALUE
             builder.append(matched_fjet_idx)
             deltaR_builder.append(minDR)
         builder.end_list()

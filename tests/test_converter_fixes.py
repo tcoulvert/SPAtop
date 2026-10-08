@@ -71,21 +71,21 @@ def test_fully_resolved_overlap_catches_every_role_pairing(role_a, role_b):
 
 
 # ------------------------------------------- fix 7: deltaRfj encoding
-def test_deltaRfj_is_cone_radius_outside_every_cone():
+def test_deltaRfj_is_the_real_distance_outside_every_cone():
     jets = momenta([(40.0, 0.0, 0.0, 5.0), (40.0, 0.0, 2.0, 5.0)])
     fjets = momenta([(200.0, 0.0, 0.3, 80.0)])
     idx, dr = M.match_fjet_to_jet(fjets, jets, ak.ArrayBuilder(), ak.ArrayBuilder())
     idx, dr = ak.to_list(idx.snapshot())[0], ak.to_list(dr.snapshot())[0]
     assert idx == [0, M.NOJET_FILL_VALUE]
-    assert dr[0] == pytest.approx(0.3) and dr[1] == pytest.approx(M.FJET_DR)
+    assert dr[0] == pytest.approx(0.3) and dr[1] == pytest.approx(1.7)
 
 
-def test_deltaRfj_without_fat_jets_is_cone_radius_not_sentinel():
+def test_deltaRfj_without_fat_jets_is_the_pad():
     jets = momenta([(40.0, 0.0, 0.0, 5.0)])
     fjets = ak.zip({k: [np.array([], dtype=float)] for k in ("pt", "eta", "phi", "mass")}, with_name="Momentum4D")
     idx, dr = M.match_fjet_to_jet(fjets, jets, ak.ArrayBuilder(), ak.ArrayBuilder())
     assert ak.to_list(idx.snapshot())[0] == [M.NOJET_FILL_VALUE]
-    assert ak.to_list(dr.snapshot())[0] == [pytest.approx(M.FJET_DR)]
+    assert ak.to_list(dr.snapshot())[0] == [pytest.approx(M.NOFJET_DR_FILL_VALUE)]
 
 
 # ------------------------------------------ fix 2: overlap exclusion works
@@ -122,15 +122,14 @@ def test_second_top_cannot_reuse_first_tops_jets():
 
 
 def test_matched_overlap_sees_recorded_assignments():
-    # the dict must be typed and populated for numba; a never-filled dict was the main-branch bug
     far = lambda i: (50.0, 0.0, 0.6 * i, 5.0)
     cands = ak.zip({"bjet": momenta([far(1), far(4)]), "q1jet": momenta([far(2), far(5)]), "q2jet": momenta([far(3), far(1)])})[0]
-    from numba.typed import Dict
+    from numba.typed import List
     from numba import types
-    matched = Dict.empty(key_type=types.int64, value_type=types.int64); matched[0] = 1
+    matched = List.empty_list(types.int64); matched.append(0)
     assert bool(M.matched_overlap(0, matched, cands, M.FullyResolved_overlap))      # already assigned
     assert bool(M.matched_overlap(1, matched, cands, M.FullyResolved_overlap))      # shares jet far(1) with candidate 0
-    empty = Dict.empty(key_type=types.int64, value_type=types.int64)
+    empty = List.empty_list(types.int64)
     assert not bool(M.matched_overlap(1, empty, cands, M.FullyResolved_overlap))
 
 
