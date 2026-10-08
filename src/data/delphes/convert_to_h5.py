@@ -882,7 +882,7 @@ def main(in_files, out_file, split_file_size, file_limit, train_frac, n_tops, pl
             list(in_files[i*condor_files_per_job:(i+1)*condor_files_per_job]) 
             for i in range(len(in_files)//condor_files_per_job)
         ]
-        submitter = LPCCITVanillaSubmitter(job_filepaths, out_file, condor_location)
+        submitter = LPCCITVanillaSubmitter(job_filepaths, out_file, location=condor_location)
         submitter.submit()
 
 

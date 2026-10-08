@@ -132,12 +132,12 @@ class LPCCITVanillaSubmitter:
                 submit_file.write(f"error = {job_file_err}\n")
                 submit_file.write(f"log = {job_file_log}\n")
                 submit_file.write(f"request_memory = {self.memory}\n")
-                if location == "CIT":
+                if self.location == "CIT":
                     submit_file.write("RequestCpus = 1 \n")
                     submit_file.write("RequestDisk = 4GB \n")
                 submit_file.write("getenv = True\n")
                 submit_file.write(f'+JobQueue = "{self.queue}"\n')
-                if location == "CIT":
+                if self.location == "CIT":
                     submit_file.write("+InteractiveUser = true \n")
                     submit_file.write("+SingularityImage = \"{}/public/heptools-compiled.simg\" \n".format(os.getenv('HOME')))
                     submit_file.write('+SingularityBindCVMFS = False \n')
@@ -152,6 +152,7 @@ class LPCCITVanillaSubmitter:
                 submit_file.write('max_retries = 0\n')
                 submit_file.write(f"queue {n_jobs}\n")
             self.job_files.append(job_file_submit)
+            
 
     def update_git(self):
         def run_git_cmd(cmd):
