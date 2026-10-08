@@ -87,10 +87,9 @@ def test_matchedfj_and_deltaRfj_follow_their_definitions(converted):
     dr = np.where(fm[:, None, :], np.sqrt((je[:, :, None] - fe[:, None, :]) ** 2 + dphi ** 2), np.inf)
     inside = dr < M.FJET_DR
     closest = np.where(inside.any(2), np.argmin(np.where(inside, dr, np.inf), 2), M.NOJET_FILL_VALUE)
-    expected_dr = np.where(inside.any(2), np.min(np.where(inside, dr, np.inf), 2), M.FJET_DR)
+    expected_dr = np.where(fm.any(1)[:, None], dr.min(2), M.NOFJET_DR_FILL_VALUE)
     assert np.array_equal(converted["INPUTS/Jets/matchedfj"][jm], closest[jm])
     assert np.allclose(converted["INPUTS/Jets/deltaRfj"][jm], expected_dr[jm], atol=1e-5)
-    assert (converted["INPUTS/Jets/deltaRfj"][jm] <= M.FJET_DR).all()
 
 
 def test_tagger_emulation_only_on_valid_fat_jets_and_not_degenerate(converted):
