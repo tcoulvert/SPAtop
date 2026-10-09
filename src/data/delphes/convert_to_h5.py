@@ -780,6 +780,29 @@ def save_file(filepath: str, dataset: dict):
     default=f"{PROJECT_DIR}/data/delphes/tt_training.h5",
     help="Output file.",
 )
+@click.option("--train-frac", default=0.80, help="Fraction for training.")
+@click.option(
+    "--n-tops",
+    "n_tops",
+    default=2,
+    type=click.IntRange(1, 4),
+    help="Number of top quark targets to include per event",
+)
+@click.option(
+    "--n-targets",
+    "n_targets",
+    default=None,
+    type=click.IntRange(0, 4),
+    help="Number of true hadronic top quarks required per event (default: same as \'n-tops\'; must not exceed it)",
+)
+@click.option(
+    "--min-valid-targets",
+    "min_valid_targets",
+    default=0,
+    type=click.IntRange(0, 4),
+    help="Minimum number of valid targets (hadronic tops) per-event, events with fewer valid targets are excluded from the output dataset",
+)
+@click.option("--plots", is_flag=True, help="Boolean to make plots.")
 @click.option(
     "--split-file-size",
     "split_file_size",
@@ -792,15 +815,6 @@ def save_file(filepath: str, dataset: dict):
     default=-1,
     help="Number of output files to make, default is \'-1\' which creates all output files",
 )
-@click.option("--train-frac", default=0.80, help="Fraction for training.")
-@click.option(
-    "--n-tops",
-    "n_tops",
-    default=2,
-    type=click.IntRange(1, 4),
-    help="Number of top quark targets to include per event",
-)
-@click.option("--plots", is_flag=True, help="Boolean to make plots.")
 @click.option("--condor", is_flag=True, help="Boolean to use condor processing.")
 @click.option(
     "--condor-queue",
@@ -832,21 +846,7 @@ def save_file(filepath: str, dataset: dict):
     default=20,
     help="Number of input files per condor job",
 )
-@click.option(
-    "--n-targets",
-    "n_targets",
-    default=None,
-    type=click.IntRange(0, 4),
-    help="Number of true hadronic top quarks required per event (default: same as \'n-tops\'; must not exceed it)",
-)
-@click.option(
-    "--min-valid-targets",
-    "min_valid_targets",
-    default=0,
-    type=click.IntRange(0, 4),
-    help="Minimum number of valid targets (hadronic tops) per-event, events with fewer valid targets are excluded from the output dataset",
-)
-def main(in_files, out_file, split_file_size, file_limit, train_frac, n_tops, plots, condor, condor_queue, condor_memory, condor_cpus, condor_disk, condor_location, condor_files_per_job, n_targets, min_valid_targets):
+def main(in_files, out_file, train_frac, n_tops, n_targets, min_valid_targets, plots, split_file_size, file_limit, condor, condor_queue, condor_memory, condor_cpus, condor_disk, condor_location, condor_files_per_job):
     if plots:
         global PLOTS
         PLOTS = True
@@ -904,7 +904,7 @@ def main(in_files, out_file, split_file_size, file_limit, train_frac, n_tops, pl
             list(in_files[i*condor_files_per_job:(i+1)*condor_files_per_job]) 
             for i in range(math.ceil(len(in_files) / condor_files_per_job))
         ]
-        submitter = LPCCITVanillaSubmitter(job_filepaths, out_file, queue=condor_queue, memory=condor_memory, cpus=condor_cpus, disk=condor_disk, location=condor_location)
+        submitter = LPCCITVanillaSubmitter(job_filepaths, out_file, train_frac, n_tops, n_targets, min_valid_targets, queue=condor_queue, memory=condor_memory, cpus=condor_cpus, disk=condor_disk, location=condor_location)
         submitter.submit()
 
 

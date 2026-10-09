@@ -31,6 +31,7 @@ class LPCCITVanillaSubmitter:
     def __init__(
         self,
         dataset_filepaths: list[list[str]], out_file: str, 
+        train_frac: float, n_tops: int, n_targets: int, min_valid_targets: int,
         queue="longlunch", memory="4GB", cpus=1, disk="4GB", location="LPC"
     ):
         self.queue = queue
@@ -126,7 +127,7 @@ class LPCCITVanillaSubmitter:
             
             for i, filepaths in enumerate(dataset_filepaths):
                 executable_file.write(f"if [ $1 -eq {i} ]; then\n")
-                executable_file.write(f"    python3.12 /srv/SPAtop/src/data/delphes/convert_to_h5.py {' '.join(filepaths)} --out-file {srv_out_file}\n")
+                executable_file.write(f"    python3.12 /srv/SPAtop/src/data/delphes/convert_to_h5.py {' '.join(filepaths)} --out-file {srv_out_file} --train-frac {train_frac} --n-tops {n_tops} --n-targets {n_targets} --min-valid-targets {min_valid_targets}\n")
                 executable_file.write(f"    xrdcp -f {srv_out_file} {job_out_file}\n")
                 executable_file.write("fi\n")
             os.system(f"chmod 775 {job_file_executable}")
