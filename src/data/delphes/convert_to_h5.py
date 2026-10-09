@@ -1,6 +1,7 @@
 import copy
 import glob
 import logging
+import math
 import os
 import re
 import subprocess
@@ -901,7 +902,7 @@ def main(in_files, out_file, split_file_size, file_limit, train_frac, n_tops, pl
     elif condor:
         job_filepaths = [
             list(in_files[i*condor_files_per_job:(i+1)*condor_files_per_job]) 
-            for i in range(len(in_files)//condor_files_per_job)
+            for i in range(math.ceil(len(in_files) / condor_files_per_job))
         ]
         submitter = LPCCITVanillaSubmitter(job_filepaths, out_file, queue=condor_queue, memory=condor_memory, cpus=condor_cpus, disk=condor_disk, location=condor_location)
         submitter.submit()
