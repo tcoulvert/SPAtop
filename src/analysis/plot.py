@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from src.analysis.merged import parse_merged_w_target
-from src.analysis.utils import calc_pureff
+from src.analysis.utils import calc_pur, calc_eff
 
 
 def calc_pur_eff(target_path, pred_path, bins_dict, mode: str='pur_eff', chi2: bool=False):
@@ -20,35 +20,35 @@ def calc_pur_eff(target_path, pred_path, bins_dict, mode: str='pur_eff', chi2: b
 
     ## generate look up tables ##
     # boosted
-    LUT_boosted_pred, LUT_boosted_target = parse_merged_w_target(target_h5, pred_h5, reco_regex='FB', chi2=chi2)
+    LUT_boosted = parse_merged_w_target(target_h5, pred_h5, reco_regex='FB', chi2=chi2)
 
     # semi-resolved
     # qq
-    LUT_semiresolved_qq_pred, LUT_semiresolved_qq_target = parse_merged_w_target(target_h5, pred_h5, reco_regex='SRqq', chi2=chi2)
+    LUT_semiresolved_qq = parse_merged_w_target(target_h5, pred_h5, reco_regex='SRqq', chi2=chi2)
     # bq
-    LUT_semiresolved_bq_pred, LUT_semiresolved_bq_target = parse_merged_w_target(target_h5, pred_h5, reco_regex='SRbq', chi2=chi2)
+    LUT_semiresolved_bq = parse_merged_w_target(target_h5, pred_h5, reco_regex='SRbq', chi2=chi2)
 
     # resolved
-    LUT_resolved_pred, LUT_resolved_target = parse_merged_w_target(target_h5, pred_h5, reco_regex='FR', chi2=chi2)
+    LUT_resolved = parse_merged_w_target(target_h5, pred_h5, reco_regex='FR', chi2=chi2)
 
     # merged
-    LUT_merged_pred, LUT_merged_target = parse_merged_w_target(target_h5, pred_h5, chi2=chi2)
+    LUT_merged = parse_merged_w_target(target_h5, pred_h5, chi2=chi2)
 
 
     ## calculate efficiencies and purities for b+r, b, and r (and srqq, srbq if available) ##
     results = {}
     if 'pur' in mode.lower():
-        results["pur_m"], results["purerr_m"] = calc_pureff(LUT_merged_pred, bins_dict['all'])
-        results["pur_b"], results["purerr_b"] = calc_pureff(LUT_boosted_pred, bins_dict['FB'])
-        results["pur_r"], results["purerr_r"] = calc_pureff(LUT_resolved_pred, bins_dict['FR'])
-        results["pur_srqq"], results["purerr_srqq"] = calc_pureff(LUT_semiresolved_qq_pred, bins_dict['SRqq'])
-        results["pur_srbq"], results["purerr_srbq"] = calc_pureff(LUT_semiresolved_bq_pred, bins_dict['SRbq'])
+        results["pur_m"], results["purerr_m"] = calc_pur(LUT_merged, bins_dict['all'])
+        results["pur_b"], results["purerr_b"] = calc_pur(LUT_boosted, bins_dict['FB'])
+        results["pur_r"], results["purerr_r"] = calc_pur(LUT_resolved, bins_dict['FR'])
+        results["pur_srqq"], results["purerr_srqq"] = calc_pur(LUT_semiresolved_qq, bins_dict['SRqq'])
+        results["pur_srbq"], results["purerr_srbq"] = calc_pur(LUT_semiresolved_bq, bins_dict['SRbq'])
     if 'eff' in mode.lower():
-        results["eff_m"], results["efferr_m"] = calc_pureff(LUT_merged_target, bins_dict['all'])
-        results["eff_b"], results["efferr_b"] = calc_pureff(LUT_boosted_target, bins_dict['FB'])
-        results["eff_r"], results["efferr_r"] = calc_pureff(LUT_resolved_target, bins_dict['FR'])
-        results["eff_srqq"], results["efferr_srqq"] = calc_pureff(LUT_semiresolved_qq_target, bins_dict['SRqq'])
-        results["eff_srbq"], results["efferr_srbq"] = calc_pureff(LUT_semiresolved_bq_target, bins_dict['SRbq'])
+        results["eff_m"], results["efferr_m"] = calc_eff(LUT_merged, bins_dict['all'])
+        results["eff_b"], results["efferr_b"] = calc_eff(LUT_boosted, bins_dict['FB'])
+        results["eff_r"], results["efferr_r"] = calc_eff(LUT_resolved, bins_dict['FR'])
+        results["eff_srqq"], results["efferr_srqq"] = calc_eff(LUT_semiresolved_qq, bins_dict['SRqq'])
+        results["eff_srbq"], results["efferr_srbq"] = calc_eff(LUT_semiresolved_bq, bins_dict['SRbq'])
 
     pred_h5.close(); target_h5.close()
 
