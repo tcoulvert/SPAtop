@@ -132,8 +132,6 @@ def overlap(jets, idxs, nrecos, ntops, deltaRs, builder):
 def reco_reorder(predicted_jets, dps, aps, n_recos, n_tops, deltaRs):
     ps = dps * aps
     idx_sort = np.flip(np.argsort(ps, axis=-1), axis=-1)
-    print(idx_sort)
-    print(ak.type(idx_sort))
     idx_sel = overlap(predicted_jets, idx_sort, n_recos, n_tops, ak.Array(deltaRs), ak.ArrayBuilder()).snapshot()
 
     return idx_sel

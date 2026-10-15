@@ -13,6 +13,7 @@ N_AK8_JETS = 3
 N_TOPS = 2
 DELTARS = None
 SYMMETRIES = None
+LUT_FILL_VALUE = -999.0
 
 def sel_target_t_by_mask(target_jets, target_pts, target_masks):
     filter = target_masks
@@ -40,115 +41,135 @@ def sel_pred_t_by_prob(predicted_jets, predicted_pts, dps, aps):
 # A look up table is in shape
 # [event x valid_predjets,
 #        [retrieved, pt]]
-def generate_pred_LUT(predicted_jets, target_jets, predicted_toppt, selected_order):
+def generate_LUT(predicted_jets, target_jets, predicted_toppt, target_toppt, predicted_dp, predicted_ap, selected_order):
     return generate_one_pred_LUT(
-        predicted_jets, target_jets, predicted_toppt,
+        predicted_jets, target_jets, predicted_toppt, target_toppt, predicted_dp, predicted_ap,
         selected_order, SYMMETRIES,
         ak.ArrayBuilder()
     ).snapshot()
 
 @nb.njit
-def generate_one_pred_LUT(
-    predicted_jets, target_jets, predicted_toppt,
+def generate_one_LUT(
+    predicted_jets, target_jets, predicted_toppt, target_toppt, predicted_dp, predicted_ap,
     selected_order, symmetries,
     builder
 ):
     # for each event
-    for pjets_event, tjets_event, toppt_event, order_event in zip(
+    for pjets_event, tjets_event, predpt_event, targpt_event, preddp_event, predap_event, order_event in zip(
         predicted_jets, target_jets,
-        predicted_toppt,
+        predicted_toppt, target_toppt,
+        predicted_dp, predicted_ap,
         selected_order
     ):
-        builder.begin_list()
-        # for each prediction per event, in order of best probs
-        matched_targ_idxs = {}
-        for pred_idx in order_event:
-            pjets, toppt = pjets_event[pred_idx], toppt_event[pred_idx]
-            if pjets is None: continue
-
-            retrieved, exists = 0, 0
-            # check all targets of matching reco (i.e. account for symmetry of top label exchange)
-            target_idxs = [pred_idx - i for i in range(1, (pred_idx % N_TOPS)+1)][::-1]+[pred_idx]+[pred_idx + i for i in range(1, N_TOPS-(pred_idx % N_TOPS))]
-            for targ_idx in target_idxs:
-                if targ_idx in matched_targ_idxs: continue
-                tjets = tjets_event[targ_idx]
+        # For each target top build separate valid and invalid maps [top index -> top pt (-999.0 when no valid top)]
+        valid_tops = nb.typed.Dict.empty(key_type=nb.types.int64, value_type=nb.types.float64)
+        invalid_tops = nb.typed.Dict.empty(key_type=nb.types.int64, value_type=nb.types.float64)
+        for top_idx in range(N_TOPS):
+            # Check for any valid targets
+            for tjets, tpt in zip(tjets_event[top_idx::N_TOPS], targpt_event[top_idx::N_TOPS]):
                 if tjets is None: continue
-                exists = 1
+                valid_tops[top_idx] = tpt; break
+            if top_idx not in valid_tops: 
+                invalid_tops[top_idx] = LUT_FILL_VALUE
 
-                # check all valid labels (i.e. account for symmetry of jet labels)
+        # For each valid top attempt to match to the predicted tops, prioritizing exact matches, followed by class matches, followed by any valid top
+        exact_matched_tops = nb.typed.Dict.empty(key_type=nb.types.int64, value_type=nb.types.int64)
+        for valid_top_idx in valid_tops.keys():
+            # Exact matches
+            for pred_idx, pjets in zip(order_event, pjets_event[order_event]):
+                target_idx = ([pred_idx - i for i in range(1, (pred_idx % N_TOPS)+1)][::-1]+[pred_idx]+[pred_idx + i for i in range(1, N_TOPS-(pred_idx % N_TOPS))])[valid_top_idx]
+                tjets = tjets_event[target_idx]
+                if pjets is None or tjets is None: continue
                 for symand in symmetries[pred_idx]:
-                    n_matched = 0
+                    n_matched_jets = 0
                     for labels in symand:
-                        if match_jet(pjets[labels[0]], tjets[labels[1]]): n_matched += 1
-                    if n_matched == len(symand): retrieved = 1; break
+                        if match_jet(pjets[labels[0]], _tjets_[labels[1]]): n_matched_jets += 1
+                    if n_matched_jets == len(symand):
+                        exact_matched_tops[valid_top_idx] = pred_idx
 
-                if retrieved: break
+        class_matched_tops = nb.typed.Dict.empty(key_type=nb.types.int64, value_type=nb.types.int64)
+        for valid_top_idx in valid_tops.keys():
+            if valid_top_idx in exact_matched_tops.keys(): continue
+            # Class matches
+            for pred_idx, pjets in zip(order_event, pjets_event[order_event]):
+                if pred_idx in exact_matched_tops.values(): continue
+                target_idx = ([pred_idx - i for i in range(1, (pred_idx % N_TOPS)+1)][::-1]+[pred_idx]+[pred_idx + i for i in range(1, N_TOPS-(pred_idx % N_TOPS))])[valid_top_idx]
+                tjets = tjets_event[target_idx]
+                if pjets is None or tjets is None: continue
+                class_matched_tops[valid_top_idx] = pred_idx
 
+        valid_matched_tops = nb.typed.Dict.empty(key_type=nb.types.int64, value_type=nb.types.int64)
+        for valid_top_idx in valid_tops.keys():
+            if valid_top_idx in exact_matched_tops.keys() or valid_top_idx in class_matched_tops.keys(): continue
+            # Valid matches
+            for pred_idx, pjets in zip(order_event, pjets_event[order_event]):
+                if pred_idx in exact_matched_tops.values() or pred_idx in class_matched_tops.values(): continue
+                if pjets is None: continue
+                valid_matched_tops[valid_top_idx] = pred_idx
+
+        # For each invalid top match any remaining predicted tops
+        invalid_matched_tops = nb.typed.Dict.empty(key_type=nb.types.int64, value_type=nb.types.int64)
+        for invalid_top_idx in invalid_tops.keys():
+            for pred_idx, pjets in zip(order_event, pjets_event[order_event]):
+                if pred_idx in exact_matched_tops.values() or pred_idx in class_matched_tops.values() or pred_idx in valid_matched_tops.values(): continue
+                if pjets is None: continue
+                invalid_matched_tops[invalid_top_idx] = pred_idx
+
+        builder.begin_list()
+        for top_idx in range(N_TOPS):
             builder.begin_list()
-            builder.append(retrieved)
-            builder.append(toppt)
+            if top_idx in exact_matched_tops:
+                builder.append(1)                                          # Valid top is true
+                builder.append(1)                                          # Valid top was matched to prediction
+                builder.append(1)                                          # Valid top was matched to prediction's reco class
+                builder.append(valid_tops[top_idx])                        # Gen pt
+                builder.append(predpt_event[exact_matched_tops[top_idx]])  # Reco pt
+                builder.append(preddp_event[exact_matched_tops[top_idx]])  # Reco detection probability
+                builder.append(predap_event[exact_matched_tops[top_idx]])  # Reco assignment probability
+            elif top_idx in class_matched_tops:
+                builder.append(1)                                          # Valid top is true
+                builder.append(0)                                          # Valid top was NOT matched to prediction
+                builder.append(1)                                          # Valid top was matched to prediction's reco class
+                builder.append(valid_tops[top_idx])                        # Gen pt
+                builder.append(predpt_event[class_matched_tops[top_idx]])  # Reco pt
+                builder.append(preddp_event[class_matched_tops[top_idx]])  # Reco detection probability
+                builder.append(predap_event[class_matched_tops[top_idx]])  # Reco assignment probability
+            elif top_idx in valid_matched_tops:
+                builder.append(1)                                          # Valid top is true
+                builder.append(0)                                          # Valid top was NOT matched to prediction
+                builder.append(0)                                          # Valid top was NOT matched to prediction's reco class
+                builder.append(valid_tops[top_idx])                        # Gen pt
+                builder.append(predpt_event[valid_matched_tops[top_idx]])  # Reco pt
+                builder.append(preddp_event[valid_matched_tops[top_idx]])  # Reco detection probability
+                builder.append(predap_event[valid_matched_tops[top_idx]])  # Reco assignment probability
+            elif top_idx in invalid_matched_tops:
+                builder.append(0)                                          # Valid top is NOT true
+                builder.append(0)                                          # Valid top was NOT matched to prediction
+                builder.append(0)                                          # Valid top was NOT matched to prediction's reco class
+                builder.append(valid_tops[top_idx])                        # Gen pt
+                builder.append(predpt_event[invalid_matched_tops[top_idx]])  # Reco pt
+                builder.append(preddp_event[invalid_matched_tops[top_idx]])  # Reco detection probability
+                builder.append(predap_event[invalid_matched_tops[top_idx]])  # Reco assignment probability
+            elif top_idx in valid_tops:
+                builder.append(1)                                          # Valid top is true
+                builder.append(0)                                          # Valid top was NOT matched to prediction
+                builder.append(0)                                          # Valid top was NOT matched to prediction's reco class
+                builder.append(valid_tops[top_idx])                        # Gen pt
+                builder.append(LUT_FILL_VALUE)                             # Reco pt
+                builder.append(LUT_FILL_VALUE)                             # Reco detection probability
+                builder.append(LUT_FILL_VALUE)                             # Reco assignment probability
+            elif top_idx in invalid_tops:
+                builder.append(0)                                          # Valid top is NOT true
+                builder.append(0)                                          # Valid top was NOT matched to prediction
+                builder.append(0)                                          # Valid top was NOT matched to prediction's reco class
+                builder.append(invalid_tops[top_idx])                      # Gen pt
+                builder.append(LUT_FILL_VALUE)                             # Reco pt
+                builder.append(LUT_FILL_VALUE)                             # Reco detection probability
+                builder.append(LUT_FILL_VALUE)                             # Reco assignment probability
+            else:
+                raise Exception(f"Unknown category of gen-reco matching")
             builder.end_list()
         builder.end_list()
-
-    return builder
-
-
-# A look up table is in shape
-# [event x valid_targjets,
-#        [retrieved, pt]]
-def generate_target_LUT(
-    target_jets, predicted_jets, target_toppt, selected_order
-):
-    return ak.concatenate([
-        generate_one_target_LUT(
-            target_jets[:, i::N_TOPS], predicted_jets, target_toppt[:, i::N_TOPS], selected_order, SYMMETRIES, ak.ArrayBuilder()
-        ).snapshot() for i in range(N_TOPS)
-    ], axis=0)
-
-@nb.njit
-def generate_one_target_LUT(
-    target_jets, predicted_jets, target_toppt,
-    selected_order, symmetries,
-    builder
-):
-    # for each event
-    for tjets_event, pjets_event, toppt_event, order_event in zip(
-        target_jets, predicted_jets,
-        target_toppt,
-        selected_order
-    ):
-        # Check for any valid targets
-        toppt = -999.0
-        for tjets, toppt_ in zip(tjets_event, toppt_event):
-            if tjets is None: continue
-            toppt = toppt_; break
-        if toppt < 0: continue
-        retrieved = 0
-
-        # Try all preds to find 1 match
-        for pred_idx in order_event:
-            pjets = pjets_event[pred_idx]
-            if pjets is None: continue
-
-            targ_idx = pred_idx // N_TOPS
-            tjets = tjets_event[targ_idx]
-            if tjets is None: continue
-
-            # check all valid labels (i.e. account for symmetry of jet labels)
-            for symand in symmetries[pred_idx]:
-                n_matched = 0
-                for labels in symand:
-                    if match_jet(pjets[labels[0]], tjets[labels[1]]): n_matched += 1
-                if n_matched == len(symand): retrieved = 1; break
-
-            if retrieved: break
-
-        builder.begin_list()
-        builder.append(retrieved)
-        builder.append(toppt)
-        builder.end_list()
-
-    return builder
 
 
 def parse_merged_w_target(
