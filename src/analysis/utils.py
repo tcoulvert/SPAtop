@@ -9,19 +9,6 @@ from hist.intervals import clopper_pearson_interval
 def n_alpha(string: str):
     return len([c for c in string if c.isalpha()])
 
-# def add_merged_selections(predfile, testfile, reconstructions: list[str], n_tops: int, selected_order: ak.Array, LUT_pred: ak.Array):
-#     valids = get_numerical(testfile, "MASK", reconstructions)
-#     for i, reco_class in enumerate(reconstructions):
-#         # print(ak.local_index(selected_order, axis=1))
-#         # print(ak.local_index(selected_order, axis=1)[selected_order == i])
-#         # print(ak.firsts(ak.local_index(selected_order, axis=1)[selected_order == i], axis=1))
-#         # print(ak.fill_none(ak.firsts(ak.local_index(selected_order, axis=1)[selected_order == i], axis=1), -1))
-#         predfile["TARGETS"][reco_class]["merged_order"] = ak.fill_none(ak.firsts(ak.local_index(selected_order, axis=1)[selected_order == i], axis=1), -1)
-#         predfile["TARGETS"][reco_class]["merged_correct"] = ak.fill_none(ak.firsts(LUT_pred[..., 0][selected_order == i], axis=1), -1)
-#         # merged_correct = ak.fill_none(ak.firsts(selected_order[selected_order == i], axis=1), -1)
-#         # predfile["TARGETS"][reco_class]["merged_correct"] = ak.where(merged_correct != -1, LUT_pred[:, 0], )
-#         predfile["TARGETS"][reco_class]["merged_valid"] = ak.any(valids[:, [j for j in range(len(reconstructions)) if j // n_tops == i // n_tops]], axis=1)
-
 def reset_collision_dp(dps, aps):
     ap_filter = aps < 1 / (13 * 13)
     return ak.where(ap_filter, 0, dps)
@@ -132,8 +119,6 @@ def overlap(jets, idxs, nrecos, ntops, deltaRs, builder):
 def reco_reorder(predicted_jets, dps, aps, n_recos, n_tops, deltaRs):
     ps = dps * aps
     idx_sort = np.flip(np.argsort(ps, axis=-1), axis=-1)
-    print(idx_sort)
-    print(ak.type(idx_sort))
     idx_sel = overlap(predicted_jets, idx_sort, n_recos, n_tops, ak.Array(deltaRs), ak.ArrayBuilder()).snapshot()
 
     return idx_sel
@@ -182,28 +167,56 @@ def dp_to_TopNumProb(dps):
 
     return probs_arr
 
+def digiflow(arr: np.ndarray, bins: np.ndarray, allow_underflow: bool=False, allow_overflow: bool=False):
+    digi = np.digitize(arr, bins)
+    if not allow_underflow: digi = np.where(arr < np.min(bins), -1, digi)
+    if not allow_overflow: digi = np.where(arr > np.max(bins), len(bins), digi)
+    return digi
 
-# calculate purity/efficiency
-def calc_pureff(LUT, bins):
-    if LUT is None: return None, None
+def pureff(func):
+    # calculate purity/efficiency
+    def calc_pureff(LUT, bins):
+        if LUT is None: return None, None
 
-    retrieved = LUT.flatten()[0::2]
-    pt = LUT.flatten()[1::2]
+        retrieved, pt = func(LUT, bins)
 
-    Tops = np.array([top for top in LUT])
+        Tops = np.array([top for top in LUT])
 
-    Tops_inds = np.digitize(pt, bins)  # index 1 is pt
+        Tops_inds = digiflow(pt, bins)  # index 1 is pt
 
-    correctTruth_per_bin = []
-    for bin_i in range(1, len(bins)):
-        correctTruth_per_bin.append(retrieved[Tops_inds == bin_i])  # index 0 is correct prediction
-    correctTruth_per_bin = ak.Array(correctTruth_per_bin)
+        correctTruth_per_bin = []
+        for bin_i in range(0, len(bins)):
+            correctTruth_per_bin.append(retrieved[Tops_inds == bin_i])  # index 0 is correct prediction
+        correctTruth_per_bin = ak.Array(correctTruth_per_bin)
 
-    means = ak.mean(correctTruth_per_bin, axis=-1)
+        means = ak.mean(correctTruth_per_bin, axis=-1)
 
-    errs = np.abs(
-        clopper_pearson_interval(num=ak.sum(correctTruth_per_bin, axis=-1), denom=ak.num(correctTruth_per_bin, axis=-1))
-        - means
-    )
+        errs = np.abs(
+            clopper_pearson_interval(num=ak.sum(correctTruth_per_bin, axis=-1), denom=ak.num(correctTruth_per_bin, axis=-1))
+            - means
+        )
 
-    return means, errs
+        return means, errs
+    return calc_pureff
+
+@pureff
+def calc_pur(LUT, bins):
+    predicted = LUT.flatten()[3::LUT.shape[-1]]
+    matched = LUT.flatten()[1::LUT.shape[-1]]
+    reco_pt = LUT.flatten()[5::LUT.shape[-1]]
+
+    prediction_mask = (predicted == 1)
+    retrieved = matched[prediction_mask]
+    pt = reco_pt[prediction_mask]
+    return retrieved, pt
+
+@pureff
+def calc_eff(LUT, bins):
+    valid = LUT.flatten()[0::LUT.shape[-1]]
+    matched = LUT.flatten()[1::LUT.shape[-1]]
+    gen_pt = LUT.flatten()[4::LUT.shape[-1]]
+
+    target_mask = (valid == 1)
+    retrieved = matched[target_mask]
+    pt = gen_pt[target_mask]
+    return retrieved, pt
