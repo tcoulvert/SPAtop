@@ -194,6 +194,11 @@ def nbgenerate_LUT(
 def parse_merged_w_target(
     testfile, predfile, reco_regex: str='', chi2: bool=False
 ):  
+    # handle different pl version
+    if "TARGETS" not in predfile.keys():
+        predfile["INPUTS"] = predfile["SpecialKey.Inputs"]
+        predfile["TARGETS"] = predfile["SpecialKey.Targets"]
+    
     print(f"Processing reco: {reco_regex}")
     global N_TOPS, N_AK5_JETS, N_AK8_JETS, DELTARS, SYMMETRIES
     reconstructions = sorted([key for key in predfile["TARGETS"].keys() if reco_regex in key])

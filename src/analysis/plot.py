@@ -13,11 +13,6 @@ def calc_pur_eff(target_path, pred_path, bins_dict, mode: str='pur_eff', chi2: b
     pred_h5 = h5.File(pred_path, "a")
     target_h5 = h5.File(target_path)
 
-    # handle different pl version
-    if "TARGETS" not in pred_h5.keys():
-        pred_h5["INPUTS"] = pred_h5["SpecialKey.Inputs"]
-        pred_h5["TARGETS"] = pred_h5["SpecialKey.Targets"]
-
     ## generate look up tables ##
     # boosted
     LUT_boosted = parse_merged_w_target(target_h5, pred_h5, reco_regex='FB', chi2=chi2)

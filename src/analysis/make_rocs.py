@@ -1,7 +1,9 @@
 import itertools
+import json
 import logging
 import os
 import re
+import sys
 from typing import Optional
 
 import awkward as ak
@@ -17,14 +19,12 @@ from scipy.integrate import trapezoid
 from sklearn.metrics import roc_curve, roc_auc_score
 vector.register_awkward()
 
-# from utils import get_jets, get_numerical, get_symmetries, match_jet, reset_collision_dp
-# from merged import sel_pred_t_by_prob
-from utils import get_symmetries
+from merged import parse_merged_w_target
 
 hep.style.use(hep.style.ROOT)
 logging.basicConfig(level=logging.INFO)
 
-PLOT_DIR = os.path.join(os.getcwd(), "multi_roc_curves")
+PLOT_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "v12vanilla_min1valid_roc_curves")
 os.makedirs(PLOT_DIR, exist_ok=True)
 
 BASE_TPR = np.linspace(0., 1., 1000)
@@ -32,22 +32,43 @@ NTOPS = 2
 NJETS = 3*NTOPS + 4
 NFJETS = NTOPS + 1
 
-FILES = {
-    "tt": {"eval": "/storage/af/user/tsievert/topNet/h5s/tt_hadronic_noBQ.h5", "test": "/storage/af/user/tsievert/topNet/h5s/fjTag_testing.h5"},
-    "qcd": {"eval": "/storage/af/user/tsievert/topNet/h5s/qcd_4j_Alltesting_noBQeval.h5", "test": "/storage/af/user/tsievert/topNet/h5s/qcd_4j_wTargets_Alltesting.h5"},
-    "t": {"eval": "/storage/af/user/tsievert/topNet/h5s/tt_semileptonic_Alltesting_noBQeval.h5", "test": "/storage/af/user/tsievert/topNet/h5s/ttbar_semileptonic/ttbar_semileptonic.h5"}
-    # "4t": "",
-}
+with open(sys.argv[1], 'r') as f:
+    FILES = json.load(f)
 
 #########################################
 
-LOADED_FILES = {label: {filetype: h5py.File(filepath) for filetype, filepath in filepaths.items()} for label, filepaths in FILES.items()}
-N_EVTS = {label: len(filepaths['test']['INPUTS']['Jets']['pt']) for label, filepaths in LOADED_FILES.items()}
-RECO_CLASSES = sorted(list(LOADED_FILES[next(iter(LOADED_FILES))]["eval"]["SpecialKey.Targets"].keys()))
-UNIQUE_RECOS = {unique_reco: [reco for reco in RECO_CLASSES if unique_reco in reco] for unique_reco in sorted(set(item[:re.search('t\d', item).start()] for item in RECO_CLASSES))}
-SCORES = [item for item in LOADED_FILES[next(iter(LOADED_FILES))]["eval"]["SpecialKey.Targets"][next(iter(RECO_CLASSES))].keys() if "probability" in item]
-ASSIGNMENTS = {unique_reco: [item for item in LOADED_FILES[next(iter(LOADED_FILES))]["eval"]["SpecialKey.Targets"][next(iter(UNIQUE_RECOS[unique_reco]))].keys() if item not in SCORES] for unique_reco in UNIQUE_RECOS.keys()}
-SYMMETRIES = dict(zip(UNIQUE_RECOS.keys(), get_symmetries(UNIQUE_RECOS.keys(), ASSIGNMENTS, returnidx=False)))
+def build_LUT(unique_reco: str, dataset: dict[str, h5py._hl.files.File]):
+    return parse_merged_w_target(dataset['test'], dataset['eval'], reco_regex=unique_reco)
+def build_and_save_LUT(label: str, unique_reco: str, dataset: dict[str, h5py._hl.files.File]):
+    filepath = os.path.join(PLOT_DIR, f"{label}_{unique_reco}.npy")
+    if os.path.exists(filepath): return filepath
+    recoLUT = build_LUT(unique_reco, dataset)
+    np.save(filepath, recoLUT)
+    return filepath
+def read_LUT(filepath: str):
+    recoLUT = None
+    with open(filepath, 'rb') as f:
+        recoLUT = np.load(f)
+    return recoLUT
+
+N_EVTS = {}
+RECO_CLASSES = None
+UNIQUE_RECOS = None
+LUTS = {}
+for i, (label, filepaths) in enumerate(FILES.items()):
+    dataset = {filetype: h5py.File(filepath, 'a') for filetype, filepath in filepaths.items()}
+    if i == 0:
+        RECO_CLASSES = sorted(list(dataset["eval"]["SpecialKey.Targets"].keys()))
+        UNIQUE_RECOS = {
+            unique_reco: [reco for reco in RECO_CLASSES if unique_reco in reco] 
+            for unique_reco in sorted(set(item[:re.search('t\d', item).start()] for item in RECO_CLASSES))
+        } | {'': RECO_CLASSES}
+    N_EVTS[label] = len(dataset['test']['INPUTS']['Jets']['pt'])
+    LUTS[label] = {
+        unique_reco: build_and_save_LUT(label, unique_reco, dataset)
+        for unique_reco in UNIQUE_RECOS.keys()
+    }
+    for file in dataset.values(): file.close()
 
 var_color_map = {
     'detection_probability': '#3f90da',
@@ -74,49 +95,34 @@ ncorrect_linestyle_map = {
 def n_alpha(string: str):
     return len([c for c in string if c.isalpha()])
 
-def find_correct(unique_reco: str, dataset: dict[str, str]):
-    return np.array([
-        np.any([
-            np.any([
-                np.all([
-                    (
-                        dataset['eval']['SpecialKey.Targets'][eval_reco][assn[0]][:] == dataset['test']['TARGETS'][test_reco][assn[1]][:]
-                        if n_alpha(assn[0]) == 1 else
-                        dataset['eval']['SpecialKey.Targets'][eval_reco][assn[0]][:] == (dataset['test']['TARGETS'][test_reco][assn[1]][:] + NJETS)
-                    ) for assn in symmetry
-                ], axis=0)
-                for symmetry in SYMMETRIES[unique_reco]
-            ], axis=0)
-            for test_reco in UNIQUE_RECOS[unique_reco]
-        ], axis=0)
-        for eval_reco in UNIQUE_RECOS[unique_reco]
-    ]).astype("bool")
-def find_n_correct(unique_reco: str, dataset: dict[str, str]):
-    return np.sum(find_correct(unique_reco, dataset), axis=0)
+def find_correct(recoLUT: np.ndarray):
+    return recoLUT[..., 1].astype("bool")
+def find_n_correct(recoLUT: np.ndarray):
+    return np.sum(find_correct(recoLUT), axis=1)
 
-def find_valid(unique_reco: str, dataset: dict[str, str]):
-    return np.array([
-        dataset['test']['TARGETS'][test_reco]['MASK'][:]
-        for test_reco in UNIQUE_RECOS[unique_reco]
-    ]).astype("bool")
-def find_n_valid(unique_reco: str, dataset: dict[str, str]):
-    return np.sum(find_valid(unique_reco, dataset), axis=0)
+def find_valid(recoLUT: np.ndarray):
+    return recoLUT[..., 0].astype("bool")
+def find_n_valid(recoLUT: np.ndarray):
+    return np.sum(find_valid(recoLUT), axis=1)
 
-def merge_evt_pred_masks(unique_reco: str, evt_mask: Optional[np.ndarray]=None, pred_mask: Optional[np.ndarray]=None):
-    return np.logical_and(np.array([evt_mask for _ in UNIQUE_RECOS[unique_reco]]), pred_mask)
+def merge_evt_pred_masks(full_arr: np.ndarray, evt_mask: Optional[np.ndarray]=None, pred_mask: Optional[np.ndarray]=None):
+    return np.logical_and(np.tile(evt_mask, (full_arr.shape[1], 1)).T, pred_mask)
 
-def get_preds(unique_reco: str, dataset: dict[str, str], score: str, evt_mask: np.ndarray=None, pred_mask: np.ndarray=None):
-    full_preds = np.array([dataset['eval']['SpecialKey.Targets'][reco][score] for reco in UNIQUE_RECOS[unique_reco]])
+def get_preds(recoLUT: np.ndarray, score: str, evt_mask: np.ndarray=None, pred_mask: np.ndarray=None):
+    if score == "detection_probability": full_preds = recoLUT[..., 6]
+    elif score == "assignment_probability": full_preds = recoLUT[..., 7]
+    elif score == "marginal_probability": full_preds = recoLUT[..., 6] * recoLUT[..., 7]
+    else: raise Exception(f"Provided score not in the known list: {score}")
     if evt_mask is None: evt_mask = np.ones_like(full_preds[0], dtype=bool)
     if pred_mask is None: pred_mask = np.ones_like(full_preds, dtype=bool)
-    full_mask = merge_evt_pred_masks(unique_reco, evt_mask, pred_mask)
+    full_mask = np.logical_and(merge_evt_pred_masks(full_preds, evt_mask, pred_mask), recoLUT[..., 3].astype("bool"))
     return full_preds[full_mask]
 
-def get_truths(unique_reco: str, dataset: dict[str, str], evt_mask: np.ndarray=None, pred_mask: np.ndarray=None):
-    full_truths = np.array([dataset['eval']['TARGETS'][reco]['MASK'] for reco in UNIQUE_RECOS[unique_reco]])
+def get_truths(recoLUT: np.ndarray, evt_mask: np.ndarray=None, pred_mask: np.ndarray=None):
+    full_truths = recoLUT[..., 0]
     if evt_mask is None: evt_mask = np.ones_like(full_truths[0], dtype=bool)
     if pred_mask is None: pred_mask = np.ones_like(full_truths, dtype=bool)
-    full_mask = merge_evt_pred_masks(unique_reco, evt_mask, pred_mask)
+    full_mask = merge_evt_pred_masks(full_truths, evt_mask, pred_mask)
     return full_truths[full_mask]
 
 #########################################
@@ -134,7 +140,7 @@ def plot_roc(fprs: list[np.ndarray], tprs: list[np.ndarray], labels: list[str], 
     if xlabel is None: xlabel = 'Bkg Eff.'
     if ylabel is None: ylabel = 'Sig Eff.'
 
-    plt.figure(figsize=(10, 8))
+    plt.figure(figsize=(21, 10))
     if colors is None: 
         colors = [None] * len(fprs)
     if linestyles is None:
@@ -148,12 +154,12 @@ def plot_roc(fprs: list[np.ndarray], tprs: list[np.ndarray], labels: list[str], 
         for hli, hla in hlines:
             plt.hlines(hli, label=hla, xmin=np.min(fprs, axis=None), xmax=np.max(fprs, axis=None))
     plt.legend(bbox_to_anchor=(1.1, 1.05))
-    plt.tight_layout()
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.xscale('log')
     plt.yscale('log')
     if title is not None: plt.title(title)
+    plt.tight_layout()
     if save is not None: plt.savefig(os.path.join(PLOT_DIR, save))
     if show: plt.show()
     else: plt.close()
@@ -171,19 +177,19 @@ def make_rocs(unique_reco: str, rocs: list[dict], **kwargs):
                 if label not in ['sig', 'bkg']: continue
 
                 for subdata in roc[label]:
-                    dataset = LOADED_FILES[subdata['dataset']]
+                    recoLUT = read_LUT(LUTS[subdata['dataset']][unique_reco])
 
                     evt_mask = np.zeros(N_EVTS[subdata['dataset']], dtype=bool)
                     for mask in subdata['masks']:
                         for n_valid, n_corrects in mask.items():
                             if type(n_corrects) is int: n_corrects = [n_corrects]
                             assert type(n_corrects) is list, f'You must pass either an int or a list to the n_corrects value in the mask dictionaries. You provided {type(n_corrects)}'
-                            n_valid_mask = (find_n_valid(unique_reco, dataset) == n_valid)
-                            n_correct_mask = np.isin(find_n_correct(unique_reco, dataset), n_corrects)
+                            n_valid_mask = (find_n_valid(recoLUT) == n_valid)
+                            n_correct_mask = np.isin(find_n_correct(recoLUT), n_corrects)
                             evt_mask = np.logical_or(evt_mask, np.logical_and(n_valid_mask, n_correct_mask))
-                    pred_mask = np.isin(find_correct(unique_reco, dataset).astype("bool"), subdata["corrs"])
-                    subpreds = get_preds(unique_reco, dataset, var, evt_mask=evt_mask, pred_mask=pred_mask)
-                    subtruths = np.ones_like(subpreds) if label == 'sig' else np.zeros_like(subpreds)
+                    pred_mask = np.isin(find_correct(recoLUT).astype("bool"), subdata["corrs"])
+                    subpreds = get_preds(recoLUT, var, evt_mask=evt_mask, pred_mask=pred_mask)
+                    subtruths = np.ones_like(subpreds, dtype=int) if label == 'sig' else np.zeros_like(subpreds, dtype=int)
                     preds.append(subpreds); truths.append(subtruths)
 
             fpr, tpr, threshold = interp_roc_curve(np.concatenate(truths, axis=0), np.concatenate(preds, axis=0), **kwargs)
@@ -227,7 +233,7 @@ tt_012valid_vs_qcd_rocs = [
 ]
 for unique_reco in UNIQUE_RECOS.keys():
     fprs, tprs, labels, colors, linestyles = make_rocs(unique_reco, tt_012valid_vs_qcd_rocs)
-    plot_roc(fprs, tprs, labels, colors=colors, linestyles=linestyles, title=f"Probabilities of tt vs. QCD - {unique_reco} Category", show=True, save=os.path.join(PLOT_DIR, f'tt_012valid_vs_qcd_roc_{unique_reco}.png'))
+    plot_roc(fprs, tprs, labels, colors=colors, linestyles=linestyles, title=f"Probabilities of tt vs. QCD - {unique_reco} Category", save=os.path.join(PLOT_DIR, f'tt_012valid_vs_qcd_rocs{unique_reco}.png'))
 
 #########################################
 
@@ -247,7 +253,7 @@ tt_12valid_corr_vs_incorr_rocs = [
 ]
 for unique_reco in UNIQUE_RECOS.keys():
     fprs, tprs, labels, colors, linestyles = make_rocs(unique_reco, tt_12valid_corr_vs_incorr_rocs)
-    plot_roc(fprs, tprs, labels, colors=colors, linestyles=linestyles, title=f"Probabilities of Correct tt vs. Incorrect tt - {unique_reco} Category", show=True, save=os.path.join(PLOT_DIR, f'tt_12valid_corr_vs_incorr_rocs{unique_reco}.png'))
+    plot_roc(fprs, tprs, labels, colors=colors, linestyles=linestyles, title=f"Probabilities of Correct tt vs. Incorrect tt - {unique_reco} Category", save=os.path.join(PLOT_DIR, f'tt_12valid_corr_vs_incorr_rocs{unique_reco}.png'))
 
 #########################################
 
@@ -267,7 +273,7 @@ tt_12valid_corr_vs_incorr_rocs = [
 ]
 for unique_reco in UNIQUE_RECOS.keys():
     fprs, tprs, labels, colors, linestyles = make_rocs(unique_reco, tt_12valid_corr_vs_incorr_rocs)
-    plot_roc(fprs, tprs, labels, colors=colors, linestyles=linestyles, title=f"Probabilities of Correct tt vs. Incorrect tt - {unique_reco} Category", show=True, save=os.path.join(PLOT_DIR, f'tt_12valid_corr_vs_incorr_rocs{unique_reco}.png'))
+    plot_roc(fprs, tprs, labels, colors=colors, linestyles=linestyles, title=f"Probabilities of Correct tt vs. Incorrect tt - {unique_reco} Category", save=os.path.join(PLOT_DIR, f'tt_12valid_corr_vs_incorr_rocs{unique_reco}.png'))
 
 #########################################
 
@@ -293,7 +299,7 @@ t_01valid_vs_qcd_rocs = [
 ]
 for unique_reco in UNIQUE_RECOS.keys():
     fprs, tprs, labels, colors, linestyles = make_rocs(unique_reco, t_01valid_vs_qcd_rocs)
-    plot_roc(fprs, tprs, labels, colors=colors, linestyles=linestyles, title=f"Probabilities of t vs. QCD - {unique_reco} Category", show=True, save=os.path.join(PLOT_DIR, f't_01valid_vs_qcd_rocs{unique_reco}.png'))
+    plot_roc(fprs, tprs, labels, colors=colors, linestyles=linestyles, title=f"Probabilities of t vs. QCD - {unique_reco} Category", save=os.path.join(PLOT_DIR, f't_01valid_vs_qcd_rocs{unique_reco}.png'))
 
 #########################################
 
@@ -307,7 +313,7 @@ t_1valid_corr_vs_incorr_rocs = [
 ]
 for unique_reco in UNIQUE_RECOS.keys():
     fprs, tprs, labels, colors, linestyles = make_rocs(unique_reco, t_1valid_corr_vs_incorr_rocs)
-    plot_roc(fprs, tprs, labels, colors=colors, linestyles=linestyles, title=f"Probabilities of Correct t vs. Incorrect t - {unique_reco} Category", show=True, save=os.path.join(PLOT_DIR, f't_1valid_corr_vs_incorr_rocs{unique_reco}.png'))
+    plot_roc(fprs, tprs, labels, colors=colors, linestyles=linestyles, title=f"Probabilities of Correct t vs. Incorrect t - {unique_reco} Category", save=os.path.join(PLOT_DIR, f't_1valid_corr_vs_incorr_rocs{unique_reco}.png'))
 
 #########################################
 
@@ -345,10 +351,7 @@ tt_012valid_vs_t_01valid_rocs = [
 ]
 for unique_reco in UNIQUE_RECOS.keys():
     fprs, tprs, labels, colors, linestyles = make_rocs(unique_reco, tt_012valid_vs_t_01valid_rocs)
-    plot_roc(fprs, tprs, labels, colors=colors, linestyles=linestyles, title=f"Probabilities of tt vs. t - {unique_reco} Category", show=True, save=os.path.join(PLOT_DIR, f'tt_012valid_vs_t_01valid_rocs{unique_reco}.png'))
+    plot_roc(fprs, tprs, labels, colors=colors, linestyles=linestyles, title=f"Probabilities of tt vs. t - {unique_reco} Category", save=os.path.join(PLOT_DIR, f'tt_012valid_vs_t_01valid_rocs{unique_reco}.png'))
 
 #########################################
-
-for files in LOADED_FILES.values(): 
-    for file in files.values(): file.close()
     
