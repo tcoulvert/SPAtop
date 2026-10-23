@@ -58,24 +58,27 @@ def random2D(layout_array, RN_array, RN_builder):
     return RN_builder
 
 
-def get_tops(particles: ak.Array):
-    return particles[np.abs(particles.pid) == 6]
-
-def get_bs(particles: ak.Array):
-    return particles[np.logical_and(
+def get_bs(particles: ak.Array, n_targets: int):
+    init_bs = particles[np.logical_and(
         np.abs(particles.pid) == 5,
         np.abs(particles.pid[particles.m1]) == 6,
     )]
+    bevt_mask = (ak.num(init_bs) == n_targets)
+    return ak.to_regular(init_bs[bevt_mask]), bevt_mask
 
-def get_Ws(particles: ak.Array):
-    return particles[np.logical_and(
-            np.abs(particles.pid) == 24,
-            np.abs(particles.pid[particles.m1]) == 6,
-        )]
+def get_Ws(particles: ak.Array, n_targets: int):
+    init_Ws = particles[np.logical_and(
+        np.abs(particles.pid) == 24,
+        np.abs(particles.pid[particles.m1]) == 6,
+    )]
+    Wevt_mask = (ak.num(init_Ws) == n_targets)
+    return ak.to_regular(init_Ws[Wevt_mask]), Wevt_mask
 
 def get_Wds(particles: ak.Array, Ws: ak.Array):
     Wi_d1s, Wi_d2s = [], []
-    for Wi in range(Ws.shape[1]):
+    for Wi in range(np.shape(Ws)[1]):
+        print(ak.type(particles.m1))
+        print(ak.type(Ws[:, Wi].idx))
         Wi_d1s.append(particles[particles.m1 == Ws[:, Wi].idx][:, 0])
         Wi_d2s.append(particles[particles.m1 == Ws[:, Wi].idx][:, 1])
     return np.concatenate(Wi_d1s).T, np.concatenate(Wi_d2s).T
@@ -96,7 +99,6 @@ def get_genparts(arrays, n_tops, n_targets, event_mask):
     part_eta = arrays["GenPart_eta"]
     part_phi = arrays["GenPart_phi"]
     part_mass = arrays["GenPart_mass"]
-
 
     
     ################################
@@ -122,14 +124,20 @@ def get_genparts(arrays, n_tops, n_targets, event_mask):
 
     ################################
     # Find tops and children
-    bquarks = get_bs(particles)
-    topquarks = particles[bquarks.m1]
+    bquarks, bevt_mask = get_bs(particles, n_targets)
+    print(f"b - {ak.type(bquarks)}")
+    topquarks = particles[bevt_mask][bquarks.m1]
     top_sort = ak.argsort(topquarks.pt, ascending=False, axis=-1)
-    topquarks = topquarks[top_sort]
-    bquarks = bquarks[top_sort]
-    wbosons = get_Ws(particles)
-    wbosons = wbosons[top_sort]
-    wquarks_d1, wquarks_d2 = get_Wds(particles, wbosons)
+    topquarks = ak.to_regular(topquarks[top_sort])
+    print(f"t - {ak.type(topquarks)}")
+    bquarks = ak.to_regular(bquarks[top_sort])
+    print(f"b - {ak.type(bquarks)}")
+    wbosons, Wevt_mask = get_Ws(particles, n_targets)
+    wbosons = ak.to_regular(wbosons[bevt_mask & Wevt_mask][top_sort])
+    print(f"W - {ak.type(wbosons)}")
+    wquarks_d1, wquarks_d2 = get_Wds(particles[bevt_mask & Wevt_mask], wbosons)
+    print(f"Wd1 - {ak.type(wquarks_d1)}")
+    print(f"Wd2 - {ak.type(wquarks_d1)}")
 
     good_tops = np.logical_and(
         np.abs(topquarks.pid) == 6,
@@ -154,9 +162,9 @@ def get_genparts(arrays, n_tops, n_targets, event_mask):
     wquarks_d1 = wquarks_d1[hadronic_tops]
     wquarks_d2 = wquarks_d2[hadronic_tops]
 
-    event_mask = (ak.num(topquarks, axis=1) == n_targets)
+    event_mask = (bevt_mask) & (Wevt_mask)
 
-    return event_mask, particles[event_mask], topquarks[event_mask], bquarks[event_mask], wbosons[event_mask], wquarks_d1[event_mask], wquarks_d2[event_mask]
+    return event_mask, particles[event_mask], topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2
 
 
 ################################
@@ -166,7 +174,7 @@ def get_jets(arrays, n_tops, n_targets):
     # Read Delphes file
     # small-radius jet info
     pt = arrays["Jet_pt"]
-    eta = arrays["Jet/Jet.Eta"]
+    eta = arrays["Jet_eta"]
     phi = arrays["Jet_phi"]
     mass = arrays["Jet_mass"]
     btag = arrays["Jet_btagDeepB"] > 0.6502  # https://btv-wiki.docs.cern.ch/ScaleFactors/Run2UL2016preVFPNanoAODv9/#ak4-b-tagging

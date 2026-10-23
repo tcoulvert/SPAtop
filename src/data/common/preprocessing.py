@@ -551,11 +551,9 @@ def main(in_files, in_file_type, out_file, split_file_size, file_limit, train_fr
     if n_targets is None:
         n_targets = n_tops
     assert n_targets <= n_tops, f"\'n-targets\' needs to be less than or equal to \'n-tops\'"
-    print(in_files)
     
     all_datasets = {}
     expanded_in_files = []
-    print(f"starting in_files = {in_files}")
 
     for file_name in in_files:
         if re.match('root://', file_name):
@@ -566,7 +564,6 @@ def main(in_files, in_file_type, out_file, split_file_size, file_limit, train_fr
             print(f"found directory: {file_name}")
             for root_file in glob.glob(os.path.join(file_name, '*.root')):
                 expanded_in_files.append(root_file)
-                print(expanded_in_files[-1])
         else:
             expanded_in_files.append(file_name)
     in_files = expanded_in_files
