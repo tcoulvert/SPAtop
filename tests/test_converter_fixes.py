@@ -15,8 +15,8 @@ import vector
 
 vector.register_awkward()
 
-from src.data.delphes import convert_to_h5 as C
-from src.data.delphes import matching as M
+from SPAtop.src.data.common import preprocessing as C
+from SPAtop.src.data.common import matching as M
 
 
 # ----------------------------------------------------------------- helpers

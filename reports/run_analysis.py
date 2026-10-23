@@ -23,4 +23,4 @@ bins_dict = {
     'all': np.arange(0, 1000, 50),
 }
 
-plot_pur_eff_w_dict(config['pred_files'], config['target_file'], config['save_path'], proj_name='SPAtop', bins_dict=bins_dict)
+plot_pur_eff_w_dict(config['files'], config['save_path'], proj_name='SPAtop', bins_dict=bins_dict)

@@ -53,7 +53,7 @@ def calc_pur_eff(target_path, pred_path, bins_dict, mode: str='pur_eff', chi2: b
 # I started to use "efficiency" for describing how many gen tops were reconstructed
 # and "purity" for desrcribing how many reco tops are actually gen tops
 def plot_pur_eff_w_dict(
-    plot_dict, target_path, save_path=None, proj_name=None, 
+    plot_dict, save_path=None, proj_name=None, 
     bins_dict={
         'FR': np.arange(0, 300, 10),
         'SRqq': np.arange(100, 400, 10),
@@ -145,7 +145,8 @@ def plot_pur_eff_w_dict(
 
 
     ## plot purities and efficiencies ##
-    for tag, pred_path in plot_dict.items():
+    for tag, paths in plot_dict.items():
+        pred_path, target_path = tuple(paths)
         print("Processing", tag)
         if 'chi2' in tag.lower(): chi2 = True
         else: chi2 = False
