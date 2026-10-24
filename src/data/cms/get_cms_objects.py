@@ -64,7 +64,7 @@ def get_bs(particles: ak.Array, n_targets: int):
         np.abs(particles.pid[particles.m1]) == 6,
     )]
     bevt_mask = (ak.num(init_bs) == n_targets)
-    return ak.to_regular(init_bs[bevt_mask]), bevt_mask
+    return init_bs, bevt_mask
 
 def get_Ws(particles: ak.Array, n_targets: int):
     init_Ws = particles[np.logical_and(
@@ -72,16 +72,80 @@ def get_Ws(particles: ak.Array, n_targets: int):
         np.abs(particles.pid[particles.m1]) == 6,
     )]
     Wevt_mask = (ak.num(init_Ws) == n_targets)
-    return ak.to_regular(init_Ws[Wevt_mask]), Wevt_mask
+    return init_Ws, Wevt_mask
 
-def get_Wds(particles: ak.Array, Ws: ak.Array):
-    Wi_d1s, Wi_d2s = [], []
-    for Wi in range(np.shape(Ws)[1]):
-        print(ak.type(particles.m1))
-        print(ak.type(Ws[:, Wi].idx))
-        Wi_d1s.append(particles[particles.m1 == Ws[:, Wi].idx][:, 0])
-        Wi_d2s.append(particles[particles.m1 == Ws[:, Wi].idx][:, 1])
-    return np.concatenate(Wi_d1s).T, np.concatenate(Wi_d2s).T
+@nb.njit
+def get_particle_from_idx(particles: ak.Array, idxs: ak.Array, parts: ak.ArrayBuilder):
+    for particles_event, idx_event in zip(particles, idxs):
+        parts.begin_list()
+        for idx_ in idx_event:
+            parts.append(particles_event[idx_])
+        parts.end_list()
+    return parts
+
+def get_ts(particles: ak.Array, n_targets: int, bs: ak.Array, Ws: ak.Array):
+
+    @nb.njit
+    def nbt(
+        n_targets: int, 
+        particles_pid: ak.Array, 
+        bs_m1: ak.Array, Ws_m1: ak.Array, 
+        t: ak.ArrayBuilder, evt_mask: ak.ArrayBuilder
+    ):
+        for particles_pid_event, bs_m1_event, Ws_m1_event in zip(
+            particles_pid, bs_m1, Ws_m1
+        ):
+            if not (
+                len(bs_m1_event) == n_targets and len(Ws_m1_event) == n_targets
+                and np.all(np.sort(bs_m1_event) == np.sort(Ws_m1_event))
+            ): evt_mask.append(0); continue
+            t.begin_list()
+            badevt = False
+            for b_m1 in bs_m1:
+                t.append(b_m1)
+                if b_m1 < 0 or particles_pid_event[b_m1]: badevt = True
+            if badevt: evt_mask.append(0)
+            else: evt_mask.append(1)
+
+    t, tevt_mask = nbt(n_targets, particles.pid, bs.m1, Ws.m1, ak.ArrayBuilder(), ak.ArrayBuilder())
+    return (
+        get_particle_from_idx(particles, t.snapshot(), ak.ArrayBuilder()).snapshot(), 
+        tevt_mask.snapshot()
+    )
+
+def get_Wds(particles: ak.Array, n_targets: int, Ws: ak.Array):
+
+    @nb.njit
+    def nbWd(
+        n_targets: int, 
+        particles_idx: ak.Array, particles_pid: ak.Array, particles_m1: ak.Array, 
+        Ws_idx: ak.Array, 
+        d1: ak.ArrayBuilder, d2: ak.ArrayBuilder, evt_mask: ak.ArrayBuilder
+    ):
+        for particles_idx_event, particles_pid_event, particles_m1_event, Ws_idx_event in zip(
+            particles_idx, particles_pid, particles_m1, Ws_idx
+        ):
+            if len(Ws_idx_event) != n_targets: evt_mask.append(0); continue
+            d1.begin_list(); d2.begin_list()
+            badevt = False
+            for w_idx in Ws_idx_event:
+                d1_ = -1; d2_ = -1
+                for part_idx, part_pid, part_m1 in zip(particles_idx_event, particles_pid_event, particles_m1_event):
+                    if np.isin(part_pid, list(range(1, 6))+list(range(11, 15))) and part_m1 == w_idx:  # assumes W can't decay to t or tau
+                        if d1_ == -1: d1_ = part_idx
+                        elif d2_ == -1: d2_ = part_idx
+                        else: badevt = True; break
+                d1.append(d1_); d2.append(d2_)
+                if d1_ == -1 or d2_ == -1: badevt = True
+            if badevt: evt_mask.append(0)
+            else: evt_mask.append(1)
+
+    d1, d2, Wdevt_mask = nbWd(n_targets, particles.idx, particles.pid, particles.m1, Ws.idx, ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder())
+    return (
+            get_particle_from_idx(particles, d1.snapshot(), ak.ArrayBuilder()).snapshot(), 
+            get_particle_from_idx(particles, d2.snapshot(), ak.ArrayBuilder()).snapshot(),
+            Wdevt_mask.snapshot()
+        )
 
 
 ################################
@@ -125,19 +189,20 @@ def get_genparts(arrays, n_tops, n_targets, event_mask):
     ################################
     # Find tops and children
     bquarks, bevt_mask = get_bs(particles, n_targets)
-    print(f"b - {ak.type(bquarks)}")
-    topquarks = particles[bevt_mask][bquarks.m1]
-    top_sort = ak.argsort(topquarks.pt, ascending=False, axis=-1)
-    topquarks = ak.to_regular(topquarks[top_sort])
-    print(f"t - {ak.type(topquarks)}")
-    bquarks = ak.to_regular(bquarks[top_sort])
-    print(f"b - {ak.type(bquarks)}")
     wbosons, Wevt_mask = get_Ws(particles, n_targets)
-    wbosons = ak.to_regular(wbosons[bevt_mask & Wevt_mask][top_sort])
-    print(f"W - {ak.type(wbosons)}")
-    wquarks_d1, wquarks_d2 = get_Wds(particles[bevt_mask & Wevt_mask], wbosons)
-    print(f"Wd1 - {ak.type(wquarks_d1)}")
-    print(f"Wd2 - {ak.type(wquarks_d1)}")
+    topquarks, tevt_mask = get_ts(particles, n_targets, bquarks, wbosons)
+    wquarks_d1, wquarks_d2, wdsevt_mask = get_Wds(particles, wbosons)
+
+    evt_mask = bevt_mask & Wevt_mask & tevt_mask & wdsevt_mask
+
+    topquarks = ak.to_regular(topquarks[evt_mask])
+    top_sort = ak.argsort(topquarks.pt, ascending=False, axis=-1)
+    topquarks = topquarks[top_sort]
+    
+    bquarks = ak.to_regular(bquarks[evt_mask])[top_sort]
+    wbosons = ak.to_regular(wbosons[evt_mask])[top_sort]
+    wquarks_d1 = ak.to_regular(wquarks_d1[evt_mask])[top_sort]
+    wquarks_d2 = ak.to_regular(wquarks_d2[evt_mask])[top_sort]
 
     good_tops = np.logical_and(
         np.abs(topquarks.pid) == 6,
@@ -162,9 +227,7 @@ def get_genparts(arrays, n_tops, n_targets, event_mask):
     wquarks_d1 = wquarks_d1[hadronic_tops]
     wquarks_d2 = wquarks_d2[hadronic_tops]
 
-    event_mask = (bevt_mask) & (Wevt_mask)
-
-    return event_mask, particles[event_mask], topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2
+    return evt_mask, particles[evt_mask], topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2
 
 
 ################################
