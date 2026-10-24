@@ -75,7 +75,7 @@ def get_Ws(particles: ak.Array, n_targets: int):
     return init_Ws, Wevt_mask
 
 @nb.njit
-def get_particle_from_idx(particles: ak.Array, idxs: ak.Array, parts: ak.ArrayBuilder):
+def get_particle_from_idx(particles: ak.Array, idxs: ak.Array, evt_mask: ak.Array, parts: ak.ArrayBuilder):
     for particles_event, idx_event in zip(particles, idxs):
         parts.begin_list()
         for idx_ in idx_event:
@@ -95,23 +95,24 @@ def get_ts(particles: ak.Array, n_targets: int, bs: ak.Array, Ws: ak.Array):
         for particles_pid_event, bs_m1_event, Ws_m1_event in zip(
             particles_pid, bs_m1, Ws_m1
         ):
-            if not (
-                len(bs_m1_event) == n_targets and len(Ws_m1_event) == n_targets
-                and np.all(np.sort(bs_m1_event) == np.sort(Ws_m1_event))
-            ): evt_mask.append(0); continue
-            t.begin_list()
             badevt = False
-            for b_m1 in bs_m1:
+            if not (len(bs_m1_event) == n_targets and len(Ws_m1_event) == n_targets): badevt = True
+            for b_m1 in bs_m1_event:
+                if b_m1 not in Ws_m1_event: badevt = True; break
+            for W_m1 in Ws_m1_event:
+                if W_m1 not in bs_m1_event: badevt = True; break
+            t.begin_list()
+            for b_m1 in bs_m1_event:
                 t.append(b_m1)
-                if b_m1 < 0 or particles_pid_event[b_m1]: badevt = True
+                if b_m1 < 0 or abs(particles_pid_event[b_m1]) != 6: badevt = True
             if badevt: evt_mask.append(0)
             else: evt_mask.append(1)
+            t.end_list()
+        return t, evt_mask
 
     t, tevt_mask = nbt(n_targets, particles.pid, bs.m1, Ws.m1, ak.ArrayBuilder(), ak.ArrayBuilder())
-    return (
-        get_particle_from_idx(particles, t.snapshot(), ak.ArrayBuilder()).snapshot(), 
-        tevt_mask.snapshot()
-    )
+    t, tevt_mask = t.snapshot(), tevt_mask.snapshot()
+    return particles[t][tevt_mask], tevt_mask
 
 def get_Wds(particles: ak.Array, n_targets: int, Ws: ak.Array):
 
@@ -125,27 +126,32 @@ def get_Wds(particles: ak.Array, n_targets: int, Ws: ak.Array):
         for particles_idx_event, particles_pid_event, particles_m1_event, Ws_idx_event in zip(
             particles_idx, particles_pid, particles_m1, Ws_idx
         ):
-            if len(Ws_idx_event) != n_targets: evt_mask.append(0); continue
-            d1.begin_list(); d2.begin_list()
             badevt = False
+            if len(Ws_idx_event) != n_targets: badevt = True
+            d1.begin_list(); d2.begin_list()
             for w_idx in Ws_idx_event:
+                eff_w_idx = w_idx
                 d1_ = -1; d2_ = -1
-                for part_idx, part_pid, part_m1 in zip(particles_idx_event, particles_pid_event, particles_m1_event):
-                    if np.isin(part_pid, list(range(1, 6))+list(range(11, 15))) and part_m1 == w_idx:  # assumes W can't decay to t or tau
-                        if d1_ == -1: d1_ = part_idx
-                        elif d2_ == -1: d2_ = part_idx
-                        else: badevt = True; break
+                for i in range(len(particles_idx_event)):  # limits total steps to length of particles per event
+                    for part_idx, part_pid, part_m1 in zip(particles_idx_event, particles_pid_event, particles_m1_event):
+                        if part_m1 == eff_w_idx:
+                            if abs(part_pid) == 24: eff_w_idx = part_idx; break
+                            elif abs(part_pid) in list(range(1, 6))+list(range(11, 15)):  # assumes W can't decay to t or tau
+                                if d1_ == -1: d1_ = part_idx
+                                elif d1_ != part_idx and d2_ == -1: d2_ = part_idx
+                                else: badevt = True
+                        if (d1_ != -1 and d2_ != -1) or badevt: break
+                    if (d1_ != -1 and d2_ != -1) or badevt: break
                 d1.append(d1_); d2.append(d2_)
                 if d1_ == -1 or d2_ == -1: badevt = True
+            d1.end_list(); d2.end_list()
             if badevt: evt_mask.append(0)
             else: evt_mask.append(1)
+        return d1, d2, evt_mask
 
     d1, d2, Wdevt_mask = nbWd(n_targets, particles.idx, particles.pid, particles.m1, Ws.idx, ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder())
-    return (
-            get_particle_from_idx(particles, d1.snapshot(), ak.ArrayBuilder()).snapshot(), 
-            get_particle_from_idx(particles, d2.snapshot(), ak.ArrayBuilder()).snapshot(),
-            Wdevt_mask.snapshot()
-        )
+    d1, d2, Wdevt_mask = d1.snapshot(), d2.snapshot(), Wdevt_mask.snapshot()
+    return particles[d1][Wdevt_mask], particles[d2][Wdevt_mask], Wdevt_mask
 
 
 ################################
@@ -191,18 +197,16 @@ def get_genparts(arrays, n_tops, n_targets, event_mask):
     bquarks, bevt_mask = get_bs(particles, n_targets)
     wbosons, Wevt_mask = get_Ws(particles, n_targets)
     topquarks, tevt_mask = get_ts(particles, n_targets, bquarks, wbosons)
-    wquarks_d1, wquarks_d2, wdsevt_mask = get_Wds(particles, wbosons)
+    wquarks_d1, wquarks_d2, wdsevt_mask = get_Wds(particles, n_targets, wbosons)
 
     evt_mask = bevt_mask & Wevt_mask & tevt_mask & wdsevt_mask
 
-    topquarks = ak.to_regular(topquarks[evt_mask])
-    top_sort = ak.argsort(topquarks.pt, ascending=False, axis=-1)
-    topquarks = topquarks[top_sort]
-    
-    bquarks = ak.to_regular(bquarks[evt_mask])[top_sort]
-    wbosons = ak.to_regular(wbosons[evt_mask])[top_sort]
-    wquarks_d1 = ak.to_regular(wquarks_d1[evt_mask])[top_sort]
-    wquarks_d2 = ak.to_regular(wquarks_d2[evt_mask])[top_sort]
+    top_sort = ak.argsort(topquarks[evt_mask].pt, ascending=False, axis=1)
+    topquarks = topquarks[evt_mask][top_sort]
+    bquarks = bquarks[evt_mask][top_sort]
+    wbosons = wbosons[evt_mask][top_sort]
+    wquarks_d1 = wquarks_d1[evt_mask][top_sort]
+    wquarks_d2 = wquarks_d2[evt_mask][top_sort]
 
     good_tops = np.logical_and(
         np.abs(topquarks.pid) == 6,

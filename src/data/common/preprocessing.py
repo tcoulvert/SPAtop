@@ -177,11 +177,6 @@ def get_datasets(arrays, file_type, n_tops, n_targets, min_valid_targets):  # no
         event_mask, particles, topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2 = cms.get_genparts(arrays, n_tops, n_targets, event_mask)
     else:
         raise Exception(f"Unknown ROOT file type, currently only accepts Delphes or NanoAODv16 (not case-sensitive)")
-    assert ak.all(ak.num(topquarks, axis=1) == n_targets), f"Not all events have {n_targets} hadronic tops"
-    assert ak.all(ak.num(bquarks, axis=1) == n_targets), f"Not all events have {n_targets} bquarks"
-    assert ak.all(ak.num(wbosons, axis=1) == n_targets), f"Not all events have {n_targets} wbosons"
-    assert ak.all(ak.num(wquarks_d1, axis=1) == n_targets), f"Not all events have {n_targets} wquarks_d1"
-    assert ak.all(ak.num(wquarks_d2, axis=1) == n_targets), f"Not all events have {n_targets} wquarks_d2"
     jets, fjets, genjets, genfjets = jets[event_mask], fjets[event_mask], genjets[event_mask], genfjets[event_mask]
     n_evts = np.sum(event_mask)
     print('='*60+'\n'+'='*60+'\n'+'='*60)

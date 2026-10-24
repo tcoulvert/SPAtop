@@ -17,7 +17,7 @@ ak.numba.register_and_check()
 
 ################################
 
-JET_DR = 0.5  # https://github.com/delphes/delphes/blob/master/cards/delphes_card_CMS.tcl#L642
+JET_DR = 0.4  # https://github.com/delphes/delphes/blob/master/cards/delphes_card_CMS.tcl#L642
 FJET_DR = 0.8  # https://github.com/delphes/delphes/blob/master/cards/delphes_card_CMS.tcl#L658
 DR_FILL_VALUE = ((2.5 - -2.5)**2 + (math.pi - -math.pi)**2)**0.5  # DeltaR between two objects at (η, ϕ) of (5, π) and (-5, -π), ≈8.03
 NOJET_FILL_VALUE = -1
