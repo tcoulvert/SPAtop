@@ -156,7 +156,7 @@ def get_Wds(particles: ak.Array, n_targets: int, Ws: ak.Array):
 
 ################################
 # Targets builder
-def get_genparts(arrays, n_tops, n_targets, event_mask):
+def get_genparts(arrays, n_tops, n_targets, event_mask, top_type: str="hadronic"):
     ################################
     # Read Delphes file
     part_pid = arrays["GenPart_pdgId"]  # PDG ID
@@ -201,12 +201,12 @@ def get_genparts(arrays, n_tops, n_targets, event_mask):
 
     evt_mask = bevt_mask & Wevt_mask & tevt_mask & wdsevt_mask
 
-    top_sort = ak.argsort(topquarks[evt_mask].pt, ascending=False, axis=1)
-    topquarks = topquarks[evt_mask][top_sort]
-    bquarks = bquarks[evt_mask][top_sort]
-    wbosons = wbosons[evt_mask][top_sort]
-    wquarks_d1 = wquarks_d1[evt_mask][top_sort]
-    wquarks_d2 = wquarks_d2[evt_mask][top_sort]
+    top_sort = ak.argsort(topquarks.pt, ascending=False, axis=1)
+    topquarks = topquarks[top_sort]
+    bquarks = bquarks[top_sort]
+    wbosons = wbosons[top_sort]
+    wquarks_d1 = wquarks_d1[top_sort]
+    wquarks_d2 = wquarks_d2[top_sort]
 
     good_tops = np.logical_and(
         np.abs(topquarks.pid) == 6,
@@ -224,12 +224,18 @@ def get_genparts(arrays, n_tops, n_targets, event_mask):
     print(f"Number of leptonic tops: {ak.sum(leptonic_tops, axis=None)}")
 
     ################################
-    # Perform hadronic selection
-    topquarks = topquarks[hadronic_tops]
-    bquarks = bquarks[hadronic_tops]
-    wbosons = wbosons[hadronic_tops]
-    wquarks_d1 = wquarks_d1[hadronic_tops]
-    wquarks_d2 = wquarks_d2[hadronic_tops]
+    # Perform decay channel selection
+    if top_type =="hadronic":
+        evt_mask = evt_mask & (ak.num(hadronic_tops, axis=1) == n_targets)
+    elif top_type =="leptonic":
+        evt_mask = evt_mask & (ak.num(leptonic_tops, axis=1) == n_targets)
+    else:
+        evt_mask = evt_mask & (ak.num(good_tops, axis=1) == n_targets)
+    topquarks = ak.to_regular(topquarks[evt_mask], axis=1)
+    bquarks = ak.to_regular(bquarks[evt_mask], axis=1)
+    wbosons = ak.to_regular(wbosons[evt_mask], axis=1)
+    wquarks_d1 = ak.to_regular(wquarks_d1[evt_mask], axis=1)
+    wquarks_d2 = ak.to_regular(wquarks_d2[evt_mask], axis=1)
 
     return evt_mask, particles[evt_mask], topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2
 
