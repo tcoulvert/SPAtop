@@ -63,6 +63,13 @@ WVSQCD_EFFS = {'t': 15.19e-2, 'W': 56.15e-2, 'bq': 9.92e-2, 'QCD': 1e-2}
 
 
 def to_np_array(ak_array, max_n=10, pad=0):
+    print(ak.type(ak_array))
+    ak.pad_none(ak_array, 4)
+    ak.pad_none(ak_array, 4, clip=True)
+    ak.pad_none(ak_array, 4, clip=True, axis=1)
+    ak.pad_none(ak_array, 4, clip=True, axis=-1)
+    print(max_n)
+    print(type(max_n))
     return ak.fill_none(ak.pad_none(ak_array, max_n, clip=True, axis=-1), pad).to_numpy()
 
 
@@ -169,19 +176,19 @@ def fb_match_jets(jets, fjets, topquarks, bquarks, wbosons, wquarks_d1, wquarks_
 ################################
 # Dataset processing
 def get_datasets(arrays, file_type, n_tops, n_targets, min_valid_targets):  # noqa: C901
+    global N_JETS, N_FJETS
+    if callable(N_JETS): N_JETS = N_JETS(n_tops)
+    if callable(N_FJETS): N_FJETS = N_FJETS(n_tops)
     if file_type.lower() == "delphes":
-        event_mask, jets, fjets, genjets, genfjets = dlp.get_jets(arrays, n_tops, n_targets)
+        event_mask, jets, fjets, genjets, genfjets = dlp.get_jets(arrays, n_tops, n_targets, N_JETS, N_FJETS)
         event_mask, particles, topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2 = dlp.get_genparts(arrays, n_tops, n_targets, event_mask)
     elif file_type.lower() == "nanoaodv9":
-        event_mask, jets, fjets, genjets, genfjets = cms.get_jets(arrays, n_tops, n_targets)
+        event_mask, jets, fjets, genjets, genfjets = cms.get_jets(arrays, n_tops, n_targets, N_JETS, N_FJETS)
         event_mask, particles, topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2 = cms.get_genparts(arrays, n_tops, n_targets, event_mask)
     else:
         raise Exception(f"Unknown ROOT file type, currently only accepts Delphes or NanoAODv16 (not case-sensitive)")
     jets, fjets, genjets, genfjets = jets[event_mask], fjets[event_mask], genjets[event_mask], genfjets[event_mask]
     n_evts = np.sum(event_mask)
-    print('='*60+'\n'+'='*60+'\n'+'='*60)
-    print(f'Num events = {len(event_mask)}')
-    print(f"Num events after pre-selection = {n_evts}")
 
     # Jet-FatJet overlap
     matched_fjet_jet_idx, matched_fjet_jet_DR  = match_fjet_to_jet(fjets, jets, ak.ArrayBuilder(), ak.ArrayBuilder())
@@ -328,7 +335,7 @@ def get_datasets(arrays, file_type, n_tops, n_targets, min_valid_targets):  # no
     # Store processed data in dataset for training/testing
     # Inputs
     datasets = {}
-    datasets["INPUTS/Jets/MASK"] = to_np_array(jets.pt > 0, max_n=N_JETS).astype("bool")[min_valid_targets_mask]
+    datasets["INPUTS/Jets/MASK"] = to_np_array(jets.pt > 0, max_n=N_JETS, pad=False).astype("bool")[min_valid_targets_mask]
     datasets["INPUTS/Jets/pt"] = to_np_array(jets.pt, max_n=N_JETS).astype("float32")[min_valid_targets_mask]
     datasets["INPUTS/Jets/eta"] = to_np_array(jets.eta, max_n=N_JETS).astype("float32")[min_valid_targets_mask]
     datasets["INPUTS/Jets/phi"] = to_np_array(jets.phi, max_n=N_JETS).astype("float32")[min_valid_targets_mask]
@@ -352,11 +359,6 @@ def get_datasets(arrays, file_type, n_tops, n_targets, min_valid_targets):  # no
     datasets["INPUTS/BoostedJets/fj_Wtag"] = to_np_array(fjets["Wtag"], max_n=N_FJETS).astype("bool")[min_valid_targets_mask]
     datasets["INPUTS/BoostedJets/fj_tau21"] = to_np_array(fjets["tau21"], max_n=N_FJETS).astype("float32")[min_valid_targets_mask]
     datasets["INPUTS/BoostedJets/fj_tau32"] = to_np_array(fjets["tau32"], max_n=N_FJETS).astype("float32")[min_valid_targets_mask]
-    datasets["INPUTS/BoostedJets/fj_charge"] = to_np_array(fjets["charge"], max_n=N_FJETS).astype("float32")[min_valid_targets_mask]
-    datasets["INPUTS/BoostedJets/fj_ehadovereem"] = to_np_array(fjets["ehadovereem"], max_n=N_FJETS).astype("float32")[min_valid_targets_mask]
-    datasets["INPUTS/BoostedJets/fj_neutralenergyfrac"] = to_np_array(fjets["neutralenergyfrac"], max_n=N_FJETS).astype("float32")[min_valid_targets_mask]
-    datasets["INPUTS/BoostedJets/fj_chargedenergyfrac"] = to_np_array(fjets["chargedenergyfrac"], max_n=N_FJETS).astype("float32")[min_valid_targets_mask]
-    datasets["INPUTS/BoostedJets/fj_nneutral"] = to_np_array(fjets["nneutral"], max_n=N_FJETS).astype("float32")[min_valid_targets_mask]
     datasets["INPUTS/BoostedJets/fj_ncharged"] = to_np_array(fjets["ncharged"], max_n=N_FJETS).astype("float32")[min_valid_targets_mask]
 
     # Targets

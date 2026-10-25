@@ -34,8 +34,6 @@ logging.basicConfig(level=logging.INFO)
 MIN_JET_PT = 30  # 20
 MIN_FJET_PT = 150  # 200
 PROJECT_DIR = Path(__file__).resolve().parents[3]
-N_JETS = lambda n_tops: 3*n_tops + 4
-N_FJETS = lambda n_tops: n_tops + 1
 
 PLOTS = False
 RNG = np.random.default_rng(seed=21)
@@ -199,7 +197,7 @@ def get_genparts(arrays, n_tops, n_targets, event_mask, top_type: str="hadronic"
     topquarks, tevt_mask = get_ts(particles, n_targets, bquarks, wbosons)
     wquarks_d1, wquarks_d2, wdsevt_mask = get_Wds(particles, n_targets, wbosons)
 
-    evt_mask = bevt_mask & Wevt_mask & tevt_mask & wdsevt_mask
+    evt_mask = (bevt_mask & Wevt_mask & tevt_mask & wdsevt_mask)
 
     top_sort = ak.argsort(topquarks.pt, ascending=False, axis=1)
     topquarks = topquarks[top_sort]
@@ -226,11 +224,12 @@ def get_genparts(arrays, n_tops, n_targets, event_mask, top_type: str="hadronic"
     ################################
     # Perform decay channel selection
     if top_type =="hadronic":
-        evt_mask = evt_mask & (ak.num(hadronic_tops, axis=1) == n_targets)
+        evt_mask = ak.values_astype((evt_mask & (ak.num(hadronic_tops, axis=1) == n_targets)), bool)
     elif top_type =="leptonic":
-        evt_mask = evt_mask & (ak.num(leptonic_tops, axis=1) == n_targets)
+        evt_mask = ak.values_astype((evt_mask & (ak.num(leptonic_tops, axis=1) == n_targets)), bool)
     else:
-        evt_mask = evt_mask & (ak.num(good_tops, axis=1) == n_targets)
+        evt_mask = ak.values_astype(evt_mask & (ak.num(good_tops, axis=1) == n_targets), bool)
+    print('-'*60+'\n'+f'Nevts passing Jet (Reco) and Particle (Gen) event pre-selection: {ak.sum(evt_mask, axis=0)}')
     topquarks = ak.to_regular(topquarks[evt_mask], axis=1)
     bquarks = ak.to_regular(bquarks[evt_mask], axis=1)
     wbosons = ak.to_regular(wbosons[evt_mask], axis=1)
@@ -242,7 +241,7 @@ def get_genparts(arrays, n_tops, n_targets, event_mask, top_type: str="hadronic"
 
 ################################
 # Inputs builder
-def get_jets(arrays, n_tops, n_targets):
+def get_jets(arrays, n_tops, n_targets, njets, nfjets):
     ################################
     # Read Delphes file
     # small-radius jet info
@@ -338,35 +337,26 @@ def get_jets(arrays, n_tops, n_targets):
     # Pre-selection cut(s) and ordering
     #  -> what cuts we apply depends on what phase-space (and benchmark) we're targeting
     event_mask = (ak.num(pt[pt > MIN_JET_PT]) >= 3*n_tops)  # resolved-like training
-    print('-'*60)
-    print(f'Nevts passing event selection: {ak.sum(event_mask, axis=0)}')
+    print('-'*60+'\n'+f'Nevts before pre-selection: {ak.num(event_mask, axis=0)}')
+    print(f'Nevts passing Jet (Reco) event pre-selection: {ak.sum(event_mask, axis=0)}')
 
     jet_sort = ak.argsort(jets.pt, ascending=False, axis=-1)
     jets = jets[jet_sort]
     jet_mask = (jets.pt[event_mask] > MIN_JET_PT)
-    print(f'Unique Njets passing Jet object selection: {np.unique(ak.num(pt > MIN_JET_PT, axis=1))}')
-    print(f'Unique Njets passing event selection and Jet object selection: {np.unique(ak.num(jet_mask, axis=1))}')
 
     fjet_sort = ak.argsort(fjets.pt, ascending=False, axis=-1)
     fjets = fjets[fjet_sort]
     fjet_mask = (fjets.pt[event_mask] > MIN_FJET_PT)
-    print(f'Unique Nfatjets passing FatJet object selection: {np.unique(ak.num(fj_pt > MIN_FJET_PT, axis=1))}')
-    print(f'Unique Nfatjets passing event selection and FatJet object selection: {np.unique(ak.num(fjet_mask, axis=1))}')
-    print('-'*60)
-
-    global N_JETS, N_FJETS
-    if callable(N_JETS): N_JETS = N_JETS(n_tops)
-    if callable(N_FJETS): N_FJETS = N_FJETS(n_tops)
 
 
     ################################
     # Perform pre-selection and sorting
     # Jets
-    jets = jets[event_mask][jet_mask][:, :N_JETS]
+    jets = jets[event_mask][jet_mask][:, :njets]
     jets['idx'] = ak.local_index(jets.pt, axis=1)
 
     # FatJets
-    fjets = fjets[event_mask][fjet_mask][:, :N_FJETS]
+    fjets = fjets[event_mask][fjet_mask][:, :nfjets]
     fjets['idx'] = ak.local_index(fjets.pt, axis=1)
 
     # Gen Jets
