@@ -55,6 +55,9 @@ def random2D(layout_array, RN_array, RN_builder):
         RN_builder.end_list()
     return RN_builder
 
+def akabs(arr: ak.Array):
+    return ak.where(arr >= 0, arr, -1*arr)
+
 
 def get_bs(particles: ak.Array, n_targets: int):
     init_bs = particles[np.logical_and(
@@ -197,44 +200,43 @@ def get_genparts(arrays, n_tops, n_targets, event_mask, top_type: str="hadronic"
     topquarks, tevt_mask = get_ts(particles, n_targets, bquarks, wbosons)
     wquarks_d1, wquarks_d2, wdsevt_mask = get_Wds(particles, n_targets, wbosons)
 
-    evt_mask = (bevt_mask & Wevt_mask & tevt_mask & wdsevt_mask)
+    evt_mask = ak.to_numpy(
+        (bevt_mask & Wevt_mask & tevt_mask & wdsevt_mask) & (
+            (ak.num(topquarks, axis=1) == n_targets)
+            & (ak.num(bquarks, axis=1) == n_targets)
+            & (ak.num(wbosons, axis=1) == n_targets)
+            & (ak.num(wquarks_d1, axis=1) == n_targets)
+            & (ak.num(wquarks_d2, axis=1) == n_targets)
+        )
+    ).astype(bool)
+    top_sort = ak.argsort(topquarks[evt_mask].pt, ascending=False, axis=-1)
+    topquarks = ak.to_regular(topquarks[evt_mask][top_sort], axis=1)
+    bquarks = ak.to_regular(bquarks[evt_mask][top_sort], axis=1)
+    wbosons = ak.to_regular(wbosons[evt_mask][top_sort], axis=1)
+    wquarks_d1 = ak.to_regular(wquarks_d1[evt_mask][top_sort], axis=1)
+    wquarks_d2 = ak.to_regular(wquarks_d2[evt_mask][top_sort], axis=1)
 
-    top_sort = ak.argsort(topquarks.pt, ascending=False, axis=1)
-    topquarks = topquarks[top_sort]
-    bquarks = bquarks[top_sort]
-    wbosons = wbosons[top_sort]
-    wquarks_d1 = wquarks_d1[top_sort]
-    wquarks_d2 = wquarks_d2[top_sort]
-
-    good_tops = np.logical_and(
-        np.abs(topquarks.pid) == 6,
-        np.logical_and(np.abs(bquarks.pid) == 5, np.abs(wbosons.pid) == 24)
+    good_tops = (
+        (akabs(topquarks.pid) == 6) & (akabs(bquarks.pid) == 5) & (akabs(wbosons.pid) == 24)
     )
-    hadronic_tops = good_tops & np.logical_and(
-        np.isin(np.abs(wquarks_d1.pid), list(range(1, 6))),  # assumes W can't decay to t
-        np.isin(np.abs(wquarks_d2.pid), list(range(1, 6)))
+    hadronic_tops = good_tops & (  #  assumes W can't decay to t
+        (akabs(wquarks_d1.pid) >= 1) & (akabs(wquarks_d1.pid) < 6)
     )
     print(f"Number of hadronic tops: {ak.sum(hadronic_tops, axis=None)}")
-    leptonic_tops = good_tops & np.logical_and(
-        np.isin(np.abs(wquarks_d1.pid), list(range(11, 15))),  # assumes W can't decay to tau
-        np.isin(np.abs(wquarks_d2.pid), list(range(11, 15)))
+    leptonic_tops = good_tops & (  # assumes W can't decay to tau
+        (akabs(wquarks_d1.pid) >= 11) & (akabs(wquarks_d1.pid) < 15)
     )
     print(f"Number of leptonic tops: {ak.sum(leptonic_tops, axis=None)}")
 
     ################################
     # Perform decay channel selection
     if top_type =="hadronic":
-        evt_mask = ak.values_astype((evt_mask & (ak.num(hadronic_tops, axis=1) == n_targets)), bool)
+        evt_mask[evt_mask] = (ak.num(hadronic_tops, axis=1) == n_targets)
     elif top_type =="leptonic":
-        evt_mask = ak.values_astype((evt_mask & (ak.num(leptonic_tops, axis=1) == n_targets)), bool)
+        evt_mask[evt_mask] = (ak.num(leptonic_tops, axis=1) == n_targets)
     else:
-        evt_mask = ak.values_astype(evt_mask & (ak.num(good_tops, axis=1) == n_targets), bool)
+        evt_mask[evt_mask] = (ak.num(good_tops, axis=1) == n_targets)
     print('-'*60+'\n'+f'Nevts passing Jet (Reco) and Particle (Gen) event pre-selection: {ak.sum(evt_mask, axis=0)}')
-    topquarks = ak.to_regular(topquarks[evt_mask], axis=1)
-    bquarks = ak.to_regular(bquarks[evt_mask], axis=1)
-    wbosons = ak.to_regular(wbosons[evt_mask], axis=1)
-    wquarks_d1 = ak.to_regular(wquarks_d1[evt_mask], axis=1)
-    wquarks_d2 = ak.to_regular(wquarks_d2[evt_mask], axis=1)
 
     return evt_mask, particles[evt_mask], topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2
 

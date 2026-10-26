@@ -63,13 +63,6 @@ WVSQCD_EFFS = {'t': 15.19e-2, 'W': 56.15e-2, 'bq': 9.92e-2, 'QCD': 1e-2}
 
 
 def to_np_array(ak_array, max_n=10, pad=0):
-    print(ak.type(ak_array))
-    ak.pad_none(ak_array, 4)
-    ak.pad_none(ak_array, 4, clip=True)
-    ak.pad_none(ak_array, 4, clip=True, axis=1)
-    ak.pad_none(ak_array, 4, clip=True, axis=-1)
-    print(max_n)
-    print(type(max_n))
     return ak.fill_none(ak.pad_none(ak_array, max_n, clip=True, axis=-1), pad).to_numpy()
 
 
