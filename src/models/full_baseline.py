@@ -1,5 +1,7 @@
+import argparse
 import copy
 import os
+import sys
 
 import h5py
 import numba as nb
@@ -22,20 +24,25 @@ AK5_SIZE = 0.5
 
 FILL_VALUE = 1e5
 
-# PLOT_CHI2_HISTS = False
-# PLOT_ROCS = False
-SAVE_H5 = True
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "in_file", metavar="in-file", type=str, help="Filepath to h5 file to perform the analysis emulation over"
+)
+parser.add_argument(
+    "out_file", metavar="out-file", type=str, help="Filepath to h5 file to output the analysis emulation selections"
+)
+parser.add_argument(
+    "--dry-run", action="store_true", help="Flag to setup script but not actually run anything"
+)
+args = parser.parse_args()
+IN_FILEPATH = args.in_file
+OUT_FILEPATH = args.out_file
+DRY_RUN = args.dry_run
 
-FILEPATH = os.path.abspath(__file__)
-DIRPATH = '/'.join(FILEPATH.split('/')[:-1])
-PLOT_DIRPATH = os.path.join(DIRPATH, f"v11p2/FullAnalysisEmu")
-if not os.path.exists(PLOT_DIRPATH): os.makedirs(PLOT_DIRPATH)
-
-file_path = "/storage/af/user/tsievert/topNet/fjTag_testing.h5"
 ################################################
 # 1) Load arrays
 ################################################
-with h5py.File(file_path, "r") as f:
+with h5py.File(IN_FILEPATH, "r") as f:
     mask = f['INPUTS/Jets/MASK'][:]
     pt   = f['INPUTS/Jets/pt'][:]
     eta  = f['INPUTS/Jets/eta'][:]
@@ -83,6 +90,13 @@ with h5py.File(file_path, "r") as f:
         'FBt2/bqq': f['TARGETS/FBt2/bqq'][:],
         'FBt2/mask': f["TARGETS/FBt2/MASK"][:],
     }
+if DRY_RUN:
+    if not os.path.exists(OUT_FILEPATH):
+        file = h5py.File(OUT_FILEPATH, 'a')
+        file.close()
+        os.remove(OUT_FILEPATH)
+    print(f"DRY RUN: Confirmed input h5 file can be loaded with required columns and output h5 file location is accessible.")
+    sys.exit(0)
 
 ################################################
 # 2) Build jagged [events][jets] array
@@ -281,19 +295,17 @@ for i in range(N_TOPS):
 
 ################################################
 # Save out new h5 file
-if SAVE_H5:
-    out_filepath = os.path.join(DIRPATH, f"tt_hadronic_analysisEmu.h5")
-    if os.path.exists(out_filepath): os.remove(out_filepath)
-    with h5py.File(out_filepath, 'a') as f:
-        with h5py.File(file_path, 'r') as test_f:
-            for jet_class in test_f['INPUTS'].keys():
-                for variable in test_f['INPUTS'][jet_class].keys():
-                    if f'INPUTS/{jet_class}/{variable}' not in f:
-                        f[f'INPUTS/{jet_class}/{variable}'] = test_f[f'INPUTS/{jet_class}/{variable}'][:]
+if os.path.exists(OUT_FILEPATH): os.remove(OUT_FILEPATH)
+with h5py.File(OUT_FILEPATH, 'a') as f:
+    with h5py.File(IN_FILEPATH, 'r') as test_f:
+        for jet_class in test_f['INPUTS'].keys():
+            for variable in test_f['INPUTS'][jet_class].keys():
+                if f'INPUTS/{jet_class}/{variable}' not in f:
+                    f[f'INPUTS/{jet_class}/{variable}'] = test_f[f'INPUTS/{jet_class}/{variable}'][:]
 
-        for label, column in dataset.items():
-            # print(f"{label}, {ak.type(column)} - \n  {column}")
-            f[label] = ak.to_numpy(column, allow_missing=False)
+    for label, column in dataset.items():
+        # print(f"{label}, {ak.type(column)} - \n  {column}")
+        f[label] = ak.to_numpy(column, allow_missing=False)
 
 ################################################
 # Computes if χ² method found correct tops

@@ -59,61 +59,82 @@ def akabs(arr: ak.Array):
     return ak.where(arr >= 0, arr, -1*arr)
 
 
-def get_bs(particles: ak.Array, n_targets: int):
+def get_particle_from_idx(particles: ak.Array, idxs: ak.Array):
+    return ak.Array([
+        particles_event[idx_event]
+        for particles_event, idx_event in zip(particles, idxs)
+    ])
+
+@nb.njit
+def nbfinal_particle(
+    intermediates_idx: ak.Array, intermediates_pid: ak.Array, intermediates_m1: ak.Array,
+    particles_idx: ak.Array, particles_pid: ak.Array, particles_m1: ak.Array,
+    final_builder: ak.ArrayBuilder
+):
+    """Follow each intermediate particle to the last copy of itself in the record.
+
+    A copy is a daughter with the same PID. Either daughter slot may hold it
+    (W -> W gamma lists the photon in d1 or d2), and Pythia does not guarantee
+    the copy's status code exceeds its parent's (W -> W W at equal status, or a
+    status-51 copy under a status-52 parent), so no status condition is used.
+    Final-state particles carry d1 = d2 = -1, which must not be used as an index.
+    The step cap guards against a malformed record with a cycle.
+    """
+    for (
+        intermediates_idx_event, intermediates_pid_event, intermediates_m1_event,
+        particles_idx_event, particles_pid_event, particles_m1_event
+    ) in zip(
+        intermediates_idx, intermediates_pid, intermediates_m1,
+        particles_pid, particles_idx, particles_m1,
+    ):
+        final_builder.begin_list()
+        n_particles = len(particles_pid_event)
+        for intermediate_idx, intermediate_pid, intermediate_m1 in zip(
+            intermediates_idx_event, intermediates_pid_event, intermediates_m1_event
+        ):
+            next_idx, next_m1 = intermediate_idx, intermediate_m1
+            for _ in range(n_particles):
+                for particle_idx, particle_pid, particle_m1 in zip(
+                    particles_idx_event, particles_pid_event, particles_m1_event
+                ):
+                    if particle_m1 >= 0 and particle_m1 == next_idx and particle_pid == intermediate_pid:
+                        next_idx = particle_idx
+                        next_m1 = particle_m1
+                        break
+            final_builder.append(next_idx)
+        final_builder.end_list()
+    return final_builder
+
+def final_particle(intermediates: ak.Array, particles: ak.Array):
+    return particles[
+        nbfinal_particle(
+            intermediates.idx, intermediates.pid, intermediates.m1,
+            particles.idx, particles.pid, particles.m1,
+            ak.ArrayBuilder()
+        ).snapshot()
+    ]
+
+
+def get_ts(particles: ak.Array):
+    init_ts = particles[np.logical_and(
+        np.abs(particles.pid) == 6,
+        np.abs(particles.pid[particles.m1]) == 6,
+    )]
+    return final_particle(init_ts, particles)
+
+def get_bs(particles: ak.Array):
     init_bs = particles[np.logical_and(
         np.abs(particles.pid) == 5,
         np.abs(particles.pid[particles.m1]) == 6,
     )]
-    bevt_mask = (ak.num(init_bs) == n_targets)
-    return init_bs, bevt_mask
+    return final_particle(init_bs, particles)
 
-def get_Ws(particles: ak.Array, n_targets: int):
+def get_Ws(particles: ak.Array):
     init_Ws = particles[np.logical_and(
         np.abs(particles.pid) == 24,
         np.abs(particles.pid[particles.m1]) == 6,
     )]
-    Wevt_mask = (ak.num(init_Ws) == n_targets)
-    return init_Ws, Wevt_mask
-
-@nb.njit
-def get_particle_from_idx(particles: ak.Array, idxs: ak.Array, evt_mask: ak.Array, parts: ak.ArrayBuilder):
-    for particles_event, idx_event in zip(particles, idxs):
-        parts.begin_list()
-        for idx_ in idx_event:
-            parts.append(particles_event[idx_])
-        parts.end_list()
-    return parts
-
-def get_ts(particles: ak.Array, n_targets: int, bs: ak.Array, Ws: ak.Array):
-
-    @nb.njit
-    def nbt(
-        n_targets: int, 
-        particles_pid: ak.Array, 
-        bs_m1: ak.Array, Ws_m1: ak.Array, 
-        t: ak.ArrayBuilder, evt_mask: ak.ArrayBuilder
-    ):
-        for particles_pid_event, bs_m1_event, Ws_m1_event in zip(
-            particles_pid, bs_m1, Ws_m1
-        ):
-            badevt = False
-            if not (len(bs_m1_event) == n_targets and len(Ws_m1_event) == n_targets): badevt = True
-            for b_m1 in bs_m1_event:
-                if b_m1 not in Ws_m1_event: badevt = True; break
-            for W_m1 in Ws_m1_event:
-                if W_m1 not in bs_m1_event: badevt = True; break
-            t.begin_list()
-            for b_m1 in bs_m1_event:
-                t.append(b_m1)
-                if b_m1 < 0 or abs(particles_pid_event[b_m1]) != 6: badevt = True
-            if badevt: evt_mask.append(0)
-            else: evt_mask.append(1)
-            t.end_list()
-        return t, evt_mask
-
-    t, tevt_mask = nbt(n_targets, particles.pid, bs.m1, Ws.m1, ak.ArrayBuilder(), ak.ArrayBuilder())
-    t, tevt_mask = t.snapshot(), tevt_mask.snapshot()
-    return particles[t][tevt_mask], tevt_mask
+    return final_particle(init_Ws, particles)
 
 def get_Wds(particles: ak.Array, n_targets: int, Ws: ak.Array):
 
@@ -122,18 +143,19 @@ def get_Wds(particles: ak.Array, n_targets: int, Ws: ak.Array):
         n_targets: int, 
         particles_idx: ak.Array, particles_pid: ak.Array, particles_m1: ak.Array, 
         Ws_idx: ak.Array, 
-        d1: ak.ArrayBuilder, d2: ak.ArrayBuilder, evt_mask: ak.ArrayBuilder
+        d1: ak.ArrayBuilder, d2: ak.ArrayBuilder
     ):
         for particles_idx_event, particles_pid_event, particles_m1_event, Ws_idx_event in zip(
             particles_idx, particles_pid, particles_m1, Ws_idx
         ):
             badevt = False
             if len(Ws_idx_event) != n_targets: badevt = True
+            n_particles = len(particles_pid_event)
             d1.begin_list(); d2.begin_list()
             for w_idx in Ws_idx_event:
                 eff_w_idx = w_idx
                 d1_ = -1; d2_ = -1
-                for i in range(len(particles_idx_event)):  # limits total steps to length of particles per event
+                for _ in range(n_particles):  # limits total steps to length of particles per event
                     for part_idx, part_pid, part_m1 in zip(particles_idx_event, particles_pid_event, particles_m1_event):
                         if part_m1 == eff_w_idx:
                             if abs(part_pid) == 24: eff_w_idx = part_idx; break
@@ -143,16 +165,15 @@ def get_Wds(particles: ak.Array, n_targets: int, Ws: ak.Array):
                                 else: badevt = True
                         if (d1_ != -1 and d2_ != -1) or badevt: break
                     if (d1_ != -1 and d2_ != -1) or badevt: break
-                d1.append(d1_); d2.append(d2_)
-                if d1_ == -1 or d2_ == -1: badevt = True
+                if (d1_ != -1 and d2_ != -1) and not badevt: d1.append(d1_); d2.append(d2_)
             d1.end_list(); d2.end_list()
-            if badevt: evt_mask.append(0)
-            else: evt_mask.append(1)
-        return d1, d2, evt_mask
+        return d1, d2
 
-    d1, d2, Wdevt_mask = nbWd(n_targets, particles.idx, particles.pid, particles.m1, Ws.idx, ak.ArrayBuilder(), ak.ArrayBuilder(), ak.ArrayBuilder())
-    d1, d2, Wdevt_mask = d1.snapshot(), d2.snapshot(), Wdevt_mask.snapshot()
-    return particles[d1][Wdevt_mask], particles[d2][Wdevt_mask], Wdevt_mask
+    init_d1s, init_d2s = nbWd(n_targets, particles.idx, particles.pid, particles.m1, Ws.idx, ak.ArrayBuilder(), ak.ArrayBuilder())
+    return (
+        final_particle(get_particle_from_idx(particles, init_d1s.snapshot()), particles), 
+        final_particle(get_particle_from_idx(particles, init_d2s.snapshot()), particles)
+    )
 
 
 ################################
@@ -164,8 +185,6 @@ def get_genparts(arrays, n_tops, n_targets, event_mask, top_type: str="hadronic"
     part_status = arrays["GenPart_status"]
     part_statflag = arrays["GenPart_statusFlags"]
     part_m1 = arrays["GenPart_genPartIdxMother"]
-    part_idx = ak.local_index(part_pid)
-    # part_d1 = part_idx[np.argsort(part_idx[arrays["GenPart_genPartIdxMother"]])]
     part_pt = arrays["GenPart_pt"]
     part_eta = arrays["GenPart_eta"]
     part_phi = arrays["GenPart_phi"]
@@ -184,7 +203,7 @@ def get_genparts(arrays, n_tops, n_targets, event_mask, top_type: str="hadronic"
             "status": part_status,
             "statflag": part_statflag,
             "m1": part_m1,
-            "idx": part_idx,
+            "idx": ak.local_index(part_pid),
         },
         with_name="Momentum4D",
     )
@@ -195,19 +214,17 @@ def get_genparts(arrays, n_tops, n_targets, event_mask, top_type: str="hadronic"
 
     ################################
     # Find tops and children
-    bquarks, bevt_mask = get_bs(particles, n_targets)
-    wbosons, Wevt_mask = get_Ws(particles, n_targets)
-    topquarks, tevt_mask = get_ts(particles, n_targets, bquarks, wbosons)
-    wquarks_d1, wquarks_d2, wdsevt_mask = get_Wds(particles, n_targets, wbosons)
+    topquarks = get_ts(particles)
+    bquarks = get_bs(particles)
+    wbosons = get_Ws(particles)
+    wquarks_d1, wquarks_d2 = get_Wds(particles, n_targets, wbosons)
 
     evt_mask = ak.to_numpy(
-        (bevt_mask & Wevt_mask & tevt_mask & wdsevt_mask) & (
-            (ak.num(topquarks, axis=1) == n_targets)
-            & (ak.num(bquarks, axis=1) == n_targets)
-            & (ak.num(wbosons, axis=1) == n_targets)
-            & (ak.num(wquarks_d1, axis=1) == n_targets)
-            & (ak.num(wquarks_d2, axis=1) == n_targets)
-        )
+        (ak.num(topquarks, axis=1) == n_targets)
+        & (ak.num(bquarks, axis=1) == n_targets)
+        & (ak.num(wbosons, axis=1) == n_targets)
+        & (ak.num(wquarks_d1, axis=1) == n_targets)
+        & (ak.num(wquarks_d2, axis=1) == n_targets)
     ).astype(bool)
     top_sort = ak.argsort(topquarks[evt_mask].pt, ascending=False, axis=-1)
     topquarks = ak.to_regular(topquarks[evt_mask][top_sort], axis=1)
