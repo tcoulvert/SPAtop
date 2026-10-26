@@ -118,7 +118,10 @@ def final_particle(intermediates: ak.Array, particles: ak.Array):
 def get_ts(particles: ak.Array):
     init_ts = particles[np.logical_and(
         np.abs(particles.pid) == 6,
-        np.abs(particles.pid[particles.m1]) == 6,
+        np.logical_or(
+            np.abs(particles.pid[particles.m1]) == 21,
+            np.abs(particles.pid[particles.m1]) < 6,
+        )
     )]
     return final_particle(init_ts, particles)
 
