@@ -57,8 +57,10 @@ N_FJETS = lambda n_tops: n_tops + 1
 PLOTS = False
 RNG = np.random.default_rng(seed=21)
 
-TVSQCD_EFFS = {'t': 83.21e-2, 'W': 6.90e-2, 'bq': 19.65e-2, 'QCD': 1e-2}
-WVSQCD_EFFS = {'t': 15.19e-2, 'W': 56.15e-2, 'bq': 9.92e-2, 'QCD': 1e-2}
+# TVSQCD_EFFS = {'t': 83.21e-2, 'W': 6.90e-2, 'bq': 19.65e-2, '-': 1e-2, 'QCD': 1e-2}  # taken from CMS 2022preEE tt -> 4Q
+# WVSQCD_EFFS = {'t': 15.19e-2, 'W': 56.15e-2, 'bq': 9.92e-2, '-': 1e-2, 'QCD': 1e-2}
+TVSQCD_EFFS = {'t': 91.53e-2, 'W': 5.54e-2, 'bq': 32.33e-2, '-': 7.24e-2, 'QCD': 1e-2}  # taken from 2016preVFP ttjets, effs ± (<0.006)
+WVSQCD_EFFS = {'t': 16.17e-2, 'W': 67.76e-2, 'bq': 13.76e-2, '-': 10.26e-2, 'QCD': 1e-2}
 
 ################################
 
@@ -245,7 +247,7 @@ def get_datasets(arrays, file_type, n_tops, n_targets, min_valid_targets):  # no
                 w_fjet_mask, fjets[f"{tag}RN"] < effs['W'], 
                 ak.where(
                     bq_fjet_mask, fjets[f"{tag}RN"] < effs['bq'],
-                    fjets[f"{tag}RN"] < effs['QCD']
+                    fjets[f"{tag}RN"] < (effs['-'] if n_targets > 0 else effs['QCD'])
                 )
             )
         )
