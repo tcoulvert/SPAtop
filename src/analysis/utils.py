@@ -185,7 +185,7 @@ def pureff(func):
         Tops_inds = digiflow(pt, bins)  # index 1 is pt
 
         correctTruth_per_bin = []
-        for bin_i in range(0, len(bins)):
+        for bin_i in range(1, len(bins)+1):
             correctTruth_per_bin.append(retrieved[Tops_inds == bin_i])  # index 0 is correct prediction
         correctTruth_per_bin = ak.Array(correctTruth_per_bin)
 
