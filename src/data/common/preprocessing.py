@@ -269,8 +269,8 @@ def get_datasets(arrays, file_type, n_tops, n_targets, min_valid_targets):  # no
         for tag, effs_map in tagger_effs_map.items():
             print(tag)
             for genmatch, eff_map in effs_map.items():
-                n_pass_tag = ak.sum(fjets[tag][mask_map[genmatch]], axis=None)
-                n_genmatch = ak.sum(mask_map[genmatch], axis=None)
+                n_pass_tag = int(ak.sum(fjets[tag][mask_map[genmatch]], axis=None))
+                n_genmatch = int(ak.sum(mask_map[genmatch], axis=None))
                 eff_map['pass'] += n_pass_tag
                 eff_map['total'] += n_genmatch
                 print(f" - % of Gen-Matched {genmatch} that pass {tag} = {100 * n_pass_tag / n_genmatch:.2f}%")
