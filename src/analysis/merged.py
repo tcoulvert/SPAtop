@@ -35,7 +35,8 @@ def sel_pred_t_by_prob(predicted_jets, predicted_pts, dps, aps):
     selected_predicted_jets = ak.mask(predicted_jets, filter)
     selected_predicted_pts = ak.where(filter, predicted_pts, LUT_FILL_VALUE)
     selected_predicted_dps = ak.where(filter, dps, LUT_FILL_VALUE)
-    selected_predicted_aps = ak.where(filter, dps, LUT_FILL_VALUE)
+    # selected_predicted_aps = ak.where(filter, dps, LUT_FILL_VALUE) #this has a copy paste bug: should be aps, not dps
+    selected_predicted_aps = ak.where(filter, aps, LUT_FILL_VALUE)
 
     return selected_predicted_jets, selected_predicted_pts, selected_predicted_dps, selected_predicted_aps, idx_sel
 
