@@ -1,5 +1,6 @@
 import copy
 import glob
+import json
 import logging
 import os
 import re
@@ -234,21 +235,47 @@ def get_datasets(arrays, file_type, n_tops, n_targets, min_valid_targets):  # no
     ################################
     # PNet tagger emulations
     # apply emulated TvsQCD and WvsQCD bools @ 1.0% QCD eff WPs
-    tops_fjet_mask = ak.any([ak.local_index(fjets) == top_fullyBoosted[f"top{i+1}_bqq"] for i in range(n_tops)], axis=0)
-    w_fjet_mask = ak.any([ak.local_index(fjets) == top_semiResolved_qq[f"top{i+1}_qq"] for i in range(n_tops)], axis=0)
-    bq_fjet_mask = ak.any([ak.local_index(fjets) == top_semiResolved_bq[f"top{i+1}_bq"] for i in range(n_tops)], axis=0)
-    apply_effs_by_mask = lambda tag, effs: ak.where(
-        tops_fjet_mask, fjets[f"{tag}RN"] < effs['t'], 
-        ak.where(
-            w_fjet_mask, fjets[f"{tag}RN"] < effs['W'], 
+    if file_type.lower() == "delphes":
+        tops_fjet_mask = ak.any([ak.local_index(fjets) == top_fullyBoosted[f"top{i+1}_bqq"] for i in range(n_tops)], axis=0)
+        w_fjet_mask = ak.any([ak.local_index(fjets) == top_semiResolved_qq[f"top{i+1}_qq"] for i in range(n_tops)], axis=0)
+        bq_fjet_mask = ak.any([ak.local_index(fjets) == top_semiResolved_bq[f"top{i+1}_bq"] for i in range(n_tops)], axis=0)
+        apply_effs_by_mask = lambda tag, effs: ak.where(
+            tops_fjet_mask, fjets[f"{tag}RN"] < effs['t'], 
             ak.where(
-                bq_fjet_mask, fjets[f"{tag}RN"] < effs['bq'],
-                fjets[f"{tag}RN"] < effs['QCD']
+                w_fjet_mask, fjets[f"{tag}RN"] < effs['W'], 
+                ak.where(
+                    bq_fjet_mask, fjets[f"{tag}RN"] < effs['bq'],
+                    fjets[f"{tag}RN"] < effs['QCD']
+                )
             )
         )
-    )
-    fjets["Ttag"] = apply_effs_by_mask("Ttag", TVSQCD_EFFS)
-    fjets["Wtag"] = apply_effs_by_mask("Wtag", WVSQCD_EFFS)
+        fjets["Ttag"] = apply_effs_by_mask("Ttag", TVSQCD_EFFS)
+        fjets["Wtag"] = apply_effs_by_mask("Wtag", WVSQCD_EFFS)
+    elif file_type.lower() == "nanoaodv9":
+        eff_filepath = 'nanoaodv9_tagger_effs.json'
+        if os.path.exists(eff_filepath):
+            with open(eff_filepath, 'r') as f:
+                tagger_effs_map = json.load(f)
+        else:
+            tagger_effs_map = {
+                'Ttag': {'t': {'pass': 0, 'total': 0}, 'W': {'pass': 0, 'total': 0}, 'bq': {'pass': 0, 'total': 0}, '-': {'pass': 0, 'total': 0}},
+                'Wtag': {'t': {'pass': 0, 'total': 0}, 'W': {'pass': 0, 'total': 0}, 'bq': {'pass': 0, 'total': 0}, '-': {'pass': 0, 'total': 0}}
+            }
+        tops_fjet_mask = ak.any([ak.local_index(fjets) == top_fullyBoosted[f"top{i+1}_bqq"] for i in range(n_tops)], axis=0)
+        w_fjet_mask = ak.any([ak.local_index(fjets) == top_semiResolved_qq[f"top{i+1}_qq"] for i in range(n_tops)], axis=0)
+        bq_fjet_mask = ak.any([ak.local_index(fjets) == top_semiResolved_bq[f"top{i+1}_bq"] for i in range(n_tops)], axis=0)
+        qcd_fjet_mask = (~tops_fjet_mask & ~w_fjet_mask & ~bq_fjet_mask)
+        mask_map = {'t': tops_fjet_mask, 'W': w_fjet_mask, 'bq': bq_fjet_mask, '-': qcd_fjet_mask}
+        for tag, effs_map in tagger_effs_map.items():
+            print(tag)
+            for genmatch, eff_map in effs_map.items():
+                n_pass_tag = ak.sum(fjets[tag][mask_map[genmatch]], axis=None)
+                n_genmatch = ak.sum(mask_map[genmatch], axis=None)
+                eff_map['pass'] += n_pass_tag
+                eff_map['total'] += n_genmatch
+                print(f" - % of Gen-Matched {genmatch} that pass {tag} = {100 * n_pass_tag / n_genmatch:.2f}%")
+        with open(eff_filepath, 'w') as f:
+            json.dump(tagger_effs_map, f)
 
 
     ################################

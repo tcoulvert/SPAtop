@@ -271,7 +271,7 @@ def get_jets(arrays, n_tops, n_targets, njets, nfjets):
     eta = arrays["Jet_eta"]
     phi = arrays["Jet_phi"]
     mass = arrays["Jet_mass"]
-    btag = arrays["Jet_btagDeepB"] > 0.6502  # https://btv-wiki.docs.cern.ch/ScaleFactors/Run2UL2016preVFPNanoAODv9/#ak4-b-tagging
+    btag = arrays["Jet_btagDeepB"] > 0.6502  # DeepJet - 57.5% bjet eff. for 2016preVFP, https://btv-wiki.docs.cern.ch/ScaleFactors/Run2UL2016preVFPNanoAODv9/#ak4-b-tagging
     flavor = arrays["Jet_partonFlavour"]
 
     # large-radius jet info
@@ -279,8 +279,8 @@ def get_jets(arrays, n_tops, n_targets, njets, nfjets):
     fj_eta = arrays["FatJet_eta"]
     fj_phi = arrays["FatJet_phi"]
     fj_mass = arrays["FatJet_mass"]
-    fj_TtagRN = random2D(fj_pt, RNG.random(size=ak.sum(ak.num(fj_pt))), ak.ArrayBuilder()).snapshot()  # FatJet_particleNet_TvsQCD
-    fj_WtagRN = random2D(fj_pt, RNG.random(size=ak.sum(ak.num(fj_pt))), ak.ArrayBuilder()).snapshot()  # FatJet_particleNet_WvsQCD
+    fj_Ttag = arrays["FatJet_particleNet_TvsQCD"] > 0.490  # ParticleNet - 1% QCD eff. for 2016 preVFP, https://cds.cern.ch/record/2929534/files/DP2025_010.pdf
+    fj_Wtag = arrays["FatJet_particleNet_WvsQCD"] > 0.935  # ParticleNet - 1% QCD eff. for 2016 preVFP, https://cds.cern.ch/record/2929534/files/DP2025_010.pdf
     fj_sdmass = arrays["FatJet_msoftdrop"]
     fj_tau21 = np.nan_to_num(arrays["FatJet_tau2"] / arrays["FatJet_tau1"], nan=-1)
     fj_tau32 = np.nan_to_num(arrays["FatJet_tau3"] / arrays["FatJet_tau2"], nan=-1)
@@ -322,10 +322,8 @@ def get_jets(arrays, n_tops, n_targets, njets, nfjets):
             "mass": fj_mass,
             "idx": ak.local_index(fj_pt),
 
-            "TtagRN": fj_TtagRN,
-            "WtagRN": fj_WtagRN,
-            "Ttag": ak.zeros_like(fj_pt),
-            "Wtag": ak.zeros_like(fj_pt),
+            "Ttag": fj_Ttag,
+            "Wtag": fj_Wtag,
             "sdmass": fj_sdmass,
             "tau21": fj_tau21,
             "tau32": fj_tau32,
