@@ -12,22 +12,24 @@ def calc_pur_eff(target_path, pred_path, bins_dict, mode: str='pur_eff', chi2: b
     # open files
     pred_h5 = h5.File(pred_path, "a")
     target_h5 = h5.File(target_path)
+    small_jet_radius = 0.5 if 'collide2v' not in pred_path.lower() and 'cmsttjet' not in pred_path.lower() else 0.4
+    print(f"Using AK{int(10*small_jet_radius)} jets")
 
     ## generate look up tables ##
     # boosted
-    LUT_boosted = parse_merged_w_target(target_h5, pred_h5, reco_regex='FB', chi2=chi2)
+    LUT_boosted = parse_merged_w_target(target_h5, pred_h5, reco_regex='FB', chi2=chi2, small_jet_radius=small_jet_radius)
 
     # semi-resolved
     # qq
-    LUT_semiresolved_qq = parse_merged_w_target(target_h5, pred_h5, reco_regex='SRqq', chi2=chi2)
+    LUT_semiresolved_qq = parse_merged_w_target(target_h5, pred_h5, reco_regex='SRqq', chi2=chi2, small_jet_radius=small_jet_radius)
     # bq
-    LUT_semiresolved_bq = parse_merged_w_target(target_h5, pred_h5, reco_regex='SRbq', chi2=chi2)
+    LUT_semiresolved_bq = parse_merged_w_target(target_h5, pred_h5, reco_regex='SRbq', chi2=chi2, small_jet_radius=small_jet_radius)
 
     # resolved
-    LUT_resolved = parse_merged_w_target(target_h5, pred_h5, reco_regex='FR', chi2=chi2)
+    LUT_resolved = parse_merged_w_target(target_h5, pred_h5, reco_regex='FR', chi2=chi2, small_jet_radius=small_jet_radius)
 
     # merged
-    LUT_merged = parse_merged_w_target(target_h5, pred_h5, chi2=chi2)
+    LUT_merged = parse_merged_w_target(target_h5, pred_h5, chi2=chi2, small_jet_radius=small_jet_radius)
 
 
     ## calculate efficiencies and purities for b+r, b, and r (and srqq, srbq if available) ##

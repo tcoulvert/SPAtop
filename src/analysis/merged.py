@@ -192,7 +192,7 @@ def nbgenerate_LUT(
 
 
 def parse_merged_w_target(
-    testfile, predfile, reco_regex: str='', chi2: bool=False
+    testfile, predfile, reco_regex: str='', chi2: bool=False, small_jet_radius: float=0.5
 ):  
     # handle different pl version
     if "TARGETS" not in predfile.keys():
@@ -206,7 +206,7 @@ def parse_merged_w_target(
     N_TOPS = np.max([int(k) for key in reconstructions for k in key if k.isdigit()])
     print(f"Number of tops: {N_TOPS}")
     jet_labels = {reco: sorted([key for key in predfile["TARGETS"][reco].keys() if 'prob' not in key]) for reco in reconstructions}
-    DELTARS = [[0.8 if n_alpha(label) > 1 else 0.5 for label in jet_labels[reco]] for reco in reconstructions]
+    DELTARS = [[0.8 if n_alpha(label) > 1 else small_jet_radius for label in jet_labels[reco]] for reco in reconstructions]
     SYMMETRIES = get_symmetries(reconstructions, jet_labels)
 
     # jet 4-momentums
