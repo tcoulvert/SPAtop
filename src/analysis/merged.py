@@ -85,6 +85,7 @@ def nbgenerate_LUT(
             # Exact matches
             for pred_idx in order_event:
                 pjets = pjets_event[pred_idx]
+                if pred_idx in values(exact_matched_tops): continue #prevents candidate that exactly matches both tops' targets to be credited to both
                 target_idx = ([pred_idx - i for i in range(1, (pred_idx % N_TOPS)+1)][::-1]+[pred_idx]+[pred_idx + i for i in range(1, N_TOPS-(pred_idx % N_TOPS))])[valid_top_idx]
                 tjets = tjets_event[target_idx]
                 if pjets is None or tjets is None: continue
@@ -94,6 +95,9 @@ def nbgenerate_LUT(
                         if match_jet(pjets[labels[0]], tjets[labels[1]]): n_matched_jets += 1
                     if n_matched_jets == len(symand):
                         exact_matched_tops[valid_top_idx] = pred_idx
+                        break
+                if valid_top_idx in exact_matched_tops: break #prevents candidate that exactly matches both tops' targets to be credited to both
+                
 
         class_matched_tops = nb.typed.Dict.empty(key_type=nb.types.int64, value_type=nb.types.int64)
         for valid_top_idx in valid_tops.keys():
@@ -101,11 +105,14 @@ def nbgenerate_LUT(
             # Class matches
             for pred_idx in order_event:
                 pjets = pjets_event[pred_idx]
-                if pred_idx in values(exact_matched_tops): continue
+                ###if pred_idx in values(exact_matched_tops): continue 
+                #needs to also skip candidates pass already used
+                if pred_idx in values(exact_matched_tops) or pred_idx in values(class_matched_tops): continue
                 target_idx = ([pred_idx - i for i in range(1, (pred_idx % N_TOPS)+1)][::-1]+[pred_idx]+[pred_idx + i for i in range(1, N_TOPS-(pred_idx % N_TOPS))])[valid_top_idx]
                 tjets = tjets_event[target_idx]
                 if pjets is None or tjets is None: continue
                 class_matched_tops[valid_top_idx] = pred_idx
+                break #stop at first acceptable canidate, otherwise loop always ends on worst rank top
 
         valid_matched_tops = nb.typed.Dict.empty(key_type=nb.types.int64, value_type=nb.types.int64)
         for valid_top_idx in valid_tops.keys():
@@ -113,18 +120,23 @@ def nbgenerate_LUT(
             # Valid matches
             for pred_idx in order_event:
                 pjets = pjets_event[pred_idx]
-                if pred_idx in values(exact_matched_tops) or pred_idx in values(class_matched_tops): continue
+                ###if pred_idx in values(exact_matched_tops) or pred_idx in values(class_matched_tops): continue
+                #same thing: needs to skip candidates already used
+                if pred_idx in values(exact_matched_tops) or pred_idx in values(class_matched_tops) or pred_idx in values(valid_matched_tops): continue
                 if pjets is None: continue
                 valid_matched_tops[valid_top_idx] = pred_idx
+                break #stop at first acceptable canidate, otherwise loop always ends on worst rank top
 
         # For each invalid top match any remaining predicted tops
         invalid_matched_tops = nb.typed.Dict.empty(key_type=nb.types.int64, value_type=nb.types.int64)
         for invalid_top_idx in invalid_tops.keys():
             for pred_idx in order_event:
                 pjets = pjets_event[pred_idx]
-                if pred_idx in values(exact_matched_tops) or pred_idx in values(class_matched_tops) or pred_idx in values(valid_matched_tops): continue
+                ###if pred_idx in values(exact_matched_tops) or pred_idx in values(class_matched_tops) or pred_idx in values(valid_matched_tops): continue
+                if pred_idx in values(exact_matched_tops) or pred_idx in values(class_matched_tops) or pred_idx in values(valid_matched_tops) or pred_idx in values(invalid_matched_tops): continue
                 if pjets is None: continue
                 invalid_matched_tops[invalid_top_idx] = pred_idx
+                break
 
         # Place results into Ak Builder
         builder.begin_list()
