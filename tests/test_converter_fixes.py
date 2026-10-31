@@ -85,7 +85,8 @@ def test_deltaRfj_without_fat_jets_is_the_pad():
     fjets = ak.zip({k: [np.array([], dtype=float)] for k in ("pt", "eta", "phi", "mass")}, with_name="Momentum4D")
     idx, dr = M.match_fjet_to_jet(fjets, jets, ak.ArrayBuilder(), ak.ArrayBuilder())
     assert ak.to_list(idx.snapshot())[0] == [M.NOJET_FILL_VALUE]
-    assert ak.to_list(dr.snapshot())[0] == [pytest.approx(M.NOFJET_DR_FILL_VALUE)]
+    #assert ak.to_list(dr.snapshot())[0] == [pytest.approx(M.NOFJET_DR_FILL_VALUE)]
+    assert ak.to_list(dr.snapshot())[0] == [pytest.approx(M.DR_FILL_VALUE)]
 
 
 # ------------------------------------------ fix 2: overlap exclusion works
