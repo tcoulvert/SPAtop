@@ -101,7 +101,7 @@ rich==13.8.0
 scikit-learn==1.5.1
 scipy==1.13.1
 six==1.16.0
-spanet==2.1.1
+-e git+https://github.com/tcoulvert/SPANet
 -e git+https://github.com/tcoulvert/SPAtop.git@fd95a6012312b91a39f7ffc79d2ef7ef694fd2ae#egg=src
 stack-data==0.6.3
 sympy==1.13.2
