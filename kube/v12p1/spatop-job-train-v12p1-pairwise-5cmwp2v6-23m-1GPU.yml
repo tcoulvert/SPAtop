@@ -1,0 +1,72 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ts-spatop-train-v12p1-pairwise-5cmwp2v6-23m-1gpu
+  labels:
+    jobgroup: spatop-job-train
+spec:
+  template:
+    spec:
+      securityContext:
+        runAsUser: 0
+        fsGroup: 0
+      containers:
+        - name: training
+          image: gitlab-registry.nrp-nautilus.io/mquinnan/top-spanet:spatop-container
+          command:
+            - "/bin/bash"
+            - "-c"
+            - |
+              set -e  # exit on error
+
+              echo "Installing SPANet v2.3, tensorboard and rich..."
+              pip install git+https://github.com/tcoulvert/SPANet
+              pip install tensorboard rich
+
+              echo "Starting training job..."
+              python -m spanet.train \
+                -of /data/spatop/options_files/v12p1/pairwise_v12p1_5cmwp2v6.json \
+                -l /data/spatop/logs/ \
+                -n spatop_v12p1_pairwise5cmwp2v6_23m_1GPU_output
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+            - mountPath: /data
+              name: spatopvol
+            - name: git-repo
+              mountPath: /opt/repo
+          resources:
+            limits:
+              memory: 64Gi
+              cpu: "8"
+              nvidia.com/a100: "1"
+            requests:
+              memory: 32Gi
+              cpu: "8"
+              nvidia.com/a100: "1"
+      initContainers:
+        - name: init-clone-repo
+          image: alpine/git
+          args:
+            - clone
+            - --single-branch
+            - https://github.com/quinnanm/SPAtop
+            - -b
+            - meldev
+            - --recurse-submodules
+            - /opt/repo/SPAtop
+          volumeMounts:
+            - name: git-repo
+              mountPath: /opt/repo
+      volumes:
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 8Gi
+        - name: git-repo
+          emptyDir: {}
+        - name: spatopvol
+          persistentVolumeClaim:
+            claimName: traindatavol
+      restartPolicy: Never
+  backoffLimit: 5
