@@ -1,12 +1,16 @@
 import os
 
 import h5py as h5
+import mplhep as hep
 import matplotlib.pyplot as plt
 import numpy as np
 
 from src.analysis.merged import parse_merged_w_target
 from src.analysis.utils import calc_pur, calc_eff
 
+# plt.rcParams.update({'font.size': 20})
+hep.style.use(hep.style.ROOT)
+colors = ['#3f90da', '#ffa90e', '#bd1f01', '#94a4a2', '#832db6', '#92dadd', '#e76300', '#717581', '#b9ac70']
 
 def calc_pur_eff(target_path, pred_path, bins_dict, mode: str='pur_eff', chi2: bool=False):
     # open files
@@ -147,7 +151,7 @@ def plot_pur_eff_w_dict(
 
 
     ## plot purities and efficiencies ##
-    for tag, paths in plot_dict.items():
+    for i, (tag, paths) in enumerate(plot_dict.items()):
         pred_path, target_path = tuple(paths)
         print("Processing", tag)
         if 'chi2' in tag.lower(): chi2 = True
@@ -158,32 +162,36 @@ def plot_pur_eff_w_dict(
         width = lambda centers, xerr: (midpoint(centers) - centers[0]) + xerr[0]
 
         # merged
-        ax_m[0].errorbar(x=bin_centers_dict['all'], y=results["pur_m"], xerr=xerr_dict['all'], yerr=results["purerr_m"], fmt="o", capsize=5, label=tag)
-        ax_m[1].errorbar(x=bin_centers_dict['all'], y=results["eff_m"], xerr=xerr_dict['all'], yerr=results["efferr_m"], fmt="o", capsize=5, label=tag)
+        ax_m[0].errorbar(x=bin_centers_dict['all'], y=results["pur_m"], xerr=xerr_dict['all'], yerr=results["purerr_m"], fmt="o", capsize=5, label=tag, color=colors[i])
+        ax_m[1].errorbar(x=bin_centers_dict['all'], y=results["eff_m"], xerr=xerr_dict['all'], yerr=results["efferr_m"], fmt="o", capsize=5, label=tag, color=colors[i])
+        # ax_m[0].step(x=bin_centers_dict['all'], y=results["pur_m"], label=tag, linewidth=2.0, where='mid', color=colors[i])
+        # ax_m[1].step(x=bin_centers_dict['all'], y=results["eff_m"], label=tag, linewidth=2.0, where='mid', color=colors[i])
+        # ax_m[0].errorbar(x=bin_centers_dict['all'], y=results["pur_m"], yerr=results["purerr_m"], fmt="none", capsize=0, linewidth=2.0, color=colors[i])
+        # ax_m[1].errorbar(x=bin_centers_dict['all'], y=results["eff_m"], yerr=results["efferr_m"], fmt="none", capsize=0, linewidth=2.0, color=colors[i])
         # boosted
         if results["pur_b"] is not None:
-            ax_b[0].errorbar(x=bin_centers_dict['FB'], y=results["pur_b"], xerr=xerr_dict['FB'], yerr=results["purerr_b"], fmt="o", capsize=5, label=tag)
-            ax_b[1].errorbar(x=bin_centers_dict['FB'], y=results["eff_b"], xerr=xerr_dict['FB'], yerr=results["efferr_b"], fmt="o", capsize=5, label=tag)
+            ax_b[0].errorbar(x=bin_centers_dict['FB'], y=results["pur_b"], xerr=xerr_dict['FB'], yerr=results["purerr_b"], fmt="o", capsize=5, label=tag, color=colors[i])
+            ax_b[1].errorbar(x=bin_centers_dict['FB'], y=results["eff_b"], xerr=xerr_dict['FB'], yerr=results["efferr_b"], fmt="o", capsize=5, label=tag, color=colors[i])
             if plot_emu_boost:
                 ax_b[0].errorbar(x=midpoint(bin_centers_dict['FB']), y=0.49, xerr=width(bin_centers_dict['FB'], xerr_dict['FB']), yerr=0.0047, fmt="o", capsize=5, label="PNet TvsQCD Emulation", color="magenta")
                 ax_b[1].errorbar(x=midpoint(bin_centers_dict['FB']), y=0.42, xerr=width(bin_centers_dict['FB'], xerr_dict['FB']), yerr=0.0040, fmt="o", capsize=5, label="PNet TvsQCD Emulation", color="magenta")
                 plot_emu_boost = False
         # resolved
         if results["pur_r"] is not None:
-            ax_r[0].errorbar(x=bin_centers_dict['FR'], y=results["pur_r"], xerr=xerr_dict['FR'], yerr=results["purerr_r"], fmt="o", capsize=5, label=tag)
-            ax_r[1].errorbar(x=bin_centers_dict['FR'], y=results["eff_r"], xerr=xerr_dict['FR'], yerr=results["efferr_r"], fmt="o", capsize=5, label=tag)
+            ax_r[0].errorbar(x=bin_centers_dict['FR'], y=results["pur_r"], xerr=xerr_dict['FR'], yerr=results["purerr_r"], fmt="o", capsize=5, label=tag, color=colors[i])
+            ax_r[1].errorbar(x=bin_centers_dict['FR'], y=results["eff_r"], xerr=xerr_dict['FR'], yerr=results["efferr_r"], fmt="o", capsize=5, label=tag, color=colors[i])
         # semi-resolved qq
         if results["pur_srqq"] is not None:
-            ax_srqq[0].errorbar(x=bin_centers_dict['SRqq'], y=results["pur_srqq"], xerr=xerr_dict['SRqq'], yerr=results["purerr_srqq"], fmt="o", capsize=5, label=tag)
-            ax_srqq[1].errorbar(x=bin_centers_dict['SRqq'], y=results["eff_srqq"], xerr=xerr_dict['SRqq'], yerr=results["efferr_srqq"], fmt="o", capsize=5, label=tag)
+            ax_srqq[0].errorbar(x=bin_centers_dict['SRqq'], y=results["pur_srqq"], xerr=xerr_dict['SRqq'], yerr=results["purerr_srqq"], fmt="o", capsize=5, label=tag, color=colors[i])
+            ax_srqq[1].errorbar(x=bin_centers_dict['SRqq'], y=results["eff_srqq"], xerr=xerr_dict['SRqq'], yerr=results["efferr_srqq"], fmt="o", capsize=5, label=tag, color=colors[i])
             if plot_emu_semi:
                 ax_srqq[0].errorbar(x=midpoint(bin_centers_dict['SRqq']), y=0.89, xerr=width(bin_centers_dict['SRqq'], xerr_dict['SRqq']), yerr=0.0048, fmt="o", capsize=5, label="PNet WvsQCD Emulation", color="magenta")
                 ax_srqq[1].errorbar(x=midpoint(bin_centers_dict['SRqq']), y=0.29, xerr=width(bin_centers_dict['SRqq'], xerr_dict['SRqq']), yerr=0.0013, fmt="o", capsize=5, label="PNet WvsQCD Emulation", color="magenta")
                 plot_emu_semi = False
         # semi-resolved bq
         if results["pur_srbq"] is not None:
-            ax_srbq[0].errorbar(x=bin_centers_dict['SRbq'], y=results["pur_srbq"], xerr=xerr_dict['SRbq'], yerr=results["purerr_srbq"], fmt="o", capsize=5, label=tag)
-            ax_srbq[1].errorbar(x=bin_centers_dict['SRbq'], y=results["eff_srbq"], xerr=xerr_dict['SRbq'], yerr=results["efferr_srbq"], fmt="o", capsize=5, label=tag)
+            ax_srbq[0].errorbar(x=bin_centers_dict['SRbq'], y=results["pur_srbq"], xerr=xerr_dict['SRbq'], yerr=results["purerr_srbq"], fmt="o", capsize=5, label=tag, color=colors[i])
+            ax_srbq[1].errorbar(x=bin_centers_dict['SRbq'], y=results["eff_srbq"], xerr=xerr_dict['SRbq'], yerr=results["efferr_srbq"], fmt="o", capsize=5, label=tag, color=colors[i])
 
 
     ## adjust limits and legends ##
