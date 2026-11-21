@@ -34,6 +34,7 @@ logging.basicConfig(level=logging.INFO)
 MIN_JET_PT = 30  # 20
 MIN_FJET_PT = 150  # 200
 PROJECT_DIR = Path(__file__).resolve().parents[3]
+PLOTS = True
 
 RNG = np.random.default_rng(seed=21)
 
@@ -217,6 +218,151 @@ def get_genparts(arrays, n_tops, n_targets, event_mask, top_type: str="hadronic"
         evt_mask[evt_mask] = (ak.num(good_tops, axis=1) == n_targets)
     print('-'*60+'\n'+f'Nevts passing Jet (Reco) and Particle (Gen) event pre-selection: {ak.sum(evt_mask, axis=0)}')
 
+    if PLOTS:
+        import matplotlib.pyplot as plt
+        import mplhep as hep
+        hep.style.use(hep.style.ROOT)
+
+        tt_minDRs = np.sort([
+            topquarks[:, 0].deltaR(topquarks[:, 1]), 
+            topquarks[:, 0].deltaR(topquarks[:, 2]), 
+            topquarks[:, 0].deltaR(topquarks[:, 3]), 
+            topquarks[:, 1].deltaR(topquarks[:, 2]), 
+            topquarks[:, 1].deltaR(topquarks[:, 3]),
+            topquarks[:, 2].deltaR(topquarks[:, 3]),
+        ], axis=0)
+        bb_minDRs = np.sort([
+            bquarks[:, 0].deltaR(bquarks[:, 1]), 
+            bquarks[:, 0].deltaR(bquarks[:, 2]), 
+            bquarks[:, 0].deltaR(bquarks[:, 3]), 
+            bquarks[:, 1].deltaR(bquarks[:, 2]), 
+            bquarks[:, 1].deltaR(bquarks[:, 3]),
+            bquarks[:, 2].deltaR(bquarks[:, 3]),
+        ], axis=0)
+        bq_minDRs = np.sort([
+            bquarks[:, 0].deltaR(wquarks_d1[:, 1]), 
+            bquarks[:, 0].deltaR(wquarks_d2[:, 1]), 
+            bquarks[:, 1].deltaR(wquarks_d1[:, 0]), 
+            bquarks[:, 1].deltaR(wquarks_d2[:, 0]),
+            #
+            bquarks[:, 0].deltaR(wquarks_d1[:, 2]), 
+            bquarks[:, 0].deltaR(wquarks_d2[:, 2]), 
+            bquarks[:, 2].deltaR(wquarks_d1[:, 0]), 
+            bquarks[:, 2].deltaR(wquarks_d2[:, 0]),
+            #
+            bquarks[:, 0].deltaR(wquarks_d1[:, 3]), 
+            bquarks[:, 0].deltaR(wquarks_d2[:, 3]), 
+            bquarks[:, 3].deltaR(wquarks_d1[:, 0]), 
+            bquarks[:, 3].deltaR(wquarks_d2[:, 0]),
+            ###
+            bquarks[:, 1].deltaR(wquarks_d1[:, 2]), 
+            bquarks[:, 1].deltaR(wquarks_d2[:, 2]), 
+            bquarks[:, 2].deltaR(wquarks_d1[:, 1]), 
+            bquarks[:, 2].deltaR(wquarks_d2[:, 1]),
+            #
+            bquarks[:, 1].deltaR(wquarks_d1[:, 3]), 
+            bquarks[:, 1].deltaR(wquarks_d2[:, 3]), 
+            bquarks[:, 3].deltaR(wquarks_d1[:, 1]), 
+            bquarks[:, 3].deltaR(wquarks_d2[:, 1]),
+            ###
+            bquarks[:, 2].deltaR(wquarks_d1[:, 3]), 
+            bquarks[:, 2].deltaR(wquarks_d2[:, 3]), 
+            bquarks[:, 3].deltaR(wquarks_d1[:, 2]), 
+            bquarks[:, 3].deltaR(wquarks_d2[:, 2]),
+        ], axis=0)
+        qq_minDRs = np.sort([
+            wquarks_d1[:, 0].deltaR(wquarks_d1[:, 1]), 
+            wquarks_d1[:, 0].deltaR(wquarks_d2[:, 1]), 
+            wquarks_d2[:, 0].deltaR(wquarks_d2[:, 1]),
+            #
+            wquarks_d1[:, 0].deltaR(wquarks_d1[:, 2]), 
+            wquarks_d1[:, 0].deltaR(wquarks_d2[:, 2]), 
+            wquarks_d2[:, 0].deltaR(wquarks_d2[:, 2]),
+            #
+            wquarks_d1[:, 0].deltaR(wquarks_d1[:, 3]), 
+            wquarks_d1[:, 0].deltaR(wquarks_d2[:, 3]), 
+            wquarks_d2[:, 0].deltaR(wquarks_d2[:, 3]),
+            ###
+            wquarks_d1[:, 1].deltaR(wquarks_d1[:, 2]), 
+            wquarks_d1[:, 1].deltaR(wquarks_d2[:, 2]), 
+            wquarks_d2[:, 1].deltaR(wquarks_d2[:, 2]),
+            #
+            wquarks_d1[:, 1].deltaR(wquarks_d1[:, 3]), 
+            wquarks_d1[:, 1].deltaR(wquarks_d2[:, 3]), 
+            wquarks_d2[:, 1].deltaR(wquarks_d2[:, 3]),
+            ###
+            wquarks_d1[:, 2].deltaR(wquarks_d1[:, 3]), 
+            wquarks_d1[:, 2].deltaR(wquarks_d2[:, 3]), 
+            wquarks_d2[:, 2].deltaR(wquarks_d2[:, 3]),
+        ], axis=0)
+        bqq_minDRs = np.sort(np.concatenate([bb_minDRs, bq_minDRs, qq_minDRs, qq_minDRs], axis=0), axis=0)
+        plt.figure()
+        plt.hist(bb_minDRs[0, ...], bins=50, range=(0.0, 5.0), histtype='step', alpha=0.8, label=r'min($\Delta R^{b_i}_{b_j}, i\ne j$)')
+        plt.hist(bq_minDRs[0, ...], bins=50, range=(0.0, 5.0), histtype='step', alpha=0.8, label=r'min($\Delta R^{b_i}_{q_j}, i\ne j$)')
+        plt.hist(qq_minDRs[0, ...], bins=50, range=(0.0, 5.0), histtype='step', alpha=0.8, label=r'min($\Delta R^{q_i}_{q_j}, i\ne j$)')
+        plt.hist(bqq_minDRs[0, ...], bins=50, range=(0.0, 5.0), histtype='step', alpha=0.8, label=r'min($\Delta R^{x_i}_{y_j}, i\ne j$)')
+        plt.legend()
+        plt.xlabel(r'$\Delta R$')
+        plt.ylabel('N. Events')
+        plt.savefig('4t_minDRs.png')
+        plt.figure()
+        plt.hist(bb_minDRs[0, ...], bins=20, range=(0.0, 1.0), histtype='step', alpha=0.8, label=r'min($\Delta R^{b_i}_{b_j}, i\ne j$)')
+        plt.hist(bq_minDRs[0, ...], bins=20, range=(0.0, 1.0), histtype='step', alpha=0.8, label=r'min($\Delta R^{b_i}_{q_j}, i\ne j$)')
+        plt.hist(qq_minDRs[0, ...], bins=20, range=(0.0, 1.0), histtype='step', alpha=0.8, label=r'min($\Delta R^{q_i}_{q_j}, i\ne j$)')
+        plt.hist(bqq_minDRs[0, ...], bins=20, range=(0.0, 1.0), histtype='step', alpha=0.8, label=r'min($\Delta R^{x_i}_{y_j}, i\ne j$)')
+        plt.legend()
+        plt.xlabel(r'$\Delta R$')
+        plt.ylabel('N. Events')
+        plt.savefig('4t_minDRs_zoomed.png')
+        ##################
+        plt.figure()
+        plt.hist(bb_minDRs[1, ...], bins=50, range=(0.0, 5.0), histtype='step', alpha=0.8, label=r'min$_{2}(\Delta R^{b_i}_{b_j}, i\ne j)$')
+        plt.hist(bq_minDRs[1, ...], bins=50, range=(0.0, 5.0), histtype='step', alpha=0.8, label=r'min$_{2}(\Delta R^{b_i}_{q_j}, i\ne j)$')
+        plt.hist(qq_minDRs[1, ...], bins=50, range=(0.0, 5.0), histtype='step', alpha=0.8, label=r'min$_{2}(\Delta R^{q_i}_{q_j}, i\ne j)$')
+        plt.hist(bqq_minDRs[1, ...], bins=50, range=(0.0, 5.0), histtype='step', alpha=0.8, label=r'min$_{2}(\Delta R^{x_i}_{y_j}, i\ne j$)')
+        plt.legend()
+        plt.xlabel(r'$\Delta R$')
+        plt.ylabel('N. Events')
+        plt.savefig('4t_2ndminDRs.png')
+        plt.figure()
+        plt.hist(bb_minDRs[1, ...], bins=20, range=(0.0, 1.0), histtype='step', alpha=0.8, label=r'min$_{2}(\Delta R^{b_i}_{b_j}, i\ne j)$')
+        plt.hist(bq_minDRs[1, ...], bins=20, range=(0.0, 1.0), histtype='step', alpha=0.8, label=r'min$_{2}(\Delta R^{b_i}_{q_j}, i\ne j)$')
+        plt.hist(qq_minDRs[1, ...], bins=20, range=(0.0, 1.0), histtype='step', alpha=0.8, label=r'min$_{2}(\Delta R^{q_i}_{q_j}, i\ne j)$')
+        plt.hist(bqq_minDRs[1, ...], bins=20, range=(0.0, 1.0), histtype='step', alpha=0.8, label=r'min$_{2}(\Delta R^{x_i}_{y_j}, i\ne j)$')
+        plt.legend()
+        plt.xlabel(r'$\Delta R$')
+        plt.ylabel('N. Events')
+        plt.savefig('4t_2ndminDRs_zoomed.png')
+        ##################
+        plt.figure()
+        plt.hist(bb_minDRs[2, ...], bins=50, range=(0.0, 5.0), histtype='step', alpha=0.8, label=r'min$_{2}(\Delta R^{b_i}_{b_j}, i\ne j)$')
+        plt.hist(bq_minDRs[2, ...], bins=50, range=(0.0, 5.0), histtype='step', alpha=0.8, label=r'min$_{2}(\Delta R^{b_i}_{q_j}, i\ne j)$')
+        plt.hist(qq_minDRs[2, ...], bins=50, range=(0.0, 5.0), histtype='step', alpha=0.8, label=r'min$_{2}(\Delta R^{q_i}_{q_j}, i\ne j)$')
+        plt.hist(bqq_minDRs[2, ...], bins=50, range=(0.0, 5.0), histtype='step', alpha=0.8, label=r'min$_{2}(\Delta R^{x_i}_{y_j}, i\ne j)$')
+        plt.legend()
+        plt.xlabel(r'$\Delta R$')
+        plt.ylabel('N. Events')
+        plt.savefig('4t_3rdminDRs.png')
+        plt.figure()
+        plt.hist(bb_minDRs[2, ...], bins=20, range=(0.0, 1.0), histtype='step', alpha=0.8, label=r'min$_{2}(\Delta R^{b_i}_{b_j}, i\ne j)$')
+        plt.hist(bq_minDRs[2, ...], bins=20, range=(0.0, 1.0), histtype='step', alpha=0.8, label=r'min$_{2}(\Delta R^{b_i}_{q_j}, i\ne j)$')
+        plt.hist(qq_minDRs[2, ...], bins=20, range=(0.0, 1.0), histtype='step', alpha=0.8, label=r'min$_{2}(\Delta R^{q_i}_{q_j}, i\ne j)$')
+        plt.hist(bqq_minDRs[2, ...], bins=20, range=(0.0, 1.0), histtype='step', alpha=0.8, label=r'min$_{2}(\Delta R^{x_i}_{y_j}, i\ne j)$')
+        plt.legend()
+        plt.xlabel(r'$\Delta R$')
+        plt.ylabel('N. Events')
+        plt.savefig('4t_3rdminDRs_zoomed.png')
+
+        genparts = ak.zip({
+            'topquarks': topquarks,
+            'bquarks': bquarks,
+            'wbosons': wbosons,
+            'wquarks_d1': wquarks_d1,
+            'wquarks_d2': wquarks_d2,
+        })
+        ak.to_parquet(genparts, '4tgenparts.parquet')
+        
+
     return evt_mask, particles[evt_mask], topquarks, bquarks, wbosons, wquarks_d1, wquarks_d2
 
 
@@ -363,5 +509,8 @@ def get_jets(arrays, n_tops, n_targets, njets, nfjets):
 
     # Gen FatJets
     genfjets = genfjets[event_mask]
+
+    ak.to_parquet(jets, '4tjets.parquet')
+    ak.to_parquet(fjets, '4tfjets.parquet')
 
     return event_mask, jets, fjets, genjets, genfjets
