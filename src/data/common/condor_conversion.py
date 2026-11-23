@@ -146,7 +146,7 @@ class LPCCITVanillaSubmitter:
                 submit_file.write("getenv = True\n")
                 submit_file.write(f'+JobQueue = "{self.queue}"\n')
                 if self.location == "CIT":
-                    submit_file.write("+InteractiveUser = true \n")
+                    submit_file.write("+InteractiveUser = True \n")
                     submit_file.write("+SingularityImage = \"{}/public/heptools-compiled.simg\" \n".format(os.getenv('HOME')))
                     submit_file.write('+SingularityBindCVMFS = False \n')
                     submit_file.write("+RunAsOwner = True \n")
