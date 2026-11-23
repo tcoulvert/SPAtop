@@ -99,7 +99,7 @@ class LPCCITVanillaSubmitter:
 
             # Setting up python environment
             executable_file.write("echo \"Retrieving libffi-dev\"\n")
-            executable_file.write("sudo apt-get install libffi-dev\n")
+            executable_file.write("apt-get install libffi-dev\n")
             executable_file.write("echo \"Pulling python to node\"\n")
             executable_file.write("wget https://www.python.org/ftp/python/3.12.6/Python-3.12.6.tar.xz\n")
             
