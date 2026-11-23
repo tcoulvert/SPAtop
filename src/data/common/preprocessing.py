@@ -596,7 +596,8 @@ def main(in_files, in_file_type, out_file, train_frac, n_tops, n_targets, min_va
             list(in_files[i*condor_files_per_job:(i+1)*condor_files_per_job]) 
             for i in range(math.ceil(len(in_files) / condor_files_per_job))
         ]
-        submitter = LPCCITVanillaSubmitter(job_filepaths, in_file_type, out_file, train_frac, n_tops, n_targets, min_valid_targets, queue=condor_queue, memory=condor_memory, cpus=condor_cpus, disk=condor_disk, location=condor_location)
+        # submitter = LPCCITVanillaSubmitter(job_filepaths, in_file_type, out_file, train_frac, n_tops, n_targets, min_valid_targets, queue=condor_queue, memory=condor_memory, cpus=condor_cpus, disk=condor_disk, location=condor_location)
+        submitter = LPCCITVanillaSubmitter([job_filepaths[0][0]], in_file_type, out_file, train_frac, n_tops, n_targets, min_valid_targets, queue=condor_queue, memory=condor_memory, cpus=condor_cpus, disk=condor_disk, location=condor_location)
         submitter.submit()
 
 

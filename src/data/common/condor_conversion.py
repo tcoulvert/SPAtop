@@ -98,6 +98,8 @@ class LPCCITVanillaSubmitter:
             executable_file.write("echo \"-------------------------------------\"\n")
 
             # Setting up python environment
+            executable_file.write("echo \"Retrieving libffi-dev\"\n")
+            executable_file.write("sudo apt-get install libffi-dev\n")
             executable_file.write("echo \"Pulling python to node\"\n")
             executable_file.write("wget https://www.python.org/ftp/python/3.12.6/Python-3.12.6.tar.xz\n")
             
@@ -134,12 +136,14 @@ class LPCCITVanillaSubmitter:
             os.system(f"chmod 775 {job_file_executable}")
             
             with open(job_file_submit, "w") as submit_file:
-                submit_file.write(f"executable = {job_file_executable}\n")
-                submit_file.write("arguments = $(ProcId)\n")
-                submit_file.write(f"output = {job_file_out}\n")
-                submit_file.write(f"error = {job_file_err}\n")
-                submit_file.write(f"log = {job_file_log}\n")
-                submit_file.write(f"request_memory = {self.memory}\n")
+                if self.location == "CIT":
+                    submit_file.write("Universe = vanilla \n")
+                submit_file.write(f"Executable = {job_file_executable}\n")
+                submit_file.write("Arguments = $(ProcId)\n")
+                submit_file.write(f"Output = {job_file_out}\n")
+                submit_file.write(f"Error = {job_file_err}\n")
+                submit_file.write(f"Log = {job_file_log}\n")
+                submit_file.write(f"RequestMemory = {self.memory}\n")
                 if self.location == "CIT":
                     submit_file.write(f"RequestCpus = {self.cpus} \n")
                     submit_file.write(f"RequestDisk = {self.disk} \n")
@@ -151,14 +155,14 @@ class LPCCITVanillaSubmitter:
                     submit_file.write('+SingularityBindCVMFS = False \n')
                     submit_file.write("+RunAsOwner = True \n")
                     submit_file.write("x509userproxy = {}/x509_proxy \n".format(os.getenv('HOME')))
-                submit_file.write(f"should_transfer_files = YES\n")
+                submit_file.write(f"Should_transfer_files = YES\n")
                 submit_file.write(f"Transfer_Input_Files = {proxy}\n")
                 submit_file.write(f"Transfer_Output_Files = \"\"\n")
-                submit_file.write(f'when_to_transfer_output = ON_EXIT\n')
+                submit_file.write(f'When_to_transfer_output = ON_EXIT_OR_EVICT\n')
 
                 submit_file.write('on_exit_remove = (ExitBySignal == False) && (ExitCode == 0)\n')
                 submit_file.write('max_retries = 0\n')
-                submit_file.write(f"queue {n_jobs}\n")
+                submit_file.write(f"Queue {n_jobs}\n")
             self.job_files.append(job_file_submit)
             
 
